@@ -66,8 +66,8 @@ The special file that contain stereo information (calibInfoStereo.txt) has the f
 The only difference is that the Directory has to contain a pair of images LefPrefixFile1 and RightPrefixFile1
 that are images of the same scene taken from left and right cameras respectively.
 
-In case of stereo calibration %W %EMAX %CheckExtraction from the first file are used 
-(the one that has stereo information)
+In case of stereo calibration %W, %EMAX, and %CheckExtraction from the first file are used 
+(the one that has stereo information).
 
 
 RECOMMENDATIONS
