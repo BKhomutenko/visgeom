@@ -1,3 +1,9 @@
+The project allows you to calibrate your camera using an enhanced unified camera model,
+or you can change some code to calibrate your own camera model.
+The program uses images of a chessboard calibration pattern.
+It extracts corners automatically, you just need to check visually the extraction and discard 
+difficult images.
+
 INSTALLATION
 
 Requred packages:
@@ -5,7 +11,7 @@ Requred packages:
 * Eigen3
 * OpenCV 2.4.9+
 
-After you have installed the needed libraries, go to the directory visgeom and run in bash:
+After you have installed the needed libraries, go to the directory visgeom in the terminal and run:
 ```
 $ cmake .
 $ make 
