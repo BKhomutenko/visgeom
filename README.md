@@ -1,4 +1,5 @@
 INSTALLATION
+
 Requred packages:
 * ceres-solver 1.10.0+
 * Eigen3
@@ -10,6 +11,7 @@ $ cmake .
 $ make 
 ```
 CALIBRATION
+
 (The file formatting will be changed to xml or yaml in the nearest future, the given version is temporary)
 To run the calibration process you need to write calibration info files.
 ex_calibrate.txt is an example of such file
@@ -71,6 +73,7 @@ In case of stereo calibration %W, %EMAX, and %CheckExtraction from the first fil
 
 
 RECOMMENDATIONS
+
 First try to perform monocular calibration for each camera separately.
 start always with %CheckExtraction = 1 and then just delete from the file names 
 of images for which the extraction fails or is incorrect.
@@ -81,6 +84,7 @@ standard deviation (Ex and Ey in the output). Then you can take for example 3*Ex
 
 
 RECTIFICATION AND UNDISTORTION
+
 This program is used to check how the model cope with undistortion part.
 Example:
 $ ./rectify ex_undistort_rectify.txt
@@ -97,6 +101,7 @@ The structure of ex_undistort_rectify.txt:
 ```
 
 TECHNICAL DETAILS
+
 The transformations in the software are represented by translation vector and 
 uTheta rotation vector (normalized vector represents the axis of rotation, the norm is the angle in radians)
 
