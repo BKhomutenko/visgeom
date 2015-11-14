@@ -34,7 +34,7 @@ inline T logistic(T x)
 }
 
 template<typename T> 
-struct MeiProjector
+struct EnhancedProjector
 {
     static inline bool compute(const T* params, const T* src, T* dst)
     {
@@ -50,7 +50,7 @@ struct MeiProjector
         const T & z = src[2];
         
         T denom = alpha * sqrt(z*z + beta*(x*x + y*y)) + (T(1.) - alpha) * z;
-
+        if (denom < 1e-3) return false;
         // Project the point to the mu plane
         T xn = x / denom;
         T yn = y / denom;
@@ -62,18 +62,18 @@ struct MeiProjector
     } 
 };
 
-class MeiCamera : public ICamera
+class EnhancedCamera : public ICamera
 {
 public:
     using ICamera::params;
     using ICamera::width;
     using ICamera::height;
-    MeiCamera(int W, int H, const double * const parameters) : ICamera(W, H, 6)
+    EnhancedCamera(int W, int H, const double * const parameters) : ICamera(W, H, 6)
     {  
         ICamera::setParameters(parameters);
     }
 
-    MeiCamera(const double * const parameters)  : ICamera(1, 1, 6)
+    EnhancedCamera(const double * const parameters)  : ICamera(1, 1, 6)
     {  
         ICamera::setParameters(parameters);
     }
@@ -111,7 +111,7 @@ public:
     virtual bool projectPoint(const Vector3d & src, Vector2d & dst) const
     {
 
-        return MeiProjector<double>::compute(params.data(), src.data(), dst.data());
+        return EnhancedProjector<double>::compute(params.data(), src.data(), dst.data());
     }
     
     virtual bool projectionJacobian(const Vector3d & src, Eigen::Matrix<double, 2, 3> & Jac) const
@@ -143,9 +143,9 @@ public:
     }
     
     
-    virtual MeiCamera * clone() const { return new MeiCamera(width, height, params.data()); }
+    virtual EnhancedCamera * clone() const { return new EnhancedCamera(width, height, params.data()); }
     
-    virtual ~MeiCamera() {}
+    virtual ~EnhancedCamera() {}
 };
 
 #endif

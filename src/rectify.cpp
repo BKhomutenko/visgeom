@@ -100,7 +100,7 @@ public:
 void initRemap(const array<double, 6> & params1, const array<double, 3> & params2,
     fMat & mapX, fMat & mapY, const array<double, 3> & rot)
 {
-    MeiCamera cam1(params1.data());
+    EnhancedCamera cam1(params1.data());
     Pinhole cam2(params2[0], params2[1], params2[2]);
     vector<Vector2d> imagePoints;
     mapX.create(params2[1]*2, params2[0]*2);

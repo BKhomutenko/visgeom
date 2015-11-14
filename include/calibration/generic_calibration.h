@@ -136,7 +136,7 @@ public:
         }
 
         calibData.projection.resize(Nx * Ny);
-        for (unsigned int i = 0; i < Nx * Ny; i++)
+        for (int i = 0; i < Nx * Ny; i++)
         {
             calibData.projection[i] = Vector2d(centers[i].x, centers[i].y);
         }
@@ -146,7 +146,7 @@ public:
     void constructGrid()
     {
         grid.resize(Nx * Ny);
-        for (unsigned int i = 0; i < Nx * Ny; i++)
+        for (int i = 0; i < Nx * Ny; i++)
         {
             grid[i] = Vector3d(sqSize * (i % Nx), sqSize * (i / Nx), 0);
         }
@@ -165,7 +165,7 @@ public:
             //compute initial orientation
             
             auto v = calibDataVec[i].projection[1] - calibDataVec[i].projection[0];
-            float alpha = atan2(-v[1], v[0]);
+            float alpha = atan2(v[1], v[0]);
             calibDataVec[i].extrinsic->data()[5] = alpha;
             
             //optimize the position
@@ -189,7 +189,7 @@ public:
             vector<CalibrationData> & calibDataVec)
     {
         typedef DynamicAutoDiffCostFunction<GridProjection<Projector>> projectionCF;
-        for (unsigned int i = 0; i < calibDataVec.size(); i++)
+        for (int i = 0; i < calibDataVec.size(); i++)
         {
             GridProjection<Projector> * boardProjection;
             boardProjection = new GridProjection<Projector>(calibDataVec[i].projection, grid);
@@ -219,7 +219,7 @@ public:
         circle(errorPlot, Point(200, 200), 50, 0.4, 1);
         circle(errorPlot, Point(200, 200), 100, 0.4, 1);
         circle(errorPlot, Point(200, 200), 150, 0.4, 1);
-        for (unsigned int ptIdx = 0; ptIdx < calibDataVec.size(); ptIdx++)
+        for (int ptIdx = 0; ptIdx < calibDataVec.size(); ptIdx++)
         {
                 vector<Vector3d> transfModelVec;
                 Transformation<double> TrefGrid(calibDataVec[ptIdx].extrinsic->data());
@@ -237,7 +237,7 @@ public:
                 Mat frame = imread(calibDataVec[ptIdx].fileName, 0);
 
                 bool outlierDetected = false;
-                for (unsigned int i = 0; i < Nx * Ny; i++)
+                for (int i = 0; i < Nx * Ny; i++)
                 {
                     Vector2d p = calibDataVec[ptIdx].projection[i];
                     Vector2d pModel = projModelVec[i];

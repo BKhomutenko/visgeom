@@ -35,11 +35,11 @@ int main(int argc, char** argv) {
 
     Transformation<double> xi(0, 0, 0, 0, 0, 0);
 
-    IntrinsicCameraCalibration<MeiProjector> calibLeft;
-    IntrinsicCameraCalibration<MeiProjector> calibRight;
+    IntrinsicCameraCalibration<EnhancedProjector> calibLeft;
+    IntrinsicCameraCalibration<EnhancedProjector> calibRight;
 
 
-    ExtrinsicCameraCalibration<MeiProjector> calibStereo;
+    ExtrinsicCameraCalibration<EnhancedProjector> calibStereo;
 
     if (calibStereo.initialize(argv[1], argv[2], argv[3]))
     {

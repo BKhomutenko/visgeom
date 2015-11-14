@@ -47,10 +47,13 @@ struct GridProjection
         for (unsigned int i = 0; i < transformedPoints.size(); i++)
         {
             Vector2<T> modProj;
-            Projector<T>::compute(params[0], transformedPoints[i].data(), modProj.data());
+            if (not Projector<T>::compute(params[0], transformedPoints[i].data(), modProj.data())) 
+            {
+                return false;
+            }
             Vector2<T> diff = _proj[i].template cast<T>() - modProj;
-            residual[2*i] = T(diff[0]);
-            residual[2*i + 1] = T(diff[1]);
+            residual[2*i] = diff[0];
+            residual[2*i + 1] = diff[1];
         }
         return true;
     }
@@ -83,8 +86,8 @@ struct GridEstimate
             Vector2<T> modProj;
             Projector<T>::compute(camParamsT.data(), transformedPoints[i].data(), modProj.data());
             Vector2<T> diff = _proj[i].template cast<T>() - modProj;
-            residual[2*i] = T(diff[0]);
-            residual[2*i + 1] = T(diff[1]);
+            residual[2*i] = diff[0];
+            residual[2*i + 1] = diff[1];
         }
         return true;
     }

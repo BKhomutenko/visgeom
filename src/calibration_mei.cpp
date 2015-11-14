@@ -23,7 +23,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "geometry.h"
 #include "vision.h"
-#include "eucm.h"
+#include "mei.h"
 #include "calibration.h"
 
 using namespace cv;
@@ -31,10 +31,10 @@ using Eigen::JacobiSVD;
 int main(int argc, char** argv) {
 
     // Intrinsic calibration
-    vector<double> params{0.5, 1, 500, 500, 500, 500};
+    vector<double> params{0.2, 0, 0, 0, 0, 0, 1000, 1000, 500, 500};
 
     Transformation<double> xi(0, 0, 0, 0, 0, 0);
-    IntrinsicCameraCalibration<EnhancedProjector> calib;
+    IntrinsicCameraCalibration<MeiProjector> calib;
 
     if (calib.initialize(argv[1]))
     {

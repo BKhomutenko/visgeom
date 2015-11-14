@@ -21,6 +21,13 @@ add_executable( calibration
 target_link_libraries( calibration ${OpenCV_LIBS} )
 TARGET_LINK_LIBRARIES( calibration ${CERES_LIBRARIES})
 
+add_executable( calibration_mei
+    src/calibration_mei.cpp
+)
+
+target_link_libraries( calibration_mei ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( calibration_mei ${CERES_LIBRARIES})
+
 add_executable( calibration_stereo
     src/calibration_stereo.cpp
 )
