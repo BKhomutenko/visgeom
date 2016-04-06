@@ -48,7 +48,8 @@ public:
             : Transform12(T12), 
             cam1(imageWidth, imageHeight, params1), 
             cam2(imageWidth, imageHeight, params2),
-            dispMax(64), verticalMargin(100), blockSize(5)
+            dispMax(64), verticalMargin(100), blockSize(5),
+            lambdaStep(8), lambdaJump(32)
             { init(); }
 
     void setTransformation(Transformation<double> T12) 
@@ -71,6 +72,8 @@ public:
         computeEpipolarCurves();
     }
     
+    // **EPIPOLAR GEOMETRY**
+    
     // computes reconstVec -- reconstruction of every pixel of the first image
     void computeReconstructed();
     
@@ -87,15 +90,18 @@ public:
     // calculate the coefficients of the polynomials for all the 
     void computeEpipolarCurves();
     
+    // to visualize the epipolar lines
+    void traceEpipolarLine(cv::Point pt, cv::Mat_<uint8_t> & out);
+    
+    
+    // **DYNAMIC PROGRAMMING**
     // fills up the output with photometric errors between the val = I1(pi) and 
     // the values from I2 on the epipolar curve
     void computeCost(const cv::Mat_<uint8_t> & img1, const cv::Mat_<uint8_t> & img2, cv::Mat_<uint8_t> & out);
     
     void computeDynamicProgramming(const cv::Mat_<uint8_t> & costMat, cv::Mat_<int> & out);
     
-    // to visualize the epipolar lines
-    void traceEpipolarLine(cv::Point pt, cv::Mat_<uint8_t> & out);
-    
+    void computeDynamicStep(const int* inCost, const uint8_t * error, int * outCost);
 private:
     Transformation<double> Transform12;  // pose of the first to the second camera
     EnhancedCamera cam1, cam2;
@@ -112,8 +118,13 @@ private:
     vector<Polynomial2> epipolarVec;  // the epipolar curves represented by polynomial functions
     
     int dispMax; //maximum shift along the epipolar
-    int verticalMargin;  //number of rows that we skip from the top and bottom of the image
+    int u0, v0, uMax, vMax;  // the active rectangle 
     int blockSize;
     
+    int lambdaStep, lambdaJump;
+    
+    cv::Mat_<uint8_t> errorBuffer;
+    cv::Mat_<int> tableauLeft, tableauRight;
+    cv::Mat_<int> tableauTop, tableauBottom;
 };
 
