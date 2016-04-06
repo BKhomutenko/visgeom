@@ -40,16 +40,17 @@ using namespace std;
 
 typedef CurveRasterizer<Polynomial2> EpipolarRasterizer;
 
-class StereoEUCM
+class EnhancedStereo
 {
 public:
-    StereoEUCM(Transformation<double> T12, int imageWidth, int imageHeight,
+    EnhancedStereo(Transformation<double> T12, int imageWidth, int imageHeight,
             const double * params1, const double * params2)
             : Transform12(T12), 
             cam1(imageWidth, imageHeight, params1), 
             cam2(imageWidth, imageHeight, params2),
-            dispMax(64), verticalMargin(100), blockSize(5),
-            lambdaStep(6), lambdaJump(20)
+            dispMax(64), blockSize(5),
+            lambdaStep(6), lambdaJump(20),
+            u0(150), v0(200), uMax(imageWidth - 150), vMax(imageHeight - 200)
             { init(); }
 
     void setTransformation(Transformation<double> T12) 
@@ -72,7 +73,7 @@ public:
         computeEpipolarCurves();
     }
     
-    // **EPIPOLAR GEOMETRY**
+    //// EPIPOLAR GEOMETRY
     
     // computes reconstVec -- reconstruction of every pixel of the first image
     void computeReconstructed();
@@ -94,12 +95,15 @@ public:
     void traceEpipolarLine(cv::Point pt, cv::Mat_<uint8_t> & out);
     
     
-    // **DYNAMIC PROGRAMMING**
+    //// DYNAMIC PROGRAMMING
+    
     // fills up the output with photometric errors between the val = I1(pi) and 
     // the values from I2 on the epipolar curve
     void comuteStereo(const cv::Mat_<uint8_t> & img1, 
             const cv::Mat_<uint8_t> & img2,
             cv::Mat_<uint8_t> & disparity);
+    
+    void createBuffer();
     
     void computeCost(const cv::Mat_<uint8_t> & img1, const cv::Mat_<uint8_t> & img2);
     
@@ -111,15 +115,20 @@ public:
     
     void upsampleDisparity(const cv::Mat_<uint8_t> & img1, cv::Mat_<uint8_t> & disparity);
     
-    void getLinearIdx(int row, int col) { return cam1.width*row + col; }
+    //// MISCELLANEOUS
     
-    void uSmall(int u) { return (u - u0) / blockSize; }
+    int getLinearIdx(int row, int col) { return cam1.width*row + col; }
     
-    void uBig(int u) { return u * blockSize + blockSize/2 + u0; }
+    int uSmall(int u) { return (u - u0) / blockSize; }
     
-    void vSmall(int v) { return (v - v0) / blockSize; }
+    int uBig(int u) { return u * blockSize + blockSize/2 + u0; }
     
-    void vBig(int v) { return v * blockSize + blockSize/2 + v0; }
+    int vSmall(int v) { return (v - v0) / blockSize; }
+    
+    int vBig(int v) { return v * blockSize + blockSize/2 + v0; }
+    
+    int smallWidth() { return uSmall(uMax - 1) + 1; }
+    int smallHeight() { return vSmall(vMax - 1) + 1; }
     
 private:
     Transformation<double> Transform12;  // pose of the first to the second camera

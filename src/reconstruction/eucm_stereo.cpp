@@ -43,7 +43,7 @@ using cv::Point;
 using cv::Mat_;
 using cv::Size;
 
-void StereoEUCM::computeEpipole()
+void EnhancedStereo::computeEpipole()
 {
     Vector3d t21 = Transform12.transInv();
     cam2.projectPoint(t21, epipole);
@@ -51,7 +51,7 @@ void StereoEUCM::computeEpipole()
     epipolePx.y = round(epipole[1]);
 }
 
-void StereoEUCM::computeReconstructed()
+void EnhancedStereo::computeReconstructed()
 {
     vector<Eigen::Vector2d> imagePointVec;
     imagePointVec.reserve(cam1.width*cam1.height);
@@ -65,12 +65,12 @@ void StereoEUCM::computeReconstructed()
     cam1.reconstructPointCloud(imagePointVec, reconstVec);
 }
 
-void StereoEUCM::computeRotated()
+void EnhancedStereo::computeRotated()
 {
     Transform12.inverseRotate(reconstVec, reconstRotVec);
 }
 
-void StereoEUCM::computePinf()
+void EnhancedStereo::computePinf()
 {
     cam2.projectPointCloud(reconstRotVec, pinfVec);
     pinfPxVec.resize(pinfVec.size());
@@ -82,7 +82,7 @@ void StereoEUCM::computePinf()
         
 }
 
-void StereoEUCM::computeEpipolarCurves()
+void EnhancedStereo::computeEpipolarCurves()
 {
     Vector3d t21 = Transform12.transInv();
     epipolarVec.clear();
@@ -141,7 +141,7 @@ void StereoEUCM::computeEpipolarCurves()
     }    
 }
 
-void StereoEUCM::traceEpipolarLine(Point pt, Mat_<uint8_t> & out)
+void EnhancedStereo::traceEpipolarLine(Point pt, Mat_<uint8_t> & out)
 {
     int idx = pt.y * cam1.width + pt.x;
     cout << idx << endl;
@@ -161,24 +161,37 @@ void StereoEUCM::traceEpipolarLine(Point pt, Mat_<uint8_t> & out)
     }
 }
 
-void StereoEUCM::computeCost(const cv::Mat_<uint8_t> & img1,
-        const cv::Mat_<uint8_t> & img2, cv::Mat_<uint8_t> & out)
+void EnhancedStereo::createBuffer()
 {
-    assert(img1.cols == cam1.width and img1.rows == cam1.height);
-    int bufferWidth = floor(img1.cols / blockSize)*dispMax;
-    int bufferHeight = floor(img1.rows / blockSize);
-    if (bufferWidth != out.cols or bufferHeight != out.rows)
+    int bufferWidth = smallWidth()*dispMax;
+    if (errorBuffer.cols != bufferWidth or errorBuffer.rows != smallHeight())
     {
-        out = Mat_<uint8_t>(Size(bufferWidth, bufferHeight));
+        errorBuffer = Mat_<uint8_t>(Size(bufferWidth, smallHeight()));
     }
-    double T1 = 0, T2 = 0;
-    int halfBlockSize = blockSize / 2;
-    for (int v = verticalMargin; v < img1.rows - verticalMargin; v += blockSize)
+    array<Mat_<int>, 4> tableauArr = {tableauLeft, tableauRight, tableauTop, tableauBottom};
+    for (auto & tableau : tableauArr)
     {
-        for (int u = 2*dispMax; u < img1.cols - 2*dispMax; u += blockSize)
+        if (tableau.cols != bufferWidth or tableau.rows != smallHeight())
         {
-            int idx = cam1.width * v + u;
-            uint8_t * outPtr = out.data + int(floor(u / blockSize)*dispMax + bufferWidth*floor(v / blockSize));
+            tableau = Mat_<int>(Size(bufferWidth, smallHeight()));
+        }
+    }
+    if (smallDisparity.cols != smallWidth() or smallDisparity.rows != smallHeight())
+    {
+        smallDisparity = Mat_<uint8_t>(Size(smallWidth(), smallHeight()));
+    }
+}
+
+void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t> & img2)
+{
+    double T1 = 0, T2 = 0; // time profiling
+    int halfBlockSize = blockSize / 2;
+    for (int v = 0; v < smallHeight(); v++)
+    {
+        for (int u = 0; u < smallWidth(); u++)
+        {
+            int idx = getLinearIdx(vBig(v), uBig(u));
+            uint8_t * outPtr = errorBuffer.row(v).data + u*dispMax;
             
             Point pinf = pinfPxVec[idx];
             CurveRasterizer<Polynomial2> raster(pinf.x, pinf.y, epipolePx.x, epipolePx.y, epipolarVec[idx]);
@@ -224,219 +237,102 @@ void StereoEUCM::computeCost(const cv::Mat_<uint8_t> & img1,
     cout << "write " << T2 / CLOCKS_PER_SEC << endl;
 } 
 
-
-void StereoEUCM::computeDynamicProgramming(const cv::Mat_<uint8_t> & costMat, cv::Mat_<int> & out)
+void EnhancedStereo::computeDynamicStep(const int* inCost, const uint8_t * error, int * outCost)
 {
-    if (out.cols != costMat.cols or out.rows != costMat.rows*3)
+    bestCost = inCost[0];
+    for (int i = 1; i < dispMax; i++)
     {
-        // out contains 4 tableaux for DP
-        // the first two are horizontal (from left, from right)
-        // the second two are vertical (top-down, bottom-up);
-        out = Mat_<int>(costMat.rows*4, costMat.cols);
-        cout << out.size() << endl;
-        out.setTo(0);
-        cout << "Reset" << endl;
+        bestCost = min(bestCost, inCost[i]);
     }
-    cout << "out created " << out.size() << endl;
-    cout << costMat.rows << endl;
-    int lambdaJump = 32;
-    int lambdaStep = 8;
-    
+    int & val0 = outCost[0];
+    val0 = inCost[0];
+    val0 = min(val0, inCost[1] + lambdaStep);
+    val0 = min(val0, bestCost + lambdaJump);
+    val0 += error[0];
+    for (int i = 1; i < dispMax-1; i++)
+    {
+        int & val = outCost[i];
+        val = inCost[i];
+        val = min(val, inCost[i + 1] + lambdaStep);
+        val = min(val, inCost[i - 1] + lambdaStep);
+        val = min(val, bestCost + lambdaJump);
+        val += error[i];
+    }
+    int & vald = outCost[dispMax - 1];
+    vald = inCost[dispMax - 1];
+    vald = min(vald, inCost[dispMax - 2] + lambdaStep);
+    vald = min(vald, bestCost + lambdaJump);
+    vald += error[dispMax - 1];
+}
+
+void EnhancedStereo::computeDynamicProgramming()
+{
+ 
     // left tableau init
-    for (int v = verticalMargin/blockSize; v < costMat.rows - verticalMargin/blockSize; v++)
+    for (int v = 0; v < smallHeight(); v++)
     {
-        int bestCost = 256;
-        auto outRow = out.row(v);
-        auto costRow = costMat.row(v);
-        for (int d = 0; d < dispMax; d++)
+        int * tableauRow = (int *)(tableauLeft.row(v).data);
+        uint8_t * errorRow = errorBuffer.row(v).data;
+        // init the first row
+        copy(errorRow, errorRow + dispMax, tableauRow);
+
+        for (int u = 1; u < smallWidth(); u++)
         {
-            outRow(d) = costRow(d);
-            bestCost = min( bestCost, int(outRow(d)) );
+            computeDynamicStep(tableauRow + (u - 1)*dispMax, errorRow + u*dispMax, tableauRow + u*dispMax);
         }
-        for (int u = 1; u < costMat.cols / dispMax; u++)
-        {
-//            cout << "COL : " << u << endl;
-            int val0;
-            val0 = outRow((u - 1)*dispMax);
-            val0 = min(val0, outRow((u - 1)*dispMax + 1) + lambdaStep);
-            val0 = min(val0, bestCost + lambdaJump);
-            outRow(u*dispMax) = val0 + costRow(u*dispMax);
-            for (int d = 1; d < dispMax-1; d++)
-            {
-                int val = outRow((u - 1)*dispMax + d);
-                val = min(val, outRow((u - 1)*dispMax + d + 1) + lambdaStep);
-                val = min(val, outRow((u - 1)*dispMax + d - 1) + lambdaStep);
-                val = min(val, bestCost + lambdaJump);
-                outRow(u*dispMax + d) = val + costRow(u*dispMax + d);
-//                cout << d << " " << val + costRow(u*dispMax + d) << " " 
-//              << int(costRow(u*dispMax + d)) << endl;
-            }
-            int vald = outRow(u*dispMax - 1);
-            vald = min(vald, outRow(u*dispMax - 2) + lambdaStep);
-            vald = min(vald, bestCost + lambdaJump);
-            outRow((u + 1)*dispMax - 1) = vald + costRow((u + 1)*dispMax - 1);
-            bestCost = outRow(u*dispMax);
-            for (int d = 1; d < dispMax; d++)
-            {
-                bestCost = min(bestCost, int(outRow(u*dispMax + d)));
-            }
-//            cout << "Best : " << bestCost << endl;
-//            cout << endl;
-        }
-        
     }
-    
         
     // right tableau init
-    for (int v =  verticalMargin/blockSize; v < costMat.rows - verticalMargin/blockSize; v++)
+    for (int v = 0; v < smallHeight(); v++)
     {
-//        cout << v << endl;
-        int bestCost = 256;
-        auto outRow = out.row(costMat.rows + v);
-        auto costRow = costMat.row(v);
-        for (int u = costMat.cols - dispMax; u < costMat.cols; u++)
-        {
-            outRow(u) = costRow(u);
-            bestCost = min( bestCost, int(outRow(u)) );
-        }
-//        cout << 111 << endl;
-        for (int u = costMat.cols / dispMax - 2; u >= 0; u--)
-        {
-//            cout << "COL : " << u << endl;
-            int val0;
-            val0 = outRow((u + 1)*dispMax);
-            val0 = min(val0, outRow((u + 1)*dispMax + 1) + lambdaStep);
-            val0 = min(val0, bestCost + lambdaJump);
-            outRow(u*dispMax) = val0 + costRow(u*dispMax);
-            for (int d = 1; d < dispMax-1; d++)
-            {
-                int val = outRow((u + 1)*dispMax + d);
-                val = min(val, outRow((u + 1)*dispMax  + d + 1) + lambdaStep);
-                val = min(val, outRow((u + 1)*dispMax  + d - 1) + lambdaStep);
-                val = min(val, bestCost + lambdaJump);
-                outRow(u*dispMax + d) = val + costRow(u*dispMax + d);
-//                cout << d << " " << val + costRow(u*dispMax + d) << " " 
-//              << int(costRow(u*dispMax + d)) << endl;
-            }
-//            cout << u << endl;
-            int vald = outRow((u + 2)*dispMax - 1);
-            vald = min(vald, outRow((u + 2)*dispMax - 2) + lambdaStep);
-            vald = min(vald, bestCost + lambdaJump);
-            outRow((u + 1)*dispMax - 1) = vald + costRow((u + 1)*dispMax - 1);
-            bestCost = outRow(u*dispMax);
-            for (int d = 1; d < dispMax; d++)
-            {
-                bestCost = min(bestCost, int(outRow(u*dispMax + d)));
-            }
-//            cout << "Best : " << bestCost << endl;
-//            cout << endl;
-        }
+        int * tableauRow = (int *)(tableauLeft.row(v).data);
+        uint8_t * errorRow = errorBuffer.row(v).data;
+        // init the first row
+        int base = (smallWidth() - 1) * dispMax;
+        copy(errorRow + base, errorRow + base + dispMax, tableauRow + base);
         
+        for (int u = smallWidth() - 2; u >= 0; u--)
+        {
+            computeDynamicStep(tableauRow + (u + 1)*dispMax, errorRow + u*dispMax, tableauRow + u*dispMax);
+        }
     }
     
-//    lambdaJump = 100;
-//    lambdaStep = 1;
-    const int G = 2;
     // top-down tableau init
-    for (int x =  0; x < costMat.cols; x+= dispMax)
+    for (int u = 0; u < smallWidth(); u++)
     {
-        int bestCost = 256;
-        auto outMat = out(Rect(x, 2*costMat.rows, dispMax, costMat.rows));
-        auto costSeg1 = out(Rect(x, 0, dispMax, costMat.rows));
-        auto costSeg2 = out(Rect(x, costMat.rows, dispMax, costMat.rows));
-        for (int u = 0; u < dispMax; u++)
+        auto tableauCol = tableauTop(Rect(x, 0, dispMax, smallHeight()));
+        auto errorCol = errorBuffer(Rect(x, 0, dispMax, smallHeight()));
+        copy(errorCol.data, errorCol.data + dispMax, (int*)(tableauCol.data));
+        for (int v = 1; v < smallHeight(); v++)
         {
-            outMat(0, u) = (costSeg1(0, u) + costSeg2(0, u))/G;
-            bestCost = min( bestCost, int(outMat(0, u)) );
+            computeDynamicStep((int*)(tableauCol.row(v-1).data), 
+                    errorCol.row(v).data,
+                    (int*)(tableauCol.row(v).data));
         }
-//        cout << 111 << endl;
-        for (int v = 1; v < costMat.rows; v++)
-        {
-//            cout << "COL : " << u << endl;
-            int val0;
-            val0 = outMat(v - 1, 0);
-            val0 = min(val0, outMat(v - 1, 1) + lambdaStep);
-            val0 = min(val0, bestCost + lambdaJump);
-            outMat(v, 0) = val0 + (costSeg1(v, 0) + costSeg2(v, 0))/G;
-            for (int d = 1; d < dispMax-1; d++)
-            {
-                int val = outMat(v - 1, d);
-                val = min(val, outMat(v - 1, d + 1) + lambdaStep);
-                val = min(val, outMat(v - 1, d - 1) + lambdaStep);
-                val = min(val, bestCost + lambdaJump);
-                outMat(v, d) = val + (costSeg1(v, d) + costSeg2(v, d))/G;
-//                cout << d << " " << val + costRow(u*dispMax + d) << " " 
-//              << int(costRow(u*dispMax + d)) << endl;
-            }
-//            cout << u << endl;
-            int vald = outMat(v - 1, dispMax-1);
-            vald = min(vald, outMat(v - 1, dispMax-2) + lambdaStep);
-            vald = min(vald, bestCost + lambdaJump);
-            outMat(v, dispMax-1) = vald + (costSeg1(v, dispMax-1) + costSeg2(v, dispMax-1))/G;
-            bestCost = outMat(v, 0);
-            for (int d = 1; d < dispMax; d++)
-            {
-                bestCost = min(bestCost, int(outMat(v, d)));
-            }
-//            cout << "Best : " << bestCost << endl;
-//            cout << endl;
-        }
-        
     }
     
     // bottom-up tableau init
-    for (int x =  0; x < costMat.cols; x+= dispMax)
+    for (int u = 0; u < smallWidth(); u++)
     {
-        int bestCost = 256;
-        auto outMat = out(Rect(x, 2*costMat.rows, dispMax, costMat.rows));
-        auto costSeg1 = out(Rect(x, 0, dispMax, costMat.rows));
-        auto costSeg2 = out(Rect(x, costMat.rows, dispMax, costMat.rows));
-        for (int u = 0; u < dispMax; u++)
+        auto tableauCol = tableauBottom(Rect(x, 0, dispMax, smallHeight()));
+        auto errorCol = errorBuffer(Rect(x, 0, dispMax, smallHeight()));
+        int vLast = smallHeight() - 1;
+        copy(errorCol.row(vLast).data, 
+                errorCol.row(vLast).data + dispMax, 
+                (int*)(tableauCol.row(vLast).data));
+        for (int v = smallHeight() - 2; v >= 0; v--)
         {
-            outMat(costMat.rows-1, u) = (costSeg1(costMat.rows-1, u) + costSeg2(costMat.rows-1, u))/G;
-            bestCost = min( bestCost, int(outMat(costMat.rows, u)) );
+            computeDynamicStep((int*)(tableauCol.row(v+1).data), 
+                    errorCol.row(v).data,
+                    (int*)(tableauCol.row(v).data));
         }
-//        cout << 111 << endl;
-        for (int v = costMat.rows - 2; v >= 0; v--)
-        {
-//            cout << "COL : " << v << endl;
-            int val0;
-            val0 = outMat(v + 1, 0);
-            val0 = min(val0, outMat(v + 1, 1) + lambdaStep);
-            val0 = min(val0, bestCost + lambdaJump);
-            outMat(v, 0) = val0 + (costSeg1(v, 0) + costSeg2(v, 0))/G;
-            for (int d = 1; d < dispMax-1; d++)
-            {
-                int val = outMat(v + 1, d);
-                val = min(val, outMat(v + 1, d + 1) + lambdaStep);
-                val = min(val, outMat(v + 1, d - 1) + lambdaStep);
-                val = min(val, bestCost + lambdaJump);
-                outMat(v, d) = val + (costSeg1(v, d)  + costSeg2(v, d))/G;
-//                cout << d << " " << val + costRow(u*dispMax + d) << " " 
-//              << int(costRow(u*dispMax + d)) << endl;
-            }
-//            cout << u << endl;
-            int vald = outMat(v + 1, dispMax-1);
-            vald = min(vald, outMat(v + 1, dispMax-2) + lambdaStep);
-            vald = min(vald, bestCost + lambdaJump);
-            outMat(v, dispMax-1) = vald + (costSeg1(v, dispMax-1) + costSeg2(v, dispMax-1))/G;
-            bestCost = outMat(v, 0);
-            for (int d = 1; d < dispMax; d++)
-            {
-                bestCost = min(bestCost, int(outMat(v, d)));
-            }
-//            cout << "Best : " << bestCost << endl;
-//            cout << endl;
-        }
-        
     }
     
-    //left tableau computation
 }
 
 
 /*
-void StereoEUCM::computeDynamicProgramming(const cv::Mat_<uint8_t> & costMat, cv::Mat_<int> & out)
+void EnhancedStereo::computeDynamicProgramming(const Mat_<uint8_t> & costMat, cv::Mat_<int> & out)
 {
     if (out.cols != costMat.cols or out.rows != costMat.rows*3)
     {
@@ -641,16 +537,16 @@ void StereoEUCM::computeDynamicProgramming(const cv::Mat_<uint8_t> & costMat, cv
 }*/
 
 /*
-class StereoEUCM
+class EnhancedStereo
 {
 public:
-    StereoEUCM(Transformation<double> T12, int imageWidth, int imageHeight,
+    EnhancedStereo(Transformation<double> T12, int imageWidth, int imageHeight,
             const array<double, 6> & params1, const array<double, 6> & params2)
             : Transform12(T12), 
             cam1(imageWidth, imageHeight, params1.data()), 
             cam2(imageWidth, imageHeight, params2.data()) {}
 
-    ~StereoEUCM();
+    ~EnhancedStereo();
 
     void setTransformation(Transformation<double> T12) { Transform12 = T12; } 
     
