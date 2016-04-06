@@ -49,7 +49,7 @@ public:
             cam1(imageWidth, imageHeight, params1), 
             cam2(imageWidth, imageHeight, params2),
             dispMax(64), verticalMargin(100), blockSize(5),
-            lambdaStep(8), lambdaJump(32)
+            lambdaStep(6), lambdaJump(20)
             { init(); }
 
     void setTransformation(Transformation<double> T12) 
@@ -97,11 +97,30 @@ public:
     // **DYNAMIC PROGRAMMING**
     // fills up the output with photometric errors between the val = I1(pi) and 
     // the values from I2 on the epipolar curve
-    void computeCost(const cv::Mat_<uint8_t> & img1, const cv::Mat_<uint8_t> & img2, cv::Mat_<uint8_t> & out);
+    void comuteStereo(const cv::Mat_<uint8_t> & img1, 
+            const cv::Mat_<uint8_t> & img2,
+            cv::Mat_<uint8_t> & disparity);
     
-    void computeDynamicProgramming(const cv::Mat_<uint8_t> & costMat, cv::Mat_<int> & out);
+    void computeCost(const cv::Mat_<uint8_t> & img1, const cv::Mat_<uint8_t> & img2);
+    
+    void computeDynamicProgramming();
     
     void computeDynamicStep(const int* inCost, const uint8_t * error, int * outCost);
+    
+    void reconstructDisparity();  // using the result of the dynamic programming
+    
+    void upsampleDisparity(const cv::Mat_<uint8_t> & img1, cv::Mat_<uint8_t> & disparity);
+    
+    void getLinearIdx(int row, int col) { return cam1.width*row + col; }
+    
+    void uSmall(int u) { return (u - u0) / blockSize; }
+    
+    void uBig(int u) { return u * blockSize + blockSize/2 + u0; }
+    
+    void vSmall(int v) { return (v - v0) / blockSize; }
+    
+    void vBig(int v) { return v * blockSize + blockSize/2 + v0; }
+    
 private:
     Transformation<double> Transform12;  // pose of the first to the second camera
     EnhancedCamera cam1, cam2;
@@ -109,22 +128,24 @@ private:
     vector<Eigen::Vector3d> reconstVec;  // reconstruction of every pixel by cam1
     vector<Eigen::Vector3d> reconstRotVec;  // reconstVec rotated into the second frame
     
-    Eigen::Vector2d epipole;
+    Eigen::Vector2d epipole;  // projection of the first camera center onto the second camera
     vector<Eigen::Vector2d> pinfVec;  // projection of reconstRotVec by cam2
     
-    cv::Point epipolePx;  // Px means that it is discrete
+    // discretized version
+    cv::Point epipolePx;  
     vector<cv::Point> pinfPxVec;
     
     vector<Polynomial2> epipolarVec;  // the epipolar curves represented by polynomial functions
     
-    int dispMax; //maximum shift along the epipolar
+    int dispMax; // maximum shift along the epipolar line
     int u0, v0, uMax, vMax;  // the active rectangle 
     int blockSize;
     
-    int lambdaStep, lambdaJump;
+    int lambdaStep, lambdaJump;  // costs for disparity changes
     
     cv::Mat_<uint8_t> errorBuffer;
     cv::Mat_<int> tableauLeft, tableauRight;
     cv::Mat_<int> tableauTop, tableauBottom;
+    cv::Mat_<uint8_t> smallDisparity;
 };
 
