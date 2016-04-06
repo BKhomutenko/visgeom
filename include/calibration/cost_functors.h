@@ -15,10 +15,8 @@ You should have received a copy of the GNU General Public License
 along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */  
     
-#ifndef _SPCSLAM_COSTFUNCTORS_H_
-#define _SPCSLAM_COSTFUNCTORS_H_
+#pragma once
 
-#include "vision.h"
 #include <vector>
 #include <Eigen/Eigen>
 
@@ -44,10 +42,11 @@ struct GridProjection
         }
         TbaseGrid.transform(transformedPoints, transformedPoints);
         
+        Projector<T> projector;
         for (unsigned int i = 0; i < transformedPoints.size(); i++)
         {
             Vector2<T> modProj;
-            if (not Projector<T>::compute(params[0], transformedPoints[i].data(), modProj.data())) 
+            if (not projector(params[0], transformedPoints[i].data(), modProj.data())) 
             {
                 return false;
             }
@@ -81,10 +80,11 @@ struct GridEstimate
         TbaseGrid.transform(transformedPoints, transformedPoints);
 
         vector<T> camParamsT(_camParams.begin(), _camParams.end());
+        Projector<T> projector;
         for (unsigned int i = 0; i < transformedPoints.size(); i++)
         {
             Vector2<T> modProj;
-            Projector<T>::compute(camParamsT.data(), transformedPoints[i].data(), modProj.data());
+            projector(camParamsT.data(), transformedPoints[i].data(), modProj.data());
             Vector2<T> diff = _proj[i].template cast<T>() - modProj;
             residual[2*i] = diff[0];
             residual[2*i + 1] = diff[1];
@@ -97,4 +97,3 @@ struct GridEstimate
     const vector<Vector3d> & _grid;
 };
 
-#endif

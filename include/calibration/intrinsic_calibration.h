@@ -15,8 +15,7 @@ You should have received a copy of the GNU General Public License
 along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
-#ifndef _SPCSLAM_INTRINSIC_CALIBRATION_H_
-#define _SPCSLAM_INTRINSIC_CALIBRATION_H_
+#pragma once
 
 #include "generic_calibration.h"
 
@@ -82,4 +81,3 @@ public:
     }
 };
 
-#endif

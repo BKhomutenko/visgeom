@@ -19,8 +19,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 All necessary geometric transformations
 */
 
-#ifndef _SPCMAP_GEOMETRY_H_
-#define _SPCMAP_GEOMETRY_H_
+#pragma once
 
 //STL
 #include <vector>
@@ -143,5 +142,3 @@ Matrix3<T> interOmegaRot(const Vector3<T> & v)
 
 #include "geometry/quaternion.h"
 #include "geometry/transformation.h"
-
-#endif

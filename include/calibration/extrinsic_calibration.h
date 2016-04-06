@@ -15,8 +15,7 @@ You should have received a copy of the GNU General Public License
 along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
-#ifndef _SPCSLAM_EXTRINSIC_CALIBRATION_H_
-#define _SPCSLAM_EXTRINSIC_CALIBRATION_H_
+#pragma once
 
 #include "generic_calibration.h"
 
@@ -43,10 +42,11 @@ struct StereoGridProjection
         }
         TcamGrid.transform(transformedPoints, transformedPoints);
         
+        Projector<T> projector;
         for (unsigned int i = 0; i < transformedPoints.size(); i++)
         {
             Vector2<T> modProj;
-            Projector<T>::compute(params[0], transformedPoints[i].data(), modProj.data());
+            projector(params[0], transformedPoints[i].data(), modProj.data());
             Vector2<T> diff = _proj[i].template cast<T>() - modProj;
             residual[2*i] = T(diff[0]);
             residual[2*i + 1] = T(diff[1]);
@@ -86,10 +86,11 @@ struct StereoEstimate
         TcamGrid.transform(transformedPoints, transformedPoints);
         
         vector<T> camParamsT(_camParams.begin(), _camParams.end());
+        Projector<T> projector;
         for (unsigned int i = 0; i < transformedPoints.size(); i++)
         {
             Vector2<T> modProj;
-            Projector<T>::compute(camParamsT.data(), transformedPoints[i].data(), modProj.data());
+            projector(camParamsT.data(), transformedPoints[i].data(), modProj.data());
             Vector2<T> diff = _proj[i].template cast<T>() - modProj;
             residual[2*i] = T(diff[0]);
             residual[2*i + 1] = T(diff[1]);
@@ -323,4 +324,3 @@ public:
     }
 };
 
-#endif

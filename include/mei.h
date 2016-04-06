@@ -19,8 +19,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 The Enhanced Unified Camera Model
 */
 
-#ifndef _SPCMAP_EUCM_H_
-#define _SPCMAP_EUCM_H_
+#pragma once
 
 #include <Eigen/Eigen>
 
@@ -36,7 +35,7 @@ inline T logistic(T x)
 template<typename T> 
 struct MeiProjector
 {
-    static inline bool compute(const T* params, const T* src, T* dst)
+    bool operator () (const T* params, const T* src, T* dst)
     {
         const T & xi = params[0];
         const T & k1 = params[1];
@@ -100,8 +99,8 @@ public:
     /// projects 3D points onto the original image
     virtual bool projectPoint(const Vector3d & src, Vector2d & dst) const
     {
-
-        return MeiProjector<double>::compute(params.data(), src.data(), dst.data());
+        MeiProjector<double> projector;
+        return projector(params.data(), src.data(), dst.data());
     }
     
     virtual bool projectionJacobian(const Vector3d & src, Eigen::Matrix<double, 2, 3> & Jac) const
@@ -116,4 +115,3 @@ public:
     virtual ~MeiCamera() {}
 };
 
-#endif

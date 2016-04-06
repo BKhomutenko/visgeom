@@ -6,7 +6,7 @@ project( calibration )
 
 find_package( OpenCV REQUIRED )
 
-find_package( Eigen3 REQUIRED )
+#find_package( Eigen3 REQUIRED )
 include_directories(${EIGEN3_INCLUDE_DIR})
 
 FIND_PACKAGE(Ceres REQUIRED)
@@ -15,32 +15,40 @@ INCLUDE_DIRECTORIES(${CERES_INCLUDE_DIRS})
 include_directories(include)
 
 add_executable( calibration
-    src/calibration.cpp
+    src/calibration/calibration.cpp
 )
 
 target_link_libraries( calibration ${OpenCV_LIBS} )
 TARGET_LINK_LIBRARIES( calibration ${CERES_LIBRARIES})
 
 add_executable( calibration_mei
-    src/calibration_mei.cpp
+    src/calibration/calibration_mei.cpp
 )
 
 target_link_libraries( calibration_mei ${OpenCV_LIBS} )
 TARGET_LINK_LIBRARIES( calibration_mei ${CERES_LIBRARIES})
 
 add_executable( calibration_stereo
-    src/calibration_stereo.cpp
+    src/calibration/calibration_stereo.cpp
 )
 
 target_link_libraries( calibration_stereo ${OpenCV_LIBS} )
 TARGET_LINK_LIBRARIES( calibration_stereo ${CERES_LIBRARIES})
 
 add_executable( rectify
-    src/rectify.cpp
+    src/calibration/rectify.cpp
 )
 
 target_link_libraries( rectify ${OpenCV_LIBS} )
 TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
+
+add_executable( stereo 
+   src/reconstruction/stereo_test.cpp
+   src/reconstruction/eucm_stereo.cpp
+)
+
+target_link_libraries( stereo ${OpenCV_LIBS} )
+
 
 if(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS "-O2")        ## Optimize

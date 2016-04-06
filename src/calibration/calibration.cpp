@@ -22,7 +22,6 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include <boost/format.hpp>
 
 #include "geometry.h"
-#include "vision.h"
 #include "eucm.h"
 #include "calibration.h"
 

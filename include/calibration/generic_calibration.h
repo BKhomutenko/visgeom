@@ -15,8 +15,7 @@ You should have received a copy of the GNU General Public License
 along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
-#ifndef _SPCMAP_GENERIC_CALIBRATION_H_
-#define _SPCMAP_GENERIC_CALIBRATION_H_
+#pragma once
 
 #include <cmath>
 #include <iostream>
@@ -31,7 +30,6 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include <ceres/ceres.h>
 #include <glog/logging.h>
 
-#include "vision.h"
 #include "cost_functors.h"
 
 using namespace std;
@@ -227,9 +225,10 @@ public:
                 TcamGrid.transform(grid, transfModelVec);
 
                 vector<Vector2d> projModelVec(transfModelVec.size());
+                Projector<double> projector;
                 for (int i = 0; i < transfModelVec.size(); i++)
                 {
-                    Projector<double>::compute(intrinsic.data(),
+                    projector(intrinsic.data(),
                             transfModelVec[i].data(),
                             projModelVec[i].data());
                 }
@@ -288,4 +287,3 @@ public:
     }
 };
 
-#endif

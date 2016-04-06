@@ -19,9 +19,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 A template-base coordinate transformation implementation
 */
 
-#ifndef _SPCMAP_TRANSFORMATION_H_
-#define _SPCMAP_TRANSFORMATION_H_
-
+#pragma once
 
 // Non-redundant transformation representation
 // using translation and angle-axis
@@ -64,8 +62,7 @@ public:
 
     void toRotTransInv(Matrix3<T> & R, Vector3<T> & t) const
     {
-        R = rotMat();
-        R.transposeInPlace();
+        R = rotMatInv();
         t = -R*mtrans;
     }
 
@@ -90,6 +87,17 @@ public:
         return res;
     }
 
+    Transformation composeInverse(const Transformation & transfo) const
+    {
+        Transformation res;
+        Quaternion<T> q1(mrot), q2(transfo.mrot);
+        Quaternion<T> q2inv = q2.inv();
+        Quaternion<T> qres = q1 * q2inv;
+        res.mtrans = mtrans - qres.rotate(transfo.mtrans);
+        res.mrot = qres.toRotationVector();
+        return res;
+    }
+    
     const Vector3<T> & trans() const { return mtrans; }
 
     const Vector3<T> & rot() const { return mrot; }
@@ -101,7 +109,9 @@ public:
     Quaternion<T> rotQuat() const { return Quaternion<T>(mrot); }
 
     Matrix3<T> rotMat() const { return rotationMatrix<T>(mrot); }
-
+    Matrix3<T> rotMatInv() const { return rotationMatrix<T>(-mrot); }
+    Vector3<T> transInv() const { return -rotMatInv() * mtrans; }
+    
     T * rotData() { return mrot.data(); }
     T * transData() { return mtrans.data(); }
 
@@ -150,8 +160,7 @@ public:
     void inverseRotate(const vector<Vector3<T>> & src, vector<Vector3<T>> & dst) const
     {
         dst.resize(src.size());
-        Matrix3<T> R = rotMat();
-        R.transposeInPlace();
+        Matrix3<T> R = rotMatInv();
         for (unsigned int i = 0; i < src.size(); i++)
         {
             dst[i] = R * src[i];
@@ -160,8 +169,7 @@ public:
 
     void inverseRotate(const Vector3<T> & src, Vector3<T> & dst) const
     {
-        Matrix3<T> R = rotMat();
-        R.transposeInPlace();
+        Matrix3<T> R = rotMatInv();
         dst = R * src;
     }
 
@@ -179,4 +187,3 @@ private:
 
 };
 
-#endif

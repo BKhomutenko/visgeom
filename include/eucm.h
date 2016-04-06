@@ -19,8 +19,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 The Enhanced Unified Camera Model
 */
 
-#ifndef _SPCMAP_EUCM_H_
-#define _SPCMAP_EUCM_H_
+#pragma once
 
 #include <Eigen/Eigen>
 
@@ -36,7 +35,7 @@ inline T logistic(T x)
 template<typename T> 
 struct EnhancedProjector
 {
-    static inline bool compute(const T* params, const T* src, T* dst)
+    bool operator() (const T* params, const T* src, T* dst)
     {
         const T & alpha = params[0];
         const T & beta = params[1];
@@ -50,7 +49,7 @@ struct EnhancedProjector
         const T & z = src[2];
         
         T denom = alpha * sqrt(z*z + beta*(x*x + y*y)) + (T(1.) - alpha) * z;
-        if (denom < 1e-3) return false;
+
         // Project the point to the mu plane
         T xn = x / denom;
         T yn = y / denom;
@@ -93,16 +92,10 @@ public:
         
         double u2 = xn * xn + yn * yn;
         double gamma = 1. - alpha;    
-        double u = sqrt(u2);
-        double A = u2 * alpha * alpha * beta - 1.;
-        double B = u * gamma;
-        double C = u2 * (alpha * alpha - gamma * gamma);
-        double D1 = B * B - A * C; 
+        double num = 1. - u2 * alpha * alpha * beta;
         
-        double r = B + sqrt(D1);
-        
-        double denom = -gamma*A + alpha*sqrt(A*A + (beta  * r * r));
-        dst << xn*denom, yn*denom, -A;
+        double denom = gamma + alpha*sqrt(1 - (alpha - gamma)*beta*u2);
+        dst << xn, yn, num/denom;
 
         return true;
     }
@@ -110,8 +103,8 @@ public:
     /// projects 3D points onto the original image
     virtual bool projectPoint(const Vector3d & src, Vector2d & dst) const
     {
-
-        return EnhancedProjector<double>::compute(params.data(), src.data(), dst.data());
+        EnhancedProjector<double> projector;
+        return projector(params.data(), src.data(), dst.data()); 
     }
     
     virtual bool projectionJacobian(const Vector3d & src, Eigen::Matrix<double, 2, 3> & Jac) const
@@ -148,4 +141,3 @@ public:
     virtual ~EnhancedCamera() {}
 };
 
-#endif

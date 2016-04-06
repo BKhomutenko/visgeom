@@ -20,8 +20,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 Template-based quaternion implementation
 */
 
-#ifndef _SPCMAP_QUATERNION_H_
-#define _SPCMAP_QUATERNION_H_
+#pragma once
 
 template<typename T>
 class Quaternion
@@ -130,4 +129,3 @@ private:
     T & w = data[3];
 };
 
-#endif
