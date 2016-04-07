@@ -17,8 +17,9 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 
 /*
-Stereo vision definition.
+Semi-global block matching algorithm for non-rectified images
 */
+
 //STL
 #include <vector>
 #include <array>

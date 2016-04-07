@@ -17,7 +17,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 
 /*
-Stereo vision definition.
+Semi-global block matching algorithm for non-rectified images
 */
 
 #pragma once
@@ -84,6 +84,7 @@ public:
         initAfterTransformation();
     }
     
+    // Only data invalidated after the transformation change are recomputed
     void initAfterTransformation()
     {
         computeEpipole();
@@ -136,16 +137,18 @@ public:
     
     //// MISCELLANEOUS
     
+    // index of an object in a linear array corresponding to pixel [row, col] 
     int getLinearIdx(int row, int col) { return cam1.width*row + col; }
     
+    // from image to small disparity coordiante transform
     int uSmall(int u) { return (u - u0) / blockSize; }
-    
-    int uBig(int u) { return u * blockSize + blockSize/2 + u0; }
-    
     int vSmall(int v) { return (v - v0) / blockSize; }
     
+    // from small disparity to image coordiante transform    
+    int uBig(int u) { return u * blockSize + blockSize/2 + u0; }
     int vBig(int v) { return v * blockSize + blockSize/2 + v0; }
     
+    // small disparity size
     int smallWidth() { return uSmall(uMax - 1) + 1; }
     int smallHeight() { return vSmall(vMax - 1) + 1; }
     
