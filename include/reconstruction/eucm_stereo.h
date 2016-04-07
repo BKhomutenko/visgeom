@@ -40,18 +40,36 @@ using namespace std;
 
 typedef CurveRasterizer<Polynomial2> EpipolarRasterizer;
 
+struct StereoParameters
+{
+    int disparityMax = 64;
+    int blockSize = 5;
+    int u0 = 100, v0 = 0;  // RoI left upper corner
+    int width = -1, height = -1;  // RoI size
+    int lambdaStep = 8;
+    int lambdaJump = 32;
+};
+
 class EnhancedStereo
 {
 public:
     EnhancedStereo(Transformation<double> T12, int imageWidth, int imageHeight,
-            const double * params1, const double * params2)
+            const double * params1, const double * params2, const StereoParameters & stereoParams)
             : Transform12(T12), 
             cam1(imageWidth, imageHeight, params1), 
             cam2(imageWidth, imageHeight, params2),
-            dispMax(64), blockSize(5),
-            lambdaStep(6), lambdaJump(20),
-            u0(150), v0(200), uMax(imageWidth - 150), vMax(imageHeight - 200)
-            { init(); }
+            dispMax(stereoParams.disparityMax),
+            blockSize(stereoParams.blockSize),
+            lambdaStep(stereoParams.lambdaStep), 
+            lambdaJump(stereoParams.lambdaJump),
+            u0(stereoParams.u0), v0(stereoParams.v0)
+    { 
+        if (stereoParams.width > 0) uMax = u0 + stereoParams.width;
+        else uMax = imageWidth;
+        if (stereoParams.width > 0) vMax = v0 + stereoParams.height;
+        else vMax = imageHeight;
+        init(); 
+    }
 
     void setTransformation(Transformation<double> T12) 
     { 
@@ -61,6 +79,7 @@ public:
     
     void init()
     {
+        createBuffer();
         computeReconstructed();
         initAfterTransformation();
     }
