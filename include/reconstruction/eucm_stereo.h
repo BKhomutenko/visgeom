@@ -46,8 +46,8 @@ struct StereoParameters
     int blockSize = 5;
     int u0 = 0, v0 = 0;  // RoI left upper corner
     int width = -1, height = -1;  // RoI size
-    int lambdaStep = 8;
-    int lambdaJump = 32;
+    int lambdaStep = 4;
+    int lambdaJump = 25;
 };
 
 class EnhancedStereo
@@ -66,7 +66,7 @@ public:
             v0(stereoParams.v0)
     { 
         if (stereoParams.width > 0) uMax = u0 + stereoParams.width;
-        else uMax = imageWidth - u0;
+        else uMax = imageWidth - stereoParams.u0;
         if (stereoParams.width > 0) vMax = v0 + stereoParams.height;
         else vMax = imageHeight - v0;
         init(); 
@@ -146,12 +146,14 @@ public:
     int vSmall(int v) { return (v - v0) / blockSize; }
     
     // from small disparity to image coordiante transform    
-    int uBig(int u) { return u * blockSize + blockSize/2 + u0; }
-    int vBig(int v) { return v * blockSize + blockSize/2 + v0; }
+    int uBig(int u) { return u * blockSize + halfBlockSize() + u0; }
+    int vBig(int v) { return v * blockSize + halfBlockSize() + v0; }
     
     // small disparity size
-    int smallWidth() { return uSmall(uMax - 1) + 1; }
-    int smallHeight() { return vSmall(vMax - 1) + 1; }
+    int smallWidth() { return uSmall(uMax - blockSize) + 1; }
+    int smallHeight() { return vSmall(vMax - blockSize) + 1; }
+    
+    int halfBlockSize() { return blockSize / 2; }
     
 private:
     Transformation<double> Transform12;  // pose of the first to the second camera

@@ -205,8 +205,8 @@ void EnhancedStereo::comuteStereo(const Mat_<uint8_t> & img1,
 void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t> & img2)
 {
     double T1 = 0, T2 = 0; // time profiling
-    int halfBlockSize = blockSize / 2;
     cout << "cost" << endl;
+    Mat_<uint8_t> img2remap(Size(blockSize - 1 + dispMax, blockSize));
     for (int v = 0; v < smallHeight(); v++)
     {
         for (int u = 0; u < smallWidth(); u++)
@@ -218,13 +218,11 @@ void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t>
             CurveRasterizer<Polynomial2> raster(pinf.x, pinf.y, epipolePx.x, epipolePx.y, epipolarVec[idx]);
             
             // the remap Mat
-            Mat_<uint8_t> img2remap(Size(blockSize - 1 + dispMax, blockSize));
-            
             for (int i = 0; i < img2remap.cols; i++, raster.makeStep())
             {
-                for (int j = -halfBlockSize; j <= halfBlockSize; j++)
+                for (int j = -halfBlockSize(); j <= halfBlockSize(); j++)
                 {
-                    img2remap(halfBlockSize + j, i) = img2(raster.y + j, raster.x + 2);
+                    img2remap(halfBlockSize() + j, i) = img2(raster.y + j, raster.x + 2);
                 }
             }
             
@@ -232,12 +230,12 @@ void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t>
             for (int i = 0; i < dispMax; i++, outPtr++)
             {
                 int acc = 0;
-                for (int x2 = -halfBlockSize; x2 <= halfBlockSize; x2++)
+                for (int x2 = -halfBlockSize(); x2 <= halfBlockSize(); x2++)
                 {
-                    for (int x1 = -halfBlockSize; x1 <= halfBlockSize; x1++)
+                    for (int x1 = -halfBlockSize(); x1 <= halfBlockSize(); x1++)
                     {
                         acc += abs(img1(vBig(v) + x2, uBig(u)- x1) - 
-                            img2remap(halfBlockSize + x2, i + halfBlockSize + x1));
+                            img2remap(halfBlockSize() + x2, i + halfBlockSize() + x1));
                     }
                 }
                 
@@ -298,7 +296,7 @@ void EnhancedStereo::computeDynamicProgramming()
     // right tableau init
     for (int v = 0; v < smallHeight(); v++)
     {
-        int * tableauRow = (int *)(tableauLeft.row(v).data);
+        int * tableauRow = (int *)(tableauRight.row(v).data);
         uint8_t * errorRow = errorBuffer.row(v).data;
         int base = (smallWidth() - 1) * dispMax;
         copy(errorRow + base, errorRow + base + dispMax, tableauRow + base);
