@@ -44,7 +44,7 @@ struct StereoParameters
 {
     int disparityMax = 64;
     int blockSize = 5;
-    int u0 = 100, v0 = 0;  // RoI left upper corner
+    int u0 = 0, v0 = 0;  // RoI left upper corner
     int width = -1, height = -1;  // RoI size
     int lambdaStep = 8;
     int lambdaJump = 32;
@@ -62,12 +62,13 @@ public:
             blockSize(stereoParams.blockSize),
             lambdaStep(stereoParams.lambdaStep), 
             lambdaJump(stereoParams.lambdaJump),
-            u0(stereoParams.u0), v0(stereoParams.v0)
+            u0(stereoParams.u0 + stereoParams.disparityMax + stereoParams.blockSize),
+            v0(stereoParams.v0)
     { 
         if (stereoParams.width > 0) uMax = u0 + stereoParams.width;
-        else uMax = imageWidth;
+        else uMax = imageWidth - u0;
         if (stereoParams.width > 0) vMax = v0 + stereoParams.height;
-        else vMax = imageHeight;
+        else vMax = imageHeight - v0;
         init(); 
     }
 
