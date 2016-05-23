@@ -46,8 +46,8 @@ struct StereoParameters
     int blockSize = 5;
     int u0 = 0, v0 = 0;  // RoI left upper corner
     int width = -1, height = -1;  // RoI size
-    int lambdaStep = 4;
-    int lambdaJump = 25;
+    int lambdaStep = 5;
+    int lambdaJump = 32;
 };
 
 class EnhancedStereo

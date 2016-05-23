@@ -58,6 +58,63 @@ inline int sign(double x)
 }
 
 template<typename T>
+struct CurveRasterizer2
+{
+    double delta;
+    double fx, fy;
+    int eps;
+    int x, y;
+    T surf; 
+    
+    CurveRasterizer2(int x, int y, int ex, int ey, const T & surf) :
+            x(x), y(y), surf(surf)
+    {
+        fx = surf.gradx(x, y);
+        fy = surf.grady(x, y);
+        delta = surf(x, y);
+        if (fx*(ey - y) - fy*(ex - x) > 0) eps = 1;
+        else eps = -1;
+    }
+    
+//    void moveX(int dx)
+//    {
+//        if (dx == 0) return;
+//        x += dx;
+//        double fx2 = surf.gradx(x, y);
+//        delta += 0.5*dx*(fx + fx2);
+//        fx = fx2;
+//        fy = surf.grady(x, y); 
+//    }
+//    
+//    void moveY(int dy)
+//    {
+//        if (dy == 0) return;
+//        y += dy;
+//        double fy2 = surf.grady(x, y);
+//        delta += 0.5*dy*(fy + fy2);
+//        fy = fy2;
+//        fx = surf.gradx(x, y); 
+//    }
+    
+    void makeStep()
+    {
+        double fx = surf.gradx(x, y);
+        double fy = surf.grady(x, y);
+        if (abs(fx) > abs(fy))  // go along y
+        {
+            y += eps*sign(fx);
+            x -= round(surf(x, y)/surf.gradx(x, y));
+        }   
+        else  // go along x
+        {
+            x -= eps*sign(fy);
+            y -= round(surf(x, y)/surf.grady(x, y));
+        }
+    }
+    
+};
+
+template<typename T>
 struct CurveRasterizer
 {
     double delta;

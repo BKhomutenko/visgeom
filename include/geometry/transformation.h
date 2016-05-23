@@ -98,6 +98,15 @@ public:
         return res;
     }
     
+    Transformation inverse() const
+    {
+        Transformation res;
+        Matrix3<T> R = rotMatInv();
+        res.mtrans = -R*mtrans;
+        res.mrot = -mrot;
+        return res;
+    }
+    
     const Vector3<T> & trans() const { return mtrans; }
 
     const Vector3<T> & rot() const { return mrot; }
@@ -180,7 +189,13 @@ public:
         copy(rotData(), rotData() + 3, res.data() + 3);
         return res;
     }
-
+    
+    void toArray(T * const data)
+    {
+        copy(transData(), transData() + 3, data);
+        copy(rotData(), rotData() + 3, data + 3);
+    }
+    
 private:
     Vector3<T> mrot;
     Vector3<T> mtrans;

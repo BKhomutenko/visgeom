@@ -35,6 +35,13 @@ add_executable( calibration_stereo
 target_link_libraries( calibration_stereo ${OpenCV_LIBS} )
 TARGET_LINK_LIBRARIES( calibration_stereo ${CERES_LIBRARIES})
 
+add_executable( calibration_robot
+    src/calibration/calibration_robot.cpp
+)
+
+target_link_libraries( calibration_robot ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( calibration_robot ${CERES_LIBRARIES})
+
 add_executable( rectify
     src/calibration/rectify.cpp
 )

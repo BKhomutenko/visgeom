@@ -207,6 +207,9 @@ void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t>
     double T1 = 0, T2 = 0; // time profiling
     cout << "cost" << endl;
     Mat_<uint8_t> img2remap(Size(blockSize - 1 + dispMax, blockSize));
+    Mat_<int> integral1, integral2;
+    integral(img1, integral1);
+    int blockSize2 = blockSize * blockSize;
     for (int v = 0; v < smallHeight(); v++)
     {
         for (int u = 0; u < smallWidth(); u++)
@@ -226,21 +229,35 @@ void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t>
                 }
             }
             
+            //compute bias
+            int u1 = uBig(u) - halfBlockSize();
+            int v1 = vBig(v) - halfBlockSize();
+            int bias1 = integral1(v1, u1) + integral1(v1 + blockSize, u1 + blockSize) -
+                         integral1(v1 + blockSize, u1) - integral1(v1, u1 + blockSize);
+//            
+//            
+            integral(img2remap, integral2);
+            
             // compute the actual error
             for (int i = 0; i < dispMax; i++, outPtr++)
             {
+                int bias = integral2(blockSize, i + blockSize) - integral2(blockSize, i);
+                bias = (bias - bias1) / blockSize2;
+                bias = min(5, max(-5, bias));
+//                cout << bias << " ";
                 int acc = 0;
                 for (int x2 = -halfBlockSize(); x2 <= halfBlockSize(); x2++)
                 {
                     for (int x1 = -halfBlockSize(); x1 <= halfBlockSize(); x1++)
                     {
                         acc += abs(img1(vBig(v) + x2, uBig(u)- x1) - 
-                            img2remap(halfBlockSize() + x2, i + halfBlockSize() + x1));
+                            img2remap(halfBlockSize() + x2, i + halfBlockSize() + x1) + bias);
                     }
                 }
                 
-                *outPtr = acc / blockSize / blockSize;
+                *outPtr = acc / blockSize2;
             }
+//            cout << endl;
         }
     }
     cout << "read " << T1 / CLOCKS_PER_SEC << endl;
@@ -279,7 +296,6 @@ void EnhancedStereo::computeDynamicProgramming()
 {
     cout << "left" << endl;
     // left tableau init
-    cout << tableauLeft.size() << endl;
     for (int v = 0; v < smallHeight(); v++)
     {
         int * tableauRow = (int *)(tableauLeft.row(v).data);
@@ -342,31 +358,38 @@ void EnhancedStereo::computeDynamicProgramming()
 
 void EnhancedStereo::reconstructDisparity()
 {
-    
+    Mat_<uint8_t> errFinalMat(smallDisparity.size());
     for (int v = 0; v < smallHeight(); v++)
     {
         int* dynRow1 = (int*)(tableauLeft.row(v).data);
         int* dynRow2 = (int*)(tableauRight.row(v).data);
         int* dynRow3 = (int*)(tableauTop.row(v).data);
         int* dynRow4 = (int*)(tableauBottom.row(v).data);
+        uint8_t* errRow = (errorBuffer.row(v).data);
         for (int u = 0; u < smallWidth(); u++)
         {
             int bestCost = 10000;
             uint8_t & bestDisp = smallDisparity(v, u);
+            uint8_t & bestErr = errFinalMat(v, u);
             bestDisp = 0;
             for (int d = 0; d < dispMax; d++)
             {
                 int base = u * dispMax;
+//                if (errRow[base + d] > 5) continue;
                 int acc = dynRow1[base + d] + dynRow2[base + d] + dynRow3[base + d] + dynRow4[base + d];
                 if (bestCost > acc)
                 {
                     bestCost = acc;
                     bestDisp = d;
+                    bestErr = acc/10;
                 }
             }
+//            cout << int(bestErr) << endl;
         }
+        
     }
-    medianBlur(smallDisparity, smallDisparity, 3);
+    imshow("errFinal", errFinalMat);
+//    medianBlur(smallDisparity, smallDisparity, 3);
 }
 
 

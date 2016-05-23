@@ -178,10 +178,12 @@ public:
             bool isExtracted1, isExtracted2;
             
             calibDataLeft.fileName = imageFolder + leftPref + imageName;
-            isExtracted1 = extractGridProjection(calibDataLeft, checkExtraction);
+            isExtracted1 = extractGridProjection(calibDataLeft.fileName,
+                    calibDataLeft.projection, checkExtraction);
             
             calibDataRight.fileName = imageFolder + rightPref + imageName;                                     
-            isExtracted2 = extractGridProjection(calibDataRight, checkExtraction);
+            isExtracted2 = extractGridProjection(calibDataRight.fileName,
+                    calibDataRight.projection, checkExtraction);
             
             if (not isExtracted1 or not isExtracted2) 
             {

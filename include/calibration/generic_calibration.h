@@ -48,6 +48,7 @@ int nObjects = 0;
 
 typedef shared_ptr<array<double, 6>> ArraySharedPtr;
 
+// TODO rewrite to get rid of shared pointers
 struct CalibrationData
 {
     vector<Vector2d> projection;
@@ -88,11 +89,10 @@ public:
         while (getline(calibInfoFile, imageName))
         {
             CalibrationData calibData;
-            vector<Vector2d> projection;
             bool isExtracted;
 
             calibData.fileName = imageFolder + imageName;
-            isExtracted = extractGridProjection(calibData, checkExtraction);
+            isExtracted = extractGridProjection(calibData.fileName, calibData.projection, checkExtraction);
 
             if (not isExtracted)
             {
@@ -108,16 +108,16 @@ public:
         return true;
     }
 
-    bool extractGridProjection(CalibrationData & calibData, bool checkExtraction)
+    bool extractGridProjection(const string & fileName, vector<Vector2d> & projection, bool checkExtraction)
     {
         Size patternSize(Nx, Ny);
-        Mat frame = imread(calibData.fileName, 0);
+        Mat frame = imread(fileName, 0);
 
         vector<Point2f> centers;
         bool patternIsFound = findChessboardCorners(frame, patternSize, centers);
         if (not patternIsFound)
         {
-            cout << calibData.fileName << " : ERROR, pattern is not found" << endl;
+            cout << fileName << " : ERROR, pattern is not found" << endl;
             return false;
         }
 
@@ -128,15 +128,15 @@ public:
             char key = waitKey();
             if (key == 'n' or key == 'N')
             {
-                cout << calibData.fileName << " : ERROR, pattern is not accepted" << endl;
+                cout << fileName << " : ERROR, pattern is not accepted" << endl;
                 return false;
             }
         }
 
-        calibData.projection.resize(Nx * Ny);
+        projection.resize(Nx * Ny);
         for (int i = 0; i < Nx * Ny; i++)
         {
-            calibData.projection[i] = Vector2d(centers[i].x, centers[i].y);
+            projection[i] = Vector2d(centers[i].x, centers[i].y);
         }
         return true;
     }
