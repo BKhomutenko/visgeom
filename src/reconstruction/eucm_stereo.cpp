@@ -32,8 +32,8 @@ Semi-global block matching algorithm for non-rectified images
 //OpenCV
 #include <opencv2/opencv.hpp>
 
-#include "geometry.h"
-#include "eucm.h"
+#include "geometry/geometry.h"
+#include "camera/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_stereo.h"
 

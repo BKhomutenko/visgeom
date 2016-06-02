@@ -21,9 +21,9 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include <fstream>
 #include <boost/format.hpp>
 
-#include "geometry.h"
+#include "geometry/geometry.h"
 #include "camera/generic_camera.h"
-#include "eucm.h"
+#include "camera/eucm.h"
 
 using namespace cv;
 using Eigen::Vector2d;

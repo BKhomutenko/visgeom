@@ -21,7 +21,7 @@ Abstract camera class
 #pragma once
 
 #include <Eigen/Eigen>
-#include "geometry.h"
+#include "geometry/geometry.h"
 
 using Eigen::Matrix;
 using Eigen::Vector2d;

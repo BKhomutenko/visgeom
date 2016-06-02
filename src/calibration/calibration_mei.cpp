@@ -21,8 +21,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <boost/format.hpp>
 
-#include "geometry.h"
-#include "mei.h"
+#include "geometry/geometry.h"
+#include "camera/mei.h"
 #include "calibration/calibration.h"
 
 using namespace cv;
