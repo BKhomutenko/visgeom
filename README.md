@@ -13,7 +13,9 @@ Requred packages:
 
 After you have installed the needed libraries, go to the directory visgeom in the terminal and run:
 ```
-$ cmake .
+$ mkdir build
+$ cd build
+$ cmake ..
 $ make 
 ```
 CALIBRATION
