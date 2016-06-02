@@ -25,12 +25,6 @@ The Enhanced Unified Camera Model
 
 #include "camera.h"
 
-template<typename T>
-inline T logistic(T x)
-{
-    T ex = exp(x);
-    return ex/(T(1.) + ex);
-}
 
 template<typename T> 
 struct MeiProjector
