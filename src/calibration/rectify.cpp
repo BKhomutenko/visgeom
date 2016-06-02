@@ -22,7 +22,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include <boost/format.hpp>
 
 #include "geometry/geometry.h"
-#include "camera/generic_camera.h"
+#include "camera/pinhole.h"
 #include "camera/eucm.h"
 
 using namespace cv;
