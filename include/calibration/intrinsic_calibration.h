@@ -29,7 +29,7 @@ private:
     using GenericCameraCalibration<Camera>::extractGridProjection;
     using GenericCameraCalibration<Camera>::constructGrid;
     using GenericCameraCalibration<Camera>::estimateInitialGrid;
-    using GenericCameraCalibration<Camera>::initIntrinsicProblem;
+    using GenericCameraCalibration<Camera>::addIntrinsicResidual;
     using GenericCameraCalibration<Camera>::residualAnalysis;
         
 public:
@@ -55,11 +55,18 @@ public:
         } 
         
         //initial board positions estimation
-        estimateInitialGrid(intrinsic, monoCalibDataVec);
+        for (auto & item : monoCalibDataVec)
+        {
+            estimateInitialGrid(intrinsic, item.projection, item.extrinsic); 
+        }
+        
         cout << "### Intrinsic parameters calibration ###" << endl;
         // Problem initialization
         Problem problem;
-        initIntrinsicProblem(problem, intrinsic, monoCalibDataVec);
+        for (auto & item : monoCalibDataVec)
+        {
+            addIntrinsicResidual(problem, intrinsic, item.projection, item.extrinsic);
+        }
                
         //run the solver
         Solver::Options options;

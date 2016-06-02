@@ -96,7 +96,7 @@ struct CurveRasterizer2
 //        fx = surf.gradx(x, y); 
 //    }
     
-    void makeStep()
+    void step()
     {
         double fx = surf.gradx(x, y);
         double fy = surf.grady(x, y);
@@ -153,7 +153,7 @@ struct CurveRasterizer
         fx = surf.gradx(x, y); 
     }
     
-    void makeStep()
+    void step()
     {
         if (abs(fx) > abs(fy))  // go along y
         {
@@ -167,4 +167,11 @@ struct CurveRasterizer
         }
     }
     
+    void step(int nsteps)
+    {
+        for (int i = 0; i < nsteps; i++)
+        {
+            step();
+        }
+    }
 };

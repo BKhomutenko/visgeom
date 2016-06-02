@@ -29,7 +29,8 @@ using namespace cv;
 using Eigen::JacobiSVD;
 int main(int argc, char** argv) {
 
-    vector<double> params{0.5, 1, 500, 500, 500, 500};
+//    vector<double> params{0.5, 1, 500, 500, 500, 500};
+    vector<double> params{0.5,    1.,    500,     500,    500,    500};
     Transformation<double> endEffector(0, 0, 0, 0, 0, 0);
 
     EndEffectorCameraCalibration<EnhancedProjector> calibRobot;

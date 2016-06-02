@@ -19,6 +19,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "generic_calibration.h"
 
+#include <string> 
+
 using ceres::SoftLOneLoss;
 
 template<template<typename> class Projector>
@@ -54,8 +56,8 @@ struct StereoGridProjection
         return true;
     }
     
-    const vector<Vector2d> & _proj;
-    const vector<Vector3d> & _orig;
+    const vector<Vector2d> _proj;
+    const vector<Vector3d> _orig;
 };
 
 template<template<typename> class Projector>
@@ -98,10 +100,39 @@ struct StereoEstimate
         return true;
     }
     
-    const array<double, 6> & _extrinsic;
-    const vector<double> & _camParams;
-    const vector<Vector2d> & _proj;
-    const vector<Vector3d> & _orig;
+    const array<double, 6> _extrinsic;
+    const vector<double> _camParams;
+    const vector<Vector2d> _proj;
+    const vector<Vector3d> _orig;
+};
+
+
+struct StereoCalibrationData
+{
+    vector<Vector2d> projection1;
+    vector<Vector2d> projection2;
+    array<double, 6> extrinsic;
+    string fileName1, fileName2;
+    
+    CalibrationData getLeftMono()
+    {
+        CalibrationData res;
+        res.projection = projection1;
+        res.fileName = fileName1;
+        res.extrinsic = extrinsic;
+        return res;
+    }
+    
+    CalibrationData getRightMono(const Transformation<double> & TleftRight)
+    {
+        CalibrationData res;
+        res.projection = projection2;
+        res.fileName = fileName2;
+        Transformation<double> TleftGrid(extrinsic.data());
+        Transformation<double> TcameraGrid = TleftRight.inverseCompose(TleftGrid);
+        res.extrinsic = TcameraGrid.toArray();
+        return res;
+    }
 };
 
 template<template<typename> class Projector>
@@ -110,15 +141,14 @@ class ExtrinsicCameraCalibration : GenericCameraCalibration<Projector>
 private:
     vector<CalibrationData> monoCalibDataVec1;
     vector<CalibrationData> monoCalibDataVec2;
-    vector<CalibrationData> stereoCalibDataVec1;
-    vector<CalibrationData> stereoCalibDataVec2;
+    vector<StereoCalibrationData> stereoCalibDataVec;
     
     // methods
     using GenericCameraCalibration<Projector>::initializeIntrinsic;
     using GenericCameraCalibration<Projector>::extractGridProjection;
     using GenericCameraCalibration<Projector>::constructGrid;
     using GenericCameraCalibration<Projector>::estimateInitialGrid;
-    using GenericCameraCalibration<Projector>::initIntrinsicProblem;
+    using GenericCameraCalibration<Projector>::addIntrinsicResidual;
     using GenericCameraCalibration<Projector>::residualAnalysis;
     
     // fields
@@ -134,6 +164,10 @@ public:
             const string & infoFileNameStereo)
     {
         cout << "### Initialize calibration data ###" << endl;
+        for (auto & x : {"ololo", "trololo"})
+        {
+            cout << x << endl;
+        }
         if (not initializeIntrinsic(infoFileName1, monoCalibDataVec1))
         {
             return false;
@@ -143,6 +177,8 @@ public:
             return false;
         }
         constructGrid();
+        
+        vector<double>{1, 2, 1.2};
         
         if (not initializeExtrinsic(infoFileNameStereo)) return false;
         return true;
@@ -161,8 +197,7 @@ public:
         calibInfoFile >> Nx >> Ny >> sqSize >> outlierThresh >> checkExtraction;
         calibInfoFile.ignore();  // To get to the next line
         
-        stereoCalibDataVec1.clear();
-        stereoCalibDataVec2.clear();
+        stereoCalibDataVec.clear();
         
         string imageFolder;
         string imageName;    
@@ -173,28 +208,25 @@ public:
         getline(calibInfoFile, rightPref);
         while (getline(calibInfoFile, imageName))
         {
-            CalibrationData calibDataLeft, calibDataRight;
+            StereoCalibrationData stereoCalibData;
             vector<Vector2d> point1Vec, point2Vec;
             bool isExtracted1, isExtracted2;
             
-            calibDataLeft.fileName = imageFolder + leftPref + imageName;
-            isExtracted1 = extractGridProjection(calibDataLeft.fileName,
-                    calibDataLeft.projection, checkExtraction);
+            stereoCalibData.fileName1 = imageFolder + leftPref + imageName;
+            isExtracted1 = extractGridProjection(stereoCalibData.fileName1,
+                    stereoCalibData.projection1, checkExtraction);
             
-            calibDataRight.fileName = imageFolder + rightPref + imageName;                                     
-            isExtracted2 = extractGridProjection(calibDataRight.fileName,
-                    calibDataRight.projection, checkExtraction);
+            stereoCalibData.fileName2 = imageFolder + rightPref + imageName;                                     
+            isExtracted2 = extractGridProjection(stereoCalibData.fileName2,
+                    stereoCalibData.projection2, checkExtraction);
             
             if (not isExtracted1 or not isExtracted2) 
             {
                 continue;
             }
             
-            calibDataLeft.extrinsic = ArraySharedPtr(new array<double, 6>{0, 0, 1, 0, 0, 0});
-            calibDataRight.extrinsic = calibDataLeft.extrinsic;
-            
-            stereoCalibDataVec1.push_back(calibDataLeft);
-            stereoCalibDataVec2.push_back(calibDataRight);
+            stereoCalibData.extrinsic = array<double, 6>{0, 0, 1, 0, 0, 0};
+            stereoCalibDataVec.push_back(stereoCalibData);
             
             cout << "." << flush;
         }
@@ -203,31 +235,25 @@ public:
     }
     
 
-    void initStereoProblem(Problem & problem, vector<double> & intrinsic, 
+    void addStereoResidual(Problem & problem, vector<double> & intrinsic, 
             array<double, 6> & extrinsic,
-            vector<CalibrationData> & calibDataVec)
+            const vector<Vector2d> & projection,
+            array<double, 6> & gridExtrinsic)
     {
         typedef DynamicAutoDiffCostFunction<StereoGridProjection<Projector>> stereoProjectionCF;
-        for (unsigned int i = 0; i < calibDataVec.size(); i++)
-        {
-            StereoGridProjection<Projector> * stereoProjection;
-            stereoProjection = new StereoGridProjection<Projector>(
-                                        calibDataVec[i].projection,
-                                        grid);
-            
-            stereoProjectionCF * costFunction = new stereoProjectionCF(stereoProjection);
-            costFunction->AddParameterBlock(intrinsic.size());
-            costFunction->AddParameterBlock(6);
-            costFunction->AddParameterBlock(6);
-            costFunction->SetNumResiduals(2 * Nx * Ny);
-            problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), intrinsic.data(),
-                    calibDataVec[i].extrinsic->data(), extrinsic.data());
-            
-        }
+        StereoGridProjection<Projector> * stereoProjection;
+        stereoProjection = new StereoGridProjection<Projector>(projection, grid);
+        stereoProjectionCF * costFunction = new stereoProjectionCF(stereoProjection);
+        costFunction->AddParameterBlock(intrinsic.size());
+        costFunction->AddParameterBlock(6);
+        costFunction->AddParameterBlock(6);
+        costFunction->SetNumResiduals(2 * Nx * Ny);
+        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), intrinsic.data(),
+                gridExtrinsic.data(), extrinsic.data());
     }
     
     void estimateInitialExtrinsic(const vector<double> & intrinsic, array<double, 6> & extrinsic,
-            vector<CalibrationData> & calibDataVec)
+            vector<StereoCalibrationData> & calibDataVec)
     {
         Problem problem;
         for (int i = 0; i < calibDataVec.size(); i++)
@@ -236,8 +262,8 @@ public:
             typedef DynamicAutoDiffCostFunction<StereoEstimate<Projector>> dynamicProjectionCF;
 
             StereoEstimate<Projector> * stereoEstimate;
-            stereoEstimate = new StereoEstimate<Projector>(calibDataVec[i].projection, grid,
-                                                intrinsic, *(calibDataVec[i].extrinsic));
+            stereoEstimate = new StereoEstimate<Projector>(calibDataVec[i].projection2, grid,
+                                                intrinsic, calibDataVec[i].extrinsic);
             dynamicProjectionCF * costFunction = new dynamicProjectionCF(stereoEstimate);
             costFunction->AddParameterBlock(6);
             costFunction->SetNumResiduals(2 * Nx * Ny);
@@ -250,15 +276,24 @@ public:
         Solver::Summary summary;
         Solve(options, &problem, &summary);
     }
-    
+
     bool estimateExtrinsic(const vector<double> & intrinsic1, 
             const vector<double> & intrinsic2,
             array<double, 6> & extrinsic)
     {
-        estimateInitialGrid(intrinsic1, monoCalibDataVec1);
-        estimateInitialGrid(intrinsic2, monoCalibDataVec2);
-        estimateInitialGrid(intrinsic1, stereoCalibDataVec1);
-        estimateInitialExtrinsic(intrinsic2, extrinsic, stereoCalibDataVec2);
+        for (auto & item : monoCalibDataVec1)
+        {
+            estimateInitialGrid(intrinsic1, item.projection, item.extrinsic);
+        }
+        for (auto & item : monoCalibDataVec2)
+        {
+            estimateInitialGrid(intrinsic1, item.projection, item.extrinsic);
+        }
+        for (auto & item : stereoCalibDataVec)
+        {
+            estimateInitialGrid(intrinsic1, item.projection1, item.extrinsic);
+        }
+        estimateInitialExtrinsic(intrinsic2, extrinsic, stereoCalibDataVec);
     }
     
     bool compute(vector<double> & intrinsic1,
@@ -282,7 +317,7 @@ public:
             return false;
         } 
         
-        if (stereoCalibDataVec1.size() == 0)
+        if (stereoCalibDataVec.size() == 0)
         {
             cout << "ERROR : none of images were accepted" << endl;
             return false;
@@ -294,13 +329,22 @@ public:
         cout << "Global optimization" << endl;
         Problem problem;
         // Intrinsic init
-        initIntrinsicProblem(problem, intrinsic1, monoCalibDataVec1);
-        initIntrinsicProblem(problem, intrinsic2, monoCalibDataVec2);
+        for (auto & item : monoCalibDataVec1)
+        {
+            addIntrinsicResidual(problem, intrinsic1, item.projection, item.extrinsic);
+        }
+        for (auto & item : monoCalibDataVec2)
+        {
+            addIntrinsicResidual(problem, intrinsic2, item.projection, item.extrinsic);
+        }
             
         // Extrinsic init
-        initIntrinsicProblem(problem, intrinsic1, stereoCalibDataVec1);
-        initStereoProblem(problem, intrinsic2, extrinsic, stereoCalibDataVec2);
-            
+        for (auto & item : stereoCalibDataVec)
+        {
+            addIntrinsicResidual(problem, intrinsic1, item.projection1, item.extrinsic);
+            addStereoResidual(problem, intrinsic2, extrinsic, item.projection2, item.extrinsic);
+        }
+        
         Solver::Options options;
         options.max_num_iterations = 500;
         
@@ -317,12 +361,18 @@ public:
     
     bool residualAnalysis(const vector<double> & intrinsic1, 
             const vector<double> & intrinsic2,
-            const Transformation<double> & transfo)
+            const Transformation<double> & TleftRight)
     {
         residualAnalysis(intrinsic1, monoCalibDataVec1);
         residualAnalysis(intrinsic2, monoCalibDataVec2);
-        residualAnalysis(intrinsic1, stereoCalibDataVec1);
-        residualAnalysis(intrinsic2, stereoCalibDataVec2, transfo);
+        vector<CalibrationData> stereoLeftData, stereoRightData;
+        for (auto & x : stereoCalibDataVec)
+        {
+            stereoLeftData.push_back(x.getLeftMono());
+            stereoRightData.push_back(x.getRightMono(TleftRight));
+        }
+        residualAnalysis(intrinsic1, stereoLeftData);
+        residualAnalysis(intrinsic2, stereoRightData);
     }
 };
 

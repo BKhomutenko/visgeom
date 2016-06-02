@@ -27,6 +27,51 @@ struct RobotCalibrationData
 };
 
 template<template<typename> class Projector>
+struct TransformedGridProjection 
+{
+    TransformedGridProjection(const vector<Vector2d> & proj,
+            const vector<Vector3d> & grid, 
+            const Transformation<double> & TterminalGrid)
+    : _proj(proj), _grid(grid), _TterminalGrid(TterminalGrid) {}
+            
+    template <typename T>
+    bool operator()(const T * const* params,
+                    T* residual) const 
+    {
+        Transformation<T> TcameraTerminal(params[1]);
+        Transformation<T> TterminalGrid = _TterminalGrid.template cast<T>();
+        vector<Vector3<T>> transformedPoints(_grid.size());
+        for (int i = 0; i < _grid.size(); i++)
+        {
+            transformedPoints[i] = _grid[i].template cast<T>();
+        }
+        TcameraTerminal.compose(TterminalGrid).transform(transformedPoints, transformedPoints);
+        
+        Projector<T> projector;
+        for (unsigned int i = 0; i < transformedPoints.size(); i++)
+        {
+            Vector2<T> modProj;
+            if (projector(params[0], transformedPoints[i].data(), modProj.data())) 
+            {
+                Vector2<T> diff = _proj[i].template cast<T>() - modProj;
+                residual[2*i] = diff[0];
+                residual[2*i + 1] = diff[1];
+            }
+            else
+            {
+                residual[2*i] = T(0.);
+                residual[2*i + 1] = T(0.);
+            }
+        }
+        return true;
+    }
+    
+    const Transformation<double> _TterminalGrid;
+    const vector<Vector2d> _proj;
+    const vector<Vector3d> _grid;
+};
+
+template<template<typename> class Projector>
 class EndEffectorCameraCalibration : GenericCameraCalibration<Projector>
 {
 private:
@@ -38,7 +83,7 @@ private:
     using GenericCameraCalibration<Projector>::extractGridProjection;
     using GenericCameraCalibration<Projector>::constructGrid;
     using GenericCameraCalibration<Projector>::estimateInitialGrid;
-    using GenericCameraCalibration<Projector>::initIntrinsicProblem;
+    using GenericCameraCalibration<Projector>::addIntrinsicResidual;
     using GenericCameraCalibration<Projector>::residualAnalysis;
     
     // fields
@@ -102,7 +147,7 @@ public:
     
     bool compute(vector<double> & intrinsic, Transformation<double> & TterminalCamera)
     {
-        array<double, 6> endEffectorPose = TterminalCamera.toArray();
+        array<double, 6> endEffectorPose;
         cout << "### Initial extrinsic estimation ###" << endl;
 
         if (robotCalibDataVec.size() == 0)
@@ -118,7 +163,6 @@ public:
         // Problem initialization
         Problem problem;
         initEndEffectorProblem(problem, intrinsic, endEffectorPose, robotCalibDataVec);
-               
         //run the solver
         Solver::Options options;
         options.max_num_iterations = 500;
@@ -129,7 +173,7 @@ public:
         Solver::Summary summary;
         Solve(options, &problem, &summary);
         cout << summary.FullReport() << endl;
-        TterminalCamera = Transformation<double>(endEffectorPose.data());
+        TterminalCamera = Transformation<double>(endEffectorPose.data()).inverse();
     } 
     
     void estimateEndEffectorTransform(const vector<double> & intrinsic, 
@@ -139,31 +183,50 @@ public:
         Problem problem;
         typedef DynamicAutoDiffCostFunction<GridEstimate<Projector>> dynamicProjectionCF;
 
+        GridEstimate<Projector> * boardEstimate;
+        
+        //compute initial orientation
+        array<double, 6> boardPose = {0,  0, 1, 0,  0, 0};
+        auto v = item.projection[2] - item.projection[0];
+        float alpha = atan2(v[1], v[0]);
+        boardPose[5] = alpha;
+        
+        //optimize the position
+        boardEstimate = new GridEstimate<Projector>(item.projection,
+                                    grid, intrinsic);
+        dynamicProjectionCF * costFunction = new dynamicProjectionCF(boardEstimate);
+        costFunction->AddParameterBlock(6);
+        costFunction->SetNumResiduals(2 * Nx * Ny);
+        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), boardPose.data());
+
+        //run the solver
+        Solver::Options options;
+        options.max_num_iterations = 50;
+        Solver::Summary summary;
+        Solve(options, &problem, &summary);
+
         // rough estimation of the end effector transformation
         Transformation<double> TbaseGrid(gridPose.data());
         Transformation<double> TbaseTerminal(item.robotPose.data());
-        Transformation<double> TterminalGrid = TbaseTerminal.inverseCompose(TbaseGrid);
-        Transformation<double> TgridCamera(sqSize * Nx / 2, sqSize * Ny / 2, -1, 0, 0, 0);
-        Transformation<double> TterminalCamera = TterminalGrid.compose(TgridCamera);
-        endEffectorPose = TterminalCamera.toArray();
+        Transformation<double> TgridTerminal = TbaseGrid.inverseCompose(TbaseTerminal);
+        Transformation<double> TcameraGrid(boardPose.data());
+        Transformation<double> TcameraTerminal = TcameraGrid.compose(TgridTerminal);
+        endEffectorPose = TcameraTerminal.toArray();
     }
     
     void initEndEffectorProblem(Problem & problem, vector<double> & intrinsic,
             array<double, 6> & endEffectorPose,
             vector<RobotCalibrationData> & calibDataVec)
     {
-        typedef DynamicAutoDiffCostFunction<GridProjection<Projector>> projectionCF;
+        typedef DynamicAutoDiffCostFunction<TransformedGridProjection<Projector>> projectionCF;
         Transformation<double> TbaseGrid(gridPose.data());
         for (auto & item : calibDataVec)
         {
-            GridProjection<Projector> * gridProjection;
-            
             Transformation<double> TbaseTerminal(item.robotPose.data());
             Transformation<double> TterminalGrid = TbaseTerminal.inverseCompose(TbaseGrid);
-            vector<Vector3d> transformedGrid;
-            TterminalGrid.transform(grid, transformedGrid);
             
-            gridProjection = new GridProjection<Projector>(item.projection, transformedGrid);
+            TransformedGridProjection<Projector> * gridProjection =
+                    new TransformedGridProjection<Projector>(item.projection, grid, TterminalGrid);
             projectionCF * costFunction = new projectionCF(gridProjection);
             costFunction->AddParameterBlock(intrinsic.size());
             costFunction->AddParameterBlock(6);
@@ -183,12 +246,11 @@ public:
             Transformation<double> TterminalGrid = TbaseTerminal.inverseCompose(TbaseGrid);
             CalibrationData calibData;
             calibData.fileName = item.fileName;
-            calibData.extrinsic = ArraySharedPtr(new array<double, 6>);
-            TterminalGrid.toArray(calibData.extrinsic->data());
+            calibData.extrinsic = TterminalCamera.inverseCompose(TterminalGrid).toArray();
             calibData.projection = item.projection;
             monoCalibDataVec.push_back(calibData);
         }
-        residualAnalysis(intrinsic, monoCalibDataVec, TterminalCamera);
+        residualAnalysis(intrinsic, monoCalibDataVec);
     }
 
 };

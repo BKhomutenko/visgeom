@@ -84,14 +84,14 @@ public:
     Vector3<T> toRotationVector() const
     {
         T s = sqrt(x*x + y*y + z*z);
-        T th = 2. * atan2(s, w);
         Vector3<T> u(x, y, z);
-        if (th < 1e-5)
+        if (s < 1e-5)
         {
             return u * T(2.);
         }
         else
         {
+            T th = 2. * atan2(s, w);
             return u / s * th;
         }
     } 

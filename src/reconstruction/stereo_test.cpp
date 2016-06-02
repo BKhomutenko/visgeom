@@ -32,14 +32,14 @@ int main(int argc, char** argv)
     int x2 = 0;
     for (int i = 0; i < 10000000; i++)
     {
-        raster.makeStep();
+        raster.step();
         x1 += raster.x;
     }
     auto tr1 = clock();
     
     for (int i = 0; i < 10000000; i++)
     {
-        raster2.makeStep();
+        raster2.step();
         x2 += raster2.x;
     }
     auto tr2 = clock();
@@ -76,16 +76,36 @@ int main(int argc, char** argv)
     cout << endl;
     paramFile.ignore();
     
-    array<double, 6> transfArr;
-    cout << "Transformation First-Second:" << endl;
-    for (auto & e: transfArr) 
+    array<double, 6> cameraPose;
+    cout << "Camera pose wrt the robot :" << endl;
+    for (auto & e: cameraPose) 
     {
         paramFile >> e;
         cout << setw(10) << e;
     }
     cout << endl;
     paramFile.ignore();
-    Transformation<double> TleftRight(transfArr.data());
+    Transformation<double> TbaseCamera(cameraPose.data());
+    
+    array<double, 6> robotPose1, robotPose2;
+    cout << "First robot's pose :" << endl;
+    for (auto & e: robotPose1) 
+    {
+        paramFile >> e;
+        cout << setw(10) << e;
+    }
+    cout << endl;
+    cout << "Second robot's pose :" << endl;
+    for (auto & e: robotPose2) 
+    {
+        paramFile >> e;
+        cout << setw(10) << e;
+    }
+    cout << endl;
+    paramFile.ignore();
+    Transformation<double> T01(robotPose1.data()), T02(robotPose2.data());
+    
+    Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
     
     StereoParameters stereoParams;
     paramFile >> stereoParams.u0;
@@ -93,15 +113,45 @@ int main(int argc, char** argv)
     paramFile >> stereoParams.disparityMax;
     paramFile >> stereoParams.blockSize;
     paramFile.ignore();
-    
+//    stereoParams.lambdaStep = 5;
+//    stereoParams.lambdaJump = 15;
     string fileName1, fileName2;
     getline(paramFile, fileName1);
     getline(paramFile, fileName2);
     
     Mat8 img1 = imread(fileName1, 0);
     Mat8 img2 = imread(fileName2, 0);
-
+    Mat_<int16_t> img1lap, img2lap;
+    
+//    
+//    Laplacian(img1, img1lap, CV_16S, 3);
+//    Laplacian(img2, img2lap, CV_16S, 3);
+    
+//    GaussianBlur(img1, img1, Size(5, 5), 0, 0);
+//    GaussianBlur(img2, img2, Size(5, 5), 0, 0);
+    
+//    img1lap = img1lap + 128;
+//    img2lap = img2lap + 128;
+//    img1lap.copyTo(img1);
+//    img2lap.copyTo(img2);
+//    
     EnhancedStereo stereo(TleftRight, img1.cols, img1.rows, params1.data(), params2.data(), stereoParams);
+    
+    Mat8 out1, out2;
+    
+    img1.copyTo(out1);
+    img2.copyTo(out2);
+    
+    
+    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
+    {
+        out1(x) = 0;
+        out1(x.y + 1, x.x) = 0;
+        out1(x.y, x.x + 1) = 255;
+        out1(x.y + 1, x.x + 1) = 255;
+        stereo.traceEpipolarLine(x, out2);
+    }
+    
 
     cv::Mat_<uint8_t> res;
     auto t2 = clock();
@@ -109,6 +159,8 @@ int main(int argc, char** argv)
     auto t3 = clock();
     cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
     
+    imshow("out1", out1);
+    imshow("out2", out2);
     imshow("res", res*2);
     waitKey(); 
     return 0;

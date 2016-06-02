@@ -46,13 +46,10 @@ using ceres::SoftLOneLoss;
 
 int nObjects = 0;
 
-typedef shared_ptr<array<double, 6>> ArraySharedPtr;
-
-// TODO rewrite to get rid of shared pointers
 struct CalibrationData
 {
     vector<Vector2d> projection;
-    ArraySharedPtr extrinsic;
+    array<double, 6> extrinsic;
     string fileName;
 };
 
@@ -64,7 +61,6 @@ protected:
     double sqSize;
     double outlierThresh;
     vector<Vector3d> grid;
-
 public:
 
     //TODO chanche the file formatting
@@ -99,7 +95,7 @@ public:
                 continue;
             }
 
-            calibData.extrinsic = ArraySharedPtr(new array<double, 6>{0, 0, 1, 0, 0, 0});
+            calibData.extrinsic = array<double, 6>{0, 0, 1, 0, 0, 0};
             calibDataVec.push_back(calibData);
 
             cout << "." << flush;
@@ -151,64 +147,51 @@ public:
     }
 
     void estimateInitialGrid(const vector<double> & intrinsic,
-            vector<CalibrationData> & calibDataVec)
+            const vector<Vector2d> & projection,
+            array<double, 6> & extrinsic)
     {
-        for (int i = 0; i < calibDataVec.size(); i++)
-        {
-            Problem problem;
-            typedef DynamicAutoDiffCostFunction<GridEstimate<Projector>> dynamicProjectionCF;
+        Problem problem;
+        typedef DynamicAutoDiffCostFunction<GridEstimate<Projector>> dynamicProjectionCF;
 
-            GridEstimate<Projector> * boardEstimate;
-            
-            //compute initial orientation
-            
-            auto v = calibDataVec[i].projection[1] - calibDataVec[i].projection[0];
-            float alpha = atan2(v[1], v[0]);
-            calibDataVec[i].extrinsic->data()[5] = alpha;
-            
-            //optimize the position
-            boardEstimate = new GridEstimate<Projector>(calibDataVec[i].projection,
-                                        grid, intrinsic);
-            dynamicProjectionCF * costFunction = new dynamicProjectionCF(boardEstimate);
-            costFunction->AddParameterBlock(6);
-            costFunction->SetNumResiduals(2 * Nx * Ny);
-            problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    calibDataVec[i].extrinsic->data());
+        GridEstimate<Projector> * boardEstimate;
+        
+        //compute initial orientation
+        
+        auto v = projection[1] - projection[0];
+        float alpha = atan2(v[1], v[0]);
+        extrinsic[5] = alpha;
+        
+        //optimize the position
+        boardEstimate = new GridEstimate<Projector>(projection,
+                                    grid, intrinsic);
+        dynamicProjectionCF * costFunction = new dynamicProjectionCF(boardEstimate);
+        costFunction->AddParameterBlock(6);
+        costFunction->SetNumResiduals(2 * Nx * Ny);
+        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), extrinsic.data());
 
-            //run the solver
-            Solver::Options options;
-            options.max_num_iterations = 250;
-            Solver::Summary summary;
-            Solve(options, &problem, &summary);
-        }
+        //run the solver
+        Solver::Options options;
+        options.max_num_iterations = 250;
+        Solver::Summary summary;
+        Solve(options, &problem, &summary);
     }
 
-    void initIntrinsicProblem(Problem & problem, vector<double> & intrinsic,
-            vector<CalibrationData> & calibDataVec)
+    void addIntrinsicResidual(Problem & problem, vector<double> & intrinsic,
+            const vector<Vector2d> & projection,
+            array<double, 6> & extrinsic)
     {
         typedef DynamicAutoDiffCostFunction<GridProjection<Projector>> projectionCF;
-        for (int i = 0; i < calibDataVec.size(); i++)
-        {
-            GridProjection<Projector> * boardProjection;
-            boardProjection = new GridProjection<Projector>(calibDataVec[i].projection, grid);
-            projectionCF * costFunction = new projectionCF(boardProjection);
-            costFunction->AddParameterBlock(intrinsic.size());
-            costFunction->AddParameterBlock(6);
-            costFunction->SetNumResiduals(2 * Nx * Ny);
-            problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), intrinsic.data(),
-                    calibDataVec[i].extrinsic->data());
-        }
+        GridProjection<Projector> * boardProjection;
+        boardProjection = new GridProjection<Projector>(projection, grid);
+        projectionCF * costFunction = new projectionCF(boardProjection);
+        costFunction->AddParameterBlock(intrinsic.size());
+        costFunction->AddParameterBlock(6);
+        costFunction->SetNumResiduals(2 * Nx * Ny);
+        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), intrinsic.data(), extrinsic.data());
     }
 
     void residualAnalysis(const vector<double> & intrinsic,
             const vector<CalibrationData> & calibDataVec)
-    {
-        residualAnalysis(intrinsic, calibDataVec, Transformation<double>());
-    }
-
-    void residualAnalysis(const vector<double> & intrinsic,
-            const vector<CalibrationData> & calibDataVec,
-            const Transformation<double> & TrefCam)
     {
 
         double Ex = 0, Ey = 0;
@@ -220,8 +203,7 @@ public:
         for (int ptIdx = 0; ptIdx < calibDataVec.size(); ptIdx++)
         {
                 vector<Vector3d> transfModelVec;
-                Transformation<double> TrefGrid(calibDataVec[ptIdx].extrinsic->data());
-                Transformation<double> TcamGrid = TrefCam.inverseCompose(TrefGrid);
+                Transformation<double> TcamGrid(calibDataVec[ptIdx].extrinsic.data());
                 TcamGrid.transform(grid, transfModelVec);
 
                 vector<Vector2d> projModelVec(transfModelVec.size());

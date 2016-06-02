@@ -5,11 +5,11 @@ add_definitions(-std=c++11)
 project( calibration )
 
 find_package( OpenCV REQUIRED )
+FIND_PACKAGE(Ceres REQUIRED)
 
 #find_package( Eigen3 REQUIRED )
-include_directories(${EIGEN3_INCLUDE_DIR})
 
-FIND_PACKAGE(Ceres REQUIRED)
+include_directories(${EIGEN3_INCLUDE_DIR})
 INCLUDE_DIRECTORIES(${CERES_INCLUDE_DIRS})
 
 include_directories(include)
@@ -46,7 +46,7 @@ add_executable( rectify
     src/calibration/rectify.cpp
 )
 
-target_link_libraries( rectify ${OpenCV_LIBS} )
+target_link_libraries( rectify ${OpenCV_LIBRARIES} )
 TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
 
 add_executable( stereo 
@@ -56,6 +56,19 @@ add_executable( stereo
 
 target_link_libraries( stereo ${OpenCV_LIBS} )
 
+add_executable( multistereo 
+   src/reconstruction/stereo_multibase.cpp
+   src/reconstruction/eucm_stereo.cpp
+)
+
+target_link_libraries( multistereo ${OpenCV_LIBS} )
+
+add_executable( generate_plane 
+   src/reconstruction/generate_plane.cpp
+   src/reconstruction/eucm_stereo.cpp
+)
+
+target_link_libraries( generate_plane ${OpenCV_LIBS} )
 
 if(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS "-O2")        ## Optimize

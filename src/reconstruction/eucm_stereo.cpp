@@ -158,13 +158,13 @@ void EnhancedStereo::traceEpipolarLine(Point pt, Mat_<uint8_t> & out)
         out(raster.y+1, raster.x) = 0;
         out(raster.y, raster.x+1) = 0;
         out(raster.y+1, raster.x+1) = 0;
-        raster.makeStep();
+        raster.step();
     }
 }
 
 void EnhancedStereo::createBuffer()
 {
-    cout << "create" << endl;
+//    cout << "create" << endl;
     int bufferWidth = smallWidth()*dispMax;
     if (errorBuffer.cols != bufferWidth or errorBuffer.rows != smallHeight())
     {
@@ -205,7 +205,7 @@ void EnhancedStereo::comuteStereo(const Mat_<uint8_t> & img1,
 void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t> & img2)
 {
     double T1 = 0, T2 = 0; // time profiling
-    cout << "cost" << endl;
+//    cout << "cost" << endl;
     Mat_<uint8_t> img2remap(Size(blockSize - 1 + dispMax, blockSize));
     Mat_<int> integral1, integral2;
     integral(img1, integral1);
@@ -221,11 +221,16 @@ void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t>
             CurveRasterizer<Polynomial2> raster(pinf.x, pinf.y, epipolePx.x, epipolePx.y, epipolarVec[idx]);
             
             // the remap Mat
-            for (int i = 0; i < img2remap.cols; i++, raster.makeStep())
+            img2remap.setTo(0);
+            for (int i = 0; i < img2remap.cols; i++, raster.step())
             {
+                int u2 = raster.x + halfBlockSize();
+                if (u2 < 0 or u2 >= img2.cols) continue;
                 for (int j = -halfBlockSize(); j <= halfBlockSize(); j++)
                 {
-                    img2remap(halfBlockSize() + j, i) = img2(raster.y + j, raster.x + 2);
+                    int v2 = raster.y + j;
+                    if (v2 < 0 or v2 >= img2.rows) continue;
+                    img2remap(halfBlockSize() + j, i) = img2(v2, u2);
                 }
             }
             
@@ -243,7 +248,7 @@ void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t>
             {
                 int bias = integral2(blockSize, i + blockSize) - integral2(blockSize, i);
                 bias = (bias - bias1) / blockSize2;
-                bias = min(5, max(-5, bias));
+                bias = min(10, max(-10, bias));
 //                cout << bias << " ";
                 int acc = 0;
                 for (int x2 = -halfBlockSize(); x2 <= halfBlockSize(); x2++)
@@ -260,8 +265,8 @@ void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t>
 //            cout << endl;
         }
     }
-    cout << "read " << T1 / CLOCKS_PER_SEC << endl;
-    cout << "write " << T2 / CLOCKS_PER_SEC << endl;
+//    cout << "read " << T1 / CLOCKS_PER_SEC << endl;
+//    cout << "write " << T2 / CLOCKS_PER_SEC << endl;
 } 
 
 void EnhancedStereo::computeDynamicStep(const int* inCost, const uint8_t * error, int * outCost)
@@ -294,7 +299,7 @@ void EnhancedStereo::computeDynamicStep(const int* inCost, const uint8_t * error
 
 void EnhancedStereo::computeDynamicProgramming()
 {
-    cout << "left" << endl;
+//    cout << "left" << endl;
     // left tableau init
     for (int v = 0; v < smallHeight(); v++)
     {
@@ -308,7 +313,7 @@ void EnhancedStereo::computeDynamicProgramming()
             computeDynamicStep(tableauRow + (u - 1)*dispMax, errorRow + u*dispMax, tableauRow + u*dispMax);
         }
     }
-    cout << "right" << endl;    
+//    cout << "right" << endl;    
     // right tableau init
     for (int v = 0; v < smallHeight(); v++)
     {
@@ -322,7 +327,7 @@ void EnhancedStereo::computeDynamicProgramming()
             computeDynamicStep(tableauRow + (u + 1)*dispMax, errorRow + u*dispMax, tableauRow + u*dispMax);
         }
     }
-    cout << "top" << endl;
+//    cout << "top" << endl;
     // top-down tableau init
     for (int u = 0; u < smallWidth(); u++)
     {
@@ -336,7 +341,7 @@ void EnhancedStereo::computeDynamicProgramming()
                     (int*)(tableauCol.row(v).data));
         }
     }
-    cout << "bottom" << endl;
+//    cout << "bottom" << endl;
     // bottom-up tableau init
     for (int u = 0; u < smallWidth(); u++)
     {
@@ -358,7 +363,7 @@ void EnhancedStereo::computeDynamicProgramming()
 
 void EnhancedStereo::reconstructDisparity()
 {
-    Mat_<uint8_t> errFinalMat(smallDisparity.size());
+    Mat_<uint16_t> errFinalMat(smallDisparity.size());
     for (int v = 0; v < smallHeight(); v++)
     {
         int* dynRow1 = (int*)(tableauLeft.row(v).data);
@@ -370,31 +375,117 @@ void EnhancedStereo::reconstructDisparity()
         {
             int bestCost = 10000;
             uint8_t & bestDisp = smallDisparity(v, u);
-            uint8_t & bestErr = errFinalMat(v, u);
+            uint16_t & bestErr = errFinalMat(v, u);
             bestDisp = 0;
             for (int d = 0; d < dispMax; d++)
             {
                 int base = u * dispMax;
 //                if (errRow[base + d] > 5) continue;
-                int acc = dynRow1[base + d] + dynRow2[base + d] + dynRow3[base + d] + dynRow4[base + d];
+                int acc = dynRow1[base + d] + dynRow2[base + d] 
+                        + dynRow3[base + d] + dynRow4[base + d] - 2*errRow[base + d];
                 if (bestCost > acc)
                 {
                     bestCost = acc;
                     bestDisp = d;
-                    bestErr = acc/10;
+                    bestErr = acc;
                 }
             }
 //            cout << int(bestErr) << endl;
         }
         
     }
-    imshow("errFinal", errFinalMat);
+//    imshow("errFinal", errFinalMat);
 //    medianBlur(smallDisparity, smallDisparity, 3);
 }
 
+Vector3d EnhancedStereo::triangulate(int x1, int y1, int x2, int y2)
+{
+    //Vector3d v1n = v1 / v1.norm(), v2n = v2 / v2.norm();
+    Vector3d v1, v2;
+    cam1.reconstructPoint(Vector2d(x1, y1), v1);
+    cam2.reconstructPoint(Vector2d(x2, y2), v2);
+    Vector3d t = Transform12.trans();
+    v2 = Transform12.rotMat() * v2;
+    double v1v2 = v1.dot(v2);
+    double v1v1 = v1.dot(v1);
+    double v2v2 = v2.dot(v2);
+    double tv1 = t.dot(v1);
+    double tv2 = t.dot(v2);
+    double delta = -v1v1 * v2v2 + v1v2 * v1v2;
+    if (abs(delta) < 1e-4) // TODO the constant to be revised
+    {
+        return Vector3d(0, 0, 0);
+    }
+    double l1 = (-tv1 * v2v2 + tv2 * v1v2)/delta;
+    double l2 = (tv2 * v1v1 - tv1 * v1v2)/delta;
+    return (v1*l1 + t + v2*l2)*0.5;
+}
+
+void EnhancedStereo::computeDistance(Mat_<float> & distance)
+{
+    distance.create(smallHeight(), smallWidth());
+    for (int v = 0; v < smallHeight(); v++)
+    {
+        for (int u = 0; u < smallWidth(); u++)
+        {
+            if (smallDisparity(v, u) == 0) 
+            {
+                distance(v, u) = 100;
+                continue;
+            }
+            int idx = getLinearIdx(vBig(v), uBig(u));
+            Point pinf = pinfPxVec[idx];
+            CurveRasterizer<Polynomial2> raster(pinf.x, pinf.y, epipolePx.x, epipolePx.y, epipolarVec[idx]);
+            raster.step(smallDisparity(v, u));
+            Vector3d X = triangulate(uBig(u), vBig(v), raster.x, raster.y);
+            distance(v, u) = X.norm();
+        }
+    }
+}
+
+void EnhancedStereo::generatePlane(Transformation<double> TcameraPlane,
+        Mat_<float> & distance, const vector<Vector3d> & polygonVec)
+{
+    distance.create(smallHeight(), smallWidth());
+    Vector3d t = TcameraPlane.trans();
+    Vector3d z = TcameraPlane.rotMat().col(2);
+    vector<Vector3d> polygonCamVec;
+    TcameraPlane.transform(polygonVec, polygonCamVec);
+    for (int v = 0; v < smallHeight(); v++)
+    {
+        for (int u = 0; u < smallWidth(); u++)
+        {
+            distance(v, u) = 0;
+            Vector3d vec; // the direction vector
+            if (not cam1.reconstructPoint(Vector2d(uBig(u), vBig(v)), vec)) continue;
+            double zvec = z.dot(vec);
+            if (zvec < 1e-3) 
+            {
+                continue;
+            }
+            bool inside = true;
+            for (int i = 0; i < polygonCamVec.size(); i++)
+            {
+                int j = (i + 1) % polygonCamVec.size();
+                Vector3d normal = polygonCamVec[i].cross(polygonCamVec[j]);
+                if (vec.dot(normal) < 0)
+                {
+                    inside = false;
+                    break;
+                }
+            }
+            if (not inside) continue;
+            double tz = t.dot(z);
+            double alpha = tz / zvec;
+            vec *= alpha;
+            distance(v, u) = vec.norm();
+        }
+    }
+}
 
 void EnhancedStereo::upsampleDisparity(const Mat_<uint8_t> & img1, Mat_<uint8_t> & disparity)
 {
-    resize(smallDisparity, disparity, Size(0, 0), blockSize, blockSize, 0);
+    smallDisparity.copyTo(disparity);
+//    resize(smallDisparity, disparity, Size(0, 0), blockSize, blockSize, 0);
 }
 

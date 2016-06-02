@@ -155,6 +155,12 @@ public:
     
     int halfBlockSize() { return blockSize / 2; }
     
+    // reconstruction
+    Vector3d triangulate(int x1, int y1, int x2, int y2);
+    void computeDistance(cv::Mat_<float> & distance);
+    void generatePlane(Transformation<double> TcameraPlane, 
+            cv::Mat_<float> & distance, const vector<Vector3d> & polygonVec);
+    
 private:
     Transformation<double> Transform12;  // pose of the first to the second camera
     EnhancedCamera cam1, cam2;

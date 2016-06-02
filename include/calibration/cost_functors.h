@@ -46,21 +46,26 @@ struct GridProjection
         for (unsigned int i = 0; i < transformedPoints.size(); i++)
         {
             Vector2<T> modProj;
-            if (not projector(params[0], transformedPoints[i].data(), modProj.data())) 
+            if (projector(params[0], transformedPoints[i].data(), modProj.data())) 
             {
-                return false;
+                Vector2<T> diff = _proj[i].template cast<T>() - modProj;
+                residual[2*i] = diff[0];
+                residual[2*i + 1] = diff[1];
             }
-            Vector2<T> diff = _proj[i].template cast<T>() - modProj;
-            residual[2*i] = diff[0];
-            residual[2*i + 1] = diff[1];
+            else
+            {
+                residual[2*i] = T(0.);
+                residual[2*i + 1] = T(0.);
+            }
         }
         return true;
     }
     
-    const vector<Vector2d> & _proj;
-    const vector<Vector3d> & _grid;
+    const vector<Vector2d> _proj;
+    const vector<Vector3d> _grid;
 };
-   
+
+    
 template<template<typename> class Projector>
 struct GridEstimate
 {
@@ -84,16 +89,23 @@ struct GridEstimate
         for (unsigned int i = 0; i < transformedPoints.size(); i++)
         {
             Vector2<T> modProj;
-            projector(camParamsT.data(), transformedPoints[i].data(), modProj.data());
-            Vector2<T> diff = _proj[i].template cast<T>() - modProj;
-            residual[2*i] = diff[0];
-            residual[2*i + 1] = diff[1];
+            if (projector(camParamsT.data(), transformedPoints[i].data(), modProj.data()))
+            {
+                Vector2<T> diff = _proj[i].template cast<T>() - modProj;
+                residual[2*i] = diff[0];
+                residual[2*i + 1] = diff[1];
+            }
+            else
+            {
+                residual[2*i] = T(0.);
+                residual[2*i + 1] = T(0.);
+            }
         }
         return true;
     }
     
-    const vector<double> & _camParams;
-    const vector<Vector2d> & _proj;
-    const vector<Vector3d> & _grid;
+    const vector<double> _camParams;
+    const vector<Vector2d> _proj;
+    const vector<Vector3d> _grid;
 };
 

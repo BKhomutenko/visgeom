@@ -50,6 +50,7 @@ struct EnhancedProjector
         
         T denom = alpha * sqrt(z*z + beta*(x*x + y*y)) + (T(1.) - alpha) * z;
 
+        if (denom < 1e-3) return false;
         // Project the point to the mu plane
         T xn = x / denom;
         T yn = y / denom;
@@ -93,8 +94,9 @@ public:
         double u2 = xn * xn + yn * yn;
         double gamma = 1. - alpha;    
         double num = 1. - u2 * alpha * alpha * beta;
-        
-        double denom = gamma + alpha*sqrt(1 - (alpha - gamma)*beta*u2);
+        double det = 1 - (alpha - gamma)*beta*u2;
+        if (det < 0) return false;
+        double denom = gamma + alpha*sqrt(det);
         dst << xn, yn, num/denom;
 
         return true;

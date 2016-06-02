@@ -123,7 +123,10 @@ public:
     
     T * rotData() { return mrot.data(); }
     T * transData() { return mtrans.data(); }
-
+    
+    const T * rotData() const { return mrot.data(); }
+    const T * transData() const { return mtrans.data(); }
+    
     friend ostream& operator << (ostream & os, const Transformation & transfo)
     {
         os << transfo.mtrans.transpose() << " # " << transfo.mrot.transpose();
@@ -182,7 +185,7 @@ public:
         dst = R * src;
     }
 
-    array<T, 6> toArray()
+    array<T, 6> toArray() const
     {
         array<T, 6> res;
         copy(transData(), transData() + 3, res.data());
@@ -190,10 +193,16 @@ public:
         return res;
     }
     
-    void toArray(T * const data)
+    void toArray(T * const data) const
     {
         copy(transData(), transData() + 3, data);
         copy(rotData(), rotData() + 3, data + 3);
+    }
+    
+    template<typename T2>
+    Transformation<T2> cast() const
+    {
+        return Transformation<T2>(mtrans.template cast<T2>(), mrot.template cast<T2>());
     }
     
 private:
