@@ -16,7 +16,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
 /*
-The Enhanced Unified Camera Model
+The Pinhole Camera Model
 */
 
 #pragma once
