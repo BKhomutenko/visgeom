@@ -23,7 +23,7 @@ The Enhanced Unified Camera Model
 
 #include <Eigen/Eigen>
 
-#include "camera.h"
+#include "camera/generic_camera.h"
 
 
 template<typename T> 

@@ -23,7 +23,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "geometry.h"
 #include "eucm.h"
-#include "calibration.h"
+#include "calibration/calibration.h"
 
 using namespace cv;
 using Eigen::JacobiSVD;
