@@ -70,6 +70,14 @@ add_executable( generate_plane
 
 target_link_libraries( generate_plane ${OpenCV_LIBS} )
 
+add_executable( photometric
+   src/localization/photometric_test.cpp
+   src/localization/photometric.cpp
+)
+
+target_link_libraries( photometric ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( photometric ${CERES_LIBRARIES})
+
 if(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS "-O2")        ## Optimize
     set(CMAKE_EXE_LINKER_FLAGS "-s")  ## Strip binary
