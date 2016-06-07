@@ -25,6 +25,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "camera/pinhole.h"
 #include "camera/eucm.h"
 
+using namespace std;
+
 using namespace cv;
 using Eigen::Vector2d;
 using Eigen::Vector3d;

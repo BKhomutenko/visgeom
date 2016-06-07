@@ -32,8 +32,29 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "cost_functors.h"
 
-using namespace std;
-using namespace cv;
+using std::vector;
+using std::array;
+using std::string;
+using std::cin;
+using std::cout;
+using std::endl;
+using std::flush;
+using std::setw;
+using std::istringstream;
+using std::ifstream;
+
+// OpenCV data structures
+using cv::Mat_;
+using cv::Mat;
+using cv::Size;
+using cv::Point;
+// OpenCV functions
+using cv::circle;
+using cv::imread;
+using cv::imshow;
+using cv::waitKey;
+using cv::Point2f;
+
 using Eigen::Vector3d;
 using Eigen::Vector2d;
 

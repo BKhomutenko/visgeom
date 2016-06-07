@@ -142,15 +142,15 @@ int main(int argc, char** argv)
     img1.copyTo(out1);
     img2.copyTo(out2);
     
-    
-    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
-    {
-        out1(x) = 0;
-        out1(x.y + 1, x.x) = 0;
-        out1(x.y, x.x + 1) = 255;
-        out1(x.y + 1, x.x + 1) = 255;
-        stereo.traceEpipolarLine(x, out2);
-    }
+//    
+//    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
+//    {
+//        out1(x) = 0;
+//        out1(x.y + 1, x.x) = 0;
+//        out1(x.y, x.x + 1) = 255;
+//        out1(x.y + 1, x.x + 1) = 255;
+//        stereo.traceEpipolarLine(x, out2);
+//    }
     
 
     cv::Mat_<uint8_t> res;
@@ -161,7 +161,7 @@ int main(int argc, char** argv)
     
     imshow("out1", out1);
     imshow("out2", out2);
-    imshow("res", res*2);
+    imshow("res", res);
     waitKey(); 
     return 0;
 }

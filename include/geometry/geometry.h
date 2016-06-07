@@ -34,7 +34,10 @@ using Vector3 = Eigen::Matrix<T, 3, 1>;
 template<typename T>
 using Matrix3 = Eigen::Matrix<T, 3, 3>; 
 
-using namespace std;
+using std::vector;
+using std::array;
+using std::ostream;
+using std::copy;
 
 template<typename T>
 inline T sinc(const T & x)

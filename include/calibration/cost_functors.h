@@ -20,7 +20,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include <vector>
 #include <Eigen/Eigen>
 
-using namespace std;
+using std::vector;
+
 using Eigen::Vector3d;
 using Eigen::Vector2d;
 

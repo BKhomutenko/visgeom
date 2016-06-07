@@ -248,7 +248,7 @@ void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t>
             {
                 int bias = integral2(blockSize, i + blockSize) - integral2(blockSize, i);
                 bias = (bias - bias1) / blockSize2;
-                bias = min(10, max(-10, bias));
+                bias = min(3, max(-3, bias));
 //                cout << bias << " ";
                 int acc = 0;
                 for (int x2 = -halfBlockSize(); x2 <= halfBlockSize(); x2++)
