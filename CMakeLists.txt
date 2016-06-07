@@ -73,6 +73,7 @@ target_link_libraries( generate_plane ${OpenCV_LIBS} )
 add_executable( photometric
    src/localization/photometric_test.cpp
    src/localization/photometric.cpp
+   src/reconstruction/eucm_stereo.cpp
 )
 
 target_link_libraries( photometric ${OpenCV_LIBS} )
