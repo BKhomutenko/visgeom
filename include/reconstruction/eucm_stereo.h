@@ -66,7 +66,7 @@ public:
             v0(stereoParams.v0)
     { 
         if (stereoParams.width > 0) uMax = u0 + stereoParams.width;
-        else uMax = imageWidth - stereoParams.u0;
+        else uMax = imageWidth - u0;
         if (stereoParams.width > 0) vMax = v0 + stereoParams.height;
         else vMax = imageHeight - v0;
         init(); 

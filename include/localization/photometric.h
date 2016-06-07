@@ -31,6 +31,7 @@ Relative camera pose estimation based on photometric error and depth map
 
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
+#include "reconstruction/eucm_stereo.h"
 
 using std::vector;
 
@@ -116,12 +117,17 @@ class PhotometricLocalization
 {
 public:
     PhotometricLocalization(int imageWidth, int imageHeight, 
-            const double * params1, const double * params2) : 
+            const double * params1, const double * params2,
+            const StereoParameters & stereoParams) : 
             cam1(imageWidth, imageHeight, params1),
-            cam2(imageWidth, imageHeight, params2) {}
+            cam2(imageWidth, imageHeight, params2),
+            blockSize(stereoParams.blockSize),
+            u0(stereoParams.u0 + stereoParams.disparityMax + stereoParams.blockSize),
+            v0(stereoParams.v0) {}
+            
     virtual ~PhotometricLocalization() {}
     
-    bool computeExtrinsic(const cv::Mat_<float> & img1,  const cv::Mat_<float> & img2, 
+    bool computePose(const cv::Mat_<float> & img1,  const cv::Mat_<float> & img2, 
             const cv::Mat_<float> & dist, Transformation<double> & xi);
     
     bool initCloud(const cv::Mat_<float> & img1, const cv::Mat_<float> & dist);
@@ -130,6 +136,7 @@ private:
     EnhancedCamera cam1, cam2;
     vector<Vector3d> cloud;
     vector<float> colorVec;
+    int u0, v0, blockSize;
 };
 
 

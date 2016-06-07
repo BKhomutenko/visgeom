@@ -40,7 +40,7 @@ using ceres::SoftLOneLoss;
 
 typedef cv::Mat_<float> Matf;
 
-bool PhotometricLocalization::computeExtrinsic(const Matf & img1,
+bool PhotometricLocalization::computePose(const Matf & img1,
             const Matf & img2, const Matf & dist, Transformation<double> & xi)
 {
     if (not initCloud(img1, dist)) return false;
@@ -57,10 +57,11 @@ bool PhotometricLocalization::computeExtrinsic(const Matf & img1,
     
     //run the solver
     Solver::Options options;
+    options.linear_solver_type = ceres::DENSE_QR;
     options.max_num_iterations = 500;
-    options.function_tolerance = 1e-10;
-    options.gradient_tolerance = 1e-10;
-    options.parameter_tolerance = 1e-10;
+//    options.function_tolerance = 1e-10;
+//    options.gradient_tolerance = 1e-10;
+//    options.parameter_tolerance = 1e-10;
     options.minimizer_progress_to_stdout = true;
     Solver::Summary summary;
     Solve(options, &problem, &summary);
@@ -74,20 +75,29 @@ bool PhotometricLocalization::computeExtrinsic(const Matf & img1,
 bool PhotometricLocalization::initCloud(const cv::Mat_<float> & img1, const cv::Mat_<float> & dist)
 {
     vector<Vector2d> imagePointVec;
-    for (int v = 0; v < img1.rows; v++)
+    vector<double> distVec;
+    for (int v = 0; v < img1.rows; v+=3)
     {
-        for (int u = 0; u < img1.cols; u++)
+        for (int u = 0; u < img1.cols; u+=3)
         {
             //TODO change it
-            int ud = u, vd = v;
-            
-            if (dist(vd, ud) == 0) continue;
+            int ud = (u - u0) / blockSize;
+            int vd = (v - v0) / blockSize;
+            if (ud < 0 or ud >= dist.cols or vd < 0 or vd >= dist.rows) continue;
+            if (dist(vd, ud) < 0.01) continue;
+//            cout << u << " " << v <<" " << ud << " " << vd << " " << dist(vd, ud) << endl;
             colorVec.push_back(img1(v, u));
             imagePointVec.emplace_back(u, v);
+            distVec.push_back(dist(vd, ud));
         }
     }
     // TODO check the reconstruction and discard bad points
     cam1.reconstructPointCloud(imagePointVec, cloud);
+    for (int i = 0; i < cloud.size(); i++)
+    {
+        cloud[i] = cloud[i] * (distVec[i] / cloud[i].norm());
+//        cout << cloud[i].transpose() << endl;
+    }
     return true;
 }
 /*
