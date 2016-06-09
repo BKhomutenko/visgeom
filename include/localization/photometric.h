@@ -113,6 +113,8 @@ struct PhotometricError
     const cv::Mat_<float> & _img2;
 };
 
+
+//TODO implement multiscale
 class PhotometricLocalization
 {
 public:
@@ -127,15 +129,17 @@ public:
             
     virtual ~PhotometricLocalization() {}
     
-    bool computePose(const cv::Mat_<float> & img1,  const cv::Mat_<float> & img2, 
-            const cv::Mat_<float> & dist, Transformation<double> & xi);
+    bool computePose(const cv::Mat_<float> & img2, Transformation<double> & T12);
     
     bool initCloud(const cv::Mat_<float> & img1, const cv::Mat_<float> & dist);
     
+    bool wrapImage(const cv::Mat_<float> & img2, cv::Mat_<float> & imgOut, Transformation<double> & T12);
+    
 private:
     EnhancedCamera cam1, cam2;
-    vector<Vector3d> cloud;
+    vector<Vector3d> cloud1;
     vector<float> colorVec;
+    vector<int> indexVec; // to wrap the image
     int u0, v0, blockSize;
 };
 

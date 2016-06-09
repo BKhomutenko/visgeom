@@ -81,15 +81,39 @@ int main (int argc, char const* argv[])
     string imageDir;
     getline(paramFile, imageDir);
     
+    //read the first image name and the robot's pose
     string imageInfo, imageName;
     array<double, 6> robotPose1, robotPose2;
     getline(paramFile, imageInfo);
     istringstream imageStream(imageInfo);
     imageStream >> imageName;
     for (auto & x : robotPose1) imageStream >> x;
-
+    
     Matf img1 = imread(imageDir + imageName, 0);
-    int counter = 2;
+    
+    const int sigma = 3;
+    GaussianBlur(img1, img1, Size(0, 0), sigma, sigma);
+    
+    // Init the distance map
+    Matf distanceMat;
+    Transformation<double> T01(robotPose1.data());
+    Transformation<double> T0Camera = T01.compose(TbaseCamera);
+    EnhancedStereo stereo(Transformation<double>(), img1.cols, img1.rows,
+                params.data(), params.data(), stereoParams);
+    stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), distanceMat,
+         vector<Vector3d>{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
+                          Vector3d(-0.1 + 3 * 0.45, 0.5, 0), Vector3d(-0.1, 0.5, 0) } );
+    imshow("distance", distanceMat);
+    
+    
+    
+    // Init the localizer
+    PhotometricLocalization localizer(img1.cols, img1.rows,
+                params.data(), params.data(), stereoParams);   
+    localizer.initCloud(img1, distanceMat);
+    
+    
+                    
     while (getline(paramFile, imageInfo))
     {
         istringstream imageStream(imageInfo);
@@ -97,30 +121,29 @@ int main (int argc, char const* argv[])
         imageStream >> imageName;
         for (auto & x : robotPose2) imageStream >> x;
     
-        Transformation<double> T01(robotPose1.data()), T02(robotPose2.data());
-        Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
-        TleftRight = TleftRight.compose(Transformation<double>(0.01, 0.005, -0.001, 0.001, 0.001, 0.001));
-        
+        Transformation<double> T02(robotPose2.data());
+        Transformation<double> T12 = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
+        cout << "REAL POSE : " << T12 << endl;
+        T12 = T12.compose(Transformation<double>(-0.01, 0.05, -0.1, 0.01, 0.01, 0.01));
+//        T12 = T12.compose(Transformation<double>(-0.001, 0.005, -0.01, 0.001, 0.001, 0.001));
         Matf img2 = imread(imageDir + imageName, 0);
-        Matf planeMat;
-
-        EnhancedStereo stereo(Transformation<double>(), img1.cols, img1.rows,
-                params.data(), params.data(), stereoParams);
-
-        Transformation<double> T0Camera = T01.compose(TbaseCamera);
-        stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), planeMat,
-         vector<Vector3d>{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
-                          Vector3d(-0.1 + 3 * 0.45, 0.5, 0), Vector3d(-0.1, 0.5, 0) } );
-       
-        imshow("depth", planeMat);
-        waitKey();
-       
-        PhotometricLocalization localizer(img1.cols, img1.rows,
-                params.data(), params.data(), stereoParams);              
+        GaussianBlur(img2, img2, Size(0, 0), sigma, sigma);
         
-        cout << TleftRight << endl;
-        localizer.computePose(img1, img2, planeMat, TleftRight);
-        cout << TleftRight << endl;
+        Matf img11, img12;
+        localizer.wrapImage(img2, img11, T12);
+        cout << T12 << endl;
+        for (int iter = 0; iter < 1; iter++)
+        {
+            localizer.computePose(img2, T12);
+            cout << T12 << endl;
+            localizer.wrapImage(img2, img12, T12);
+            imshow("img11", img11/256);
+            imshow("img12", img12/256);
+            imshow("delta img11", abs(img1 - img11)/250);
+            imshow("delta img12", abs(img1 - img12)/250);
+            waitKey(50);
+        }
     }
+    waitKey();
     return 0;
 }

@@ -40,25 +40,22 @@ using ceres::SoftLOneLoss;
 
 typedef cv::Mat_<float> Matf;
 
-bool PhotometricLocalization::computePose(const Matf & img1,
-            const Matf & img2, const Matf & dist, Transformation<double> & xi)
+bool PhotometricLocalization::computePose(const Matf & img2, Transformation<double> & T12)
 {
-    if (not initCloud(img1, dist)) return false;
-    
     Problem problem;
-    array<double, 6> pose = xi.toArray();
+    array<double, 6> pose = T12.toArray();
     typedef DynamicAutoDiffCostFunction<PhotometricError<EnhancedProjector>> photometricCF;
     PhotometricError<EnhancedProjector> * errorFunctor;
-    errorFunctor = new PhotometricError<EnhancedProjector>(cam2.params, colorVec, cloud, img2);
+    errorFunctor = new PhotometricError<EnhancedProjector>(cam2.params, colorVec, cloud1, img2);
     photometricCF * costFunction = new photometricCF(errorFunctor);
     costFunction->AddParameterBlock(6);
-    costFunction->SetNumResiduals(cloud.size());
+    costFunction->SetNumResiduals(cloud1.size());
     problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), pose.data());
     
     //run the solver
     Solver::Options options;
     options.linear_solver_type = ceres::DENSE_QR;
-    options.max_num_iterations = 500;
+    options.max_num_iterations = 300;
 //    options.function_tolerance = 1e-10;
 //    options.gradient_tolerance = 1e-10;
 //    options.parameter_tolerance = 1e-10;
@@ -67,18 +64,40 @@ bool PhotometricLocalization::computePose(const Matf & img1,
     Solve(options, &problem, &summary);
     cout << summary.FullReport() << endl;
     
-    xi = Transformation<double>(pose.data());
+    T12 = Transformation<double>(pose.data());
     return true;
 }
 
+bool PhotometricLocalization::wrapImage(const cv::Mat_<float> & img2, cv::Mat_<float> & imgOut,
+        Transformation<double> & T12)
+{
+    imgOut.create(cam1.height, cam1.width);
+    imgOut.setTo(0);
+    
+    vector<Vector3d> cloud2;
+    T12.inverseTransform(cloud1, cloud2);
+    
+    vector<Vector2d> pointVec2;
+    cam2.projectPointCloud(cloud2, pointVec2);
+    
+    for (int i = 0; i < pointVec2.size(); i++)
+    {
+        int u = round(pointVec2[i][0]), v = round(pointVec2[i][1]);
+        if (u < 0 or u >= img2.cols or v < 0 or v > img2.rows) continue;
+        imgOut(indexVec[i]) = img2(v, u);
+    }
+    return true;
+}
+
+const int step = 15;
 
 bool PhotometricLocalization::initCloud(const cv::Mat_<float> & img1, const cv::Mat_<float> & dist)
 {
     vector<Vector2d> imagePointVec;
     vector<double> distVec;
-    for (int v = 0; v < img1.rows; v+=3)
+    for (int v = 0; v < img1.rows; v += step)
     {
-        for (int u = 0; u < img1.cols; u+=3)
+        for (int u = 0; u < img1.cols; u += step)
         {
             //TODO change it
             int ud = (u - u0) / blockSize;
@@ -89,13 +108,15 @@ bool PhotometricLocalization::initCloud(const cv::Mat_<float> & img1, const cv::
             colorVec.push_back(img1(v, u));
             imagePointVec.emplace_back(u, v);
             distVec.push_back(dist(vd, ud));
+            indexVec.push_back(v*img1.cols + u);
         }
     }
+//    cout << indexVec.size() << endl;
     // TODO check the reconstruction and discard bad points
-    cam1.reconstructPointCloud(imagePointVec, cloud);
-    for (int i = 0; i < cloud.size(); i++)
+    cam1.reconstructPointCloud(imagePointVec, cloud1);
+    for (int i = 0; i < cloud1.size(); i++)
     {
-        cloud[i] = cloud[i] * (distVec[i] / cloud[i].norm());
+        cloud1[i] = cloud1[i] * (distVec[i] / cloud1[i].norm());
 //        cout << cloud[i].transpose() << endl;
     }
     return true;
