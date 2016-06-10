@@ -46,19 +46,16 @@ bool PhotometricLocalization::computePose(const Matf & img2, Transformation<doub
     array<double, 6> pose = T12.toArray();
     typedef DynamicAutoDiffCostFunction<PhotometricError<EnhancedProjector>> photometricCF;
     PhotometricError<EnhancedProjector> * errorFunctor;
-    errorFunctor = new PhotometricError<EnhancedProjector>(cam2.params, colorVec, cloud1, img2);
+    errorFunctor = new PhotometricError<EnhancedProjector>(cam2.params, dataPack, img2);
     photometricCF * costFunction = new photometricCF(errorFunctor);
     costFunction->AddParameterBlock(6);
-    costFunction->SetNumResiduals(cloud1.size());
+    costFunction->SetNumResiduals(dataPack.cloud.size());
     problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), pose.data());
     
     //run the solver
     Solver::Options options;
     options.linear_solver_type = ceres::DENSE_QR;
     options.max_num_iterations = 300;
-//    options.function_tolerance = 1e-10;
-//    options.gradient_tolerance = 1e-10;
-//    options.parameter_tolerance = 1e-10;
     options.minimizer_progress_to_stdout = true;
     Solver::Summary summary;
     Solve(options, &problem, &summary);
@@ -75,7 +72,7 @@ bool PhotometricLocalization::wrapImage(const cv::Mat_<float> & img2, cv::Mat_<f
     imgOut.setTo(0);
     
     vector<Vector3d> cloud2;
-    T12.inverseTransform(cloud1, cloud2);
+    T12.inverseTransform(dataPack.cloud, cloud2);
     
     vector<Vector2d> pointVec2;
     cam2.projectPointCloud(cloud2, pointVec2);
@@ -84,7 +81,7 @@ bool PhotometricLocalization::wrapImage(const cv::Mat_<float> & img2, cv::Mat_<f
     {
         int u = round(pointVec2[i][0]), v = round(pointVec2[i][1]);
         if (u < 0 or u >= img2.cols or v < 0 or v > img2.rows) continue;
-        imgOut(indexVec[i]) = img2(v, u);
+        imgOut(dataPack.idxVec[i]) = img2(v, u);
     }
     return true;
 }
@@ -105,36 +102,20 @@ bool PhotometricLocalization::initCloud(const cv::Mat_<float> & img1, const cv::
             if (ud < 0 or ud >= dist.cols or vd < 0 or vd >= dist.rows) continue;
             if (dist(vd, ud) < 0.01) continue;
 //            cout << u << " " << v <<" " << ud << " " << vd << " " << dist(vd, ud) << endl;
-            colorVec.push_back(img1(v, u));
+            dataPack.colorVec.push_back(img1(v, u));
             imagePointVec.emplace_back(u, v);
             distVec.push_back(dist(vd, ud));
-            indexVec.push_back(v*img1.cols + u);
+            dataPack.idxVec.push_back(v*img1.cols + u);
         }
     }
 //    cout << indexVec.size() << endl;
     // TODO check the reconstruction and discard bad points
-    cam1.reconstructPointCloud(imagePointVec, cloud1);
-    for (int i = 0; i < cloud1.size(); i++)
+    cam1.reconstructPointCloud(imagePointVec, dataPack.cloud);
+    for (int i = 0; i < dataPack.cloud.size(); i++)
     {
-        cloud1[i] = cloud1[i] * (distVec[i] / cloud1[i].norm());
+        dataPack.cloud[i] = dataPack.cloud[i] * (distVec[i] / dataPack.cloud[i].norm());
 //        cout << cloud[i].transpose() << endl;
     }
     return true;
 }
-/*
-class PhotometricLocalization
-{
-public:
-    
-    Transformation<double> computeExtrinsic(const cv::Mat_<float> & img1,
-            const cv::Mat_<float> & img2,
-            const cv::Mat_<float> & dist);
-    
-    void initCloud(const cv::Mat_<float> & dist);
-    
-private:
-    EnhancedCamera cam1, cam2;
-    vector<Vector3d> cloud;
-    vector<float> colorVec;
-};
-*/
+

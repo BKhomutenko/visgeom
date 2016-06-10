@@ -61,13 +61,21 @@ struct Grid2D
     const float * const data;
 };
 
+// to store the data for the photometric optimization
+struct PhotometricPack
+{
+    vector<float> colorVec;
+    vector<Vector3d> cloud;
+    vector<int> idxVec;
+    int scaleIdx;
+};
+
 template<template<typename> class Projector>
 struct PhotometricError 
 {
-    PhotometricError(const vector<double> & projectionParams,
-            const vector<float> & colorVec, const vector<Vector3d> & cloud,
+    PhotometricError(vector<double> & projectionParams, const PhotometricPack & dataPack,
             const cv::Mat_<float> & img2)
-    : _projectionParams(projectionParams), _colorVec(colorVec), _cloud(cloud), _img2(img2) {}
+    : _projectionParams(projectionParams), _dataPack(dataPack), _img2(img2) {}
             
     template <typename T>
     bool operator()(const T * const* params,
@@ -75,8 +83,8 @@ struct PhotometricError
     {
         Transformation<T> T12(params[0]);
         vector<Vector3<T>> transformedPoints;
-        transformedPoints.reserve(_cloud.size());
-        for (auto & point : _cloud)
+        transformedPoints.reserve(_dataPack.cloud.size());
+        for (auto & point : _dataPack.cloud)
         {
             transformedPoints.push_back(point.template cast<T>());
         }
@@ -97,7 +105,7 @@ struct PhotometricError
             {
                 T res;
                 imageIterpolator.Evaluate(pt[1], pt[0], &res);
-                residual[i] = T(_colorVec[i]) - res;
+                residual[i] = T(_dataPack.colorVec[i]) - res;
             }
             else
             {
@@ -107,9 +115,8 @@ struct PhotometricError
         return true;
     }
     
-    const vector<double> _projectionParams;
-    const vector<float> _colorVec;
-    const vector<Vector3d> _cloud;
+    vector<double> & _projectionParams;
+    const PhotometricPack & _dataPack;
     const cv::Mat_<float> & _img2;
 };
 
@@ -137,9 +144,7 @@ public:
     
 private:
     EnhancedCamera cam1, cam2;
-    vector<Vector3d> cloud1;
-    vector<float> colorVec;
-    vector<int> indexVec; // to wrap the image
+    PhotometricPack dataPack; // to wrap the image
     int u0, v0, blockSize;
 };
 
