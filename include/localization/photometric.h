@@ -125,14 +125,14 @@ struct PhotometricError
 class PhotometricLocalization
 {
 public:
-    PhotometricLocalization(int imageWidth, int imageHeight, 
-            const double * params1, const double * params2,
+    PhotometricLocalization(const double * params1, const double * params2,
             const StereoParameters & stereoParams) : 
-            cam1(imageWidth, imageHeight, params1),
-            cam2(imageWidth, imageHeight, params2),
-            blockSize(stereoParams.blockSize),
-            u0(stereoParams.u0 + stereoParams.disparityMax + stereoParams.blockSize),
-            v0(stereoParams.v0) {}
+            cam1(stereoParams.imageWidth, stereoParams.imageHeight, params1),
+            cam2(stereoParams.imageWidth, stereoParams.imageHeight, params2),
+            params(stereoParams) 
+            {
+                params.init();
+            }
             
     virtual ~PhotometricLocalization() {}
     
@@ -145,7 +145,7 @@ public:
 private:
     EnhancedCamera cam1, cam2;
     PhotometricPack dataPack; // to wrap the image
-    int u0, v0, blockSize;
+    StereoParameters params;
 };
 
 

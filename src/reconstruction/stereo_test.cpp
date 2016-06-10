@@ -108,9 +108,9 @@ int main(int argc, char** argv)
     Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
     
     StereoParameters stereoParams;
-    paramFile >> stereoParams.u0;
-    paramFile >> stereoParams.v0;
-    paramFile >> stereoParams.disparityMax;
+    paramFile >> stereoParams.uMargin;
+    paramFile >> stereoParams.vMargin;
+    paramFile >> stereoParams.dispMax;
     paramFile >> stereoParams.blockSize;
     paramFile.ignore();
 //    stereoParams.lambdaStep = 5;
@@ -122,6 +122,8 @@ int main(int argc, char** argv)
     Mat8 img1 = imread(fileName1, 0);
     Mat8 img2 = imread(fileName2, 0);
     Mat_<int16_t> img1lap, img2lap;
+    stereoParams.imageWidth = img1.cols;
+    stereoParams.imageHeight = img1.rows;
     
 //    
 //    Laplacian(img1, img1lap, CV_16S, 3);
@@ -135,7 +137,7 @@ int main(int argc, char** argv)
 //    img1lap.copyTo(img1);
 //    img2lap.copyTo(img2);
 //    
-    EnhancedStereo stereo(TleftRight, img1.cols, img1.rows, params1.data(), params2.data(), stereoParams);
+    EnhancedStereo stereo(TleftRight, params1.data(), params2.data(), stereoParams);
     
     Mat8 out1, out2;
     
@@ -143,14 +145,14 @@ int main(int argc, char** argv)
     img2.copyTo(out2);
     
 //    
-//    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
-//    {
-//        out1(x) = 0;
-//        out1(x.y + 1, x.x) = 0;
-//        out1(x.y, x.x + 1) = 255;
-//        out1(x.y + 1, x.x + 1) = 255;
-//        stereo.traceEpipolarLine(x, out2);
-//    }
+    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
+    {
+        out1(x) = 0;
+        out1(x.y + 1, x.x) = 0;
+        out1(x.y, x.x + 1) = 255;
+        out1(x.y + 1, x.x + 1) = 255;
+        stereo.traceEpipolarLine(x, out2);
+    }
     
 
     cv::Mat_<uint8_t> res;

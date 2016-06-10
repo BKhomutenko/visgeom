@@ -55,7 +55,7 @@ bool PhotometricLocalization::computePose(const Matf & img2, Transformation<doub
     //run the solver
     Solver::Options options;
     options.linear_solver_type = ceres::DENSE_QR;
-    options.max_num_iterations = 300;
+    options.max_num_iterations = 5;
     options.minimizer_progress_to_stdout = true;
     Solver::Summary summary;
     Solve(options, &problem, &summary);
@@ -86,7 +86,7 @@ bool PhotometricLocalization::wrapImage(const cv::Mat_<float> & img2, cv::Mat_<f
     return true;
 }
 
-const int step = 15;
+const int step = 27;
 
 bool PhotometricLocalization::initCloud(const cv::Mat_<float> & img1, const cv::Mat_<float> & dist)
 {
@@ -97,8 +97,8 @@ bool PhotometricLocalization::initCloud(const cv::Mat_<float> & img1, const cv::
         for (int u = 0; u < img1.cols; u += step)
         {
             //TODO change it
-            int ud = (u - u0) / blockSize;
-            int vd = (v - v0) / blockSize;
+            int ud = params.uSmall(u);
+            int vd = params.vSmall(v);
             if (ud < 0 or ud >= dist.cols or vd < 0 or vd >= dist.rows) continue;
             if (dist(vd, ud) < 0.01) continue;
 //            cout << u << " " << v <<" " << ud << " " << vd << " " << dist(vd, ud) << endl;

@@ -72,9 +72,9 @@ int main (int argc, char const* argv[])
     Transformation<double> TbasePlane(cameraPose.data());
     
     StereoParameters stereoParams;
-    paramFile >> stereoParams.u0;
-    paramFile >> stereoParams.v0;
-    paramFile >> stereoParams.disparityMax;
+    paramFile >> stereoParams.uMargin;
+    paramFile >> stereoParams.vMargin;
+    paramFile >> stereoParams.dispMax;
     paramFile >> stereoParams.blockSize;
     paramFile.ignore();
     
@@ -91,14 +91,17 @@ int main (int argc, char const* argv[])
     
     Matf img1 = imread(imageDir + imageName, 0);
     
-    const int sigma = 3;
+    stereoParams.imageWidth = img1.cols;
+    stereoParams.imageHeight = img1.rows;
+    
+    const int sigma = 20;
     GaussianBlur(img1, img1, Size(0, 0), sigma, sigma);
     
     // Init the distance map
     Matf distanceMat;
     Transformation<double> T01(robotPose1.data());
     Transformation<double> T0Camera = T01.compose(TbaseCamera);
-    EnhancedStereo stereo(Transformation<double>(), img1.cols, img1.rows,
+    EnhancedStereo stereo(Transformation<double>(),
                 params.data(), params.data(), stereoParams);
     stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), distanceMat,
          vector<Vector3d>{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
@@ -108,8 +111,7 @@ int main (int argc, char const* argv[])
     
     
     // Init the localizer
-    PhotometricLocalization localizer(img1.cols, img1.rows,
-                params.data(), params.data(), stereoParams);   
+    PhotometricLocalization localizer(params.data(), params.data(), stereoParams);   
     localizer.initCloud(img1, distanceMat);
     
     
@@ -124,7 +126,7 @@ int main (int argc, char const* argv[])
         Transformation<double> T02(robotPose2.data());
         Transformation<double> T12 = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         cout << "REAL POSE : " << T12 << endl;
-        T12 = T12.compose(Transformation<double>(-0.01, 0.05, -0.1, 0.01, 0.01, 0.01));
+        T12 = T12.compose(Transformation<double>(-0.1, 0.05, -0.1, 0.03, 0.03, 0.05));
 //        T12 = T12.compose(Transformation<double>(-0.001, 0.005, -0.01, 0.001, 0.001, 0.001));
         Matf img2 = imread(imageDir + imageName, 0);
         GaussianBlur(img2, img2, Size(0, 0), sigma, sigma);

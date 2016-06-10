@@ -42,33 +42,59 @@ typedef CurveRasterizer<Polynomial2> EpipolarRasterizer;
 
 struct StereoParameters
 {
-    int disparityMax = 64;
-    int blockSize = 5;
-    int u0 = 0, v0 = 0;  // RoI left upper corner
+    // basic parameters
+    int dispMax = 48; // maximum disparity
+    int blockSize = 3;
+    int uMargin = 0, vMargin = 0;  // RoI left upper corner
     int width = -1, height = -1;  // RoI size
     int lambdaStep = 5;
     int lambdaJump = 32;
+    int imageWidth = 0, imageHeight = 0;
+    
+    // precomputed parameters
+    int u0, v0;
+    int uMax, vMax;
+    int smallWidth, smallHeight;
+    int halfBlockSize;
+    
+    // to be called before using
+    void init()
+    {
+        u0 = uMargin + dispMax + blockSize; 
+        v0 = vMargin;
+        
+        if (width > 0) uMax = u0 + width;
+        else uMax = imageWidth - uMargin - blockSize;
+        
+        if (height > 0) vMax = v0 + height;
+        else vMax = imageHeight - vMargin - blockSize;
+        
+        smallWidth = uSmall(uMax) + 1;
+        smallHeight = vSmall(vMax) + 1;
+        
+        halfBlockSize =  blockSize / 2; 
+    }
+    
+    // from image to small disparity coordiante transform
+    int uSmall(int u) { return (u - u0) / blockSize; }
+    int vSmall(int v) { return (v - v0) / blockSize; }
+    
+    // from small disparity to image coordiante transform    
+    int uBig(int u) { return u * blockSize + halfBlockSize + u0; }
+    int vBig(int v) { return v * blockSize + halfBlockSize + v0; }
 };
 
 class EnhancedStereo
 {
 public:
-    EnhancedStereo(Transformation<double> T12, int imageWidth, int imageHeight,
+    EnhancedStereo(Transformation<double> T12,
             const double * params1, const double * params2, const StereoParameters & stereoParams)
             : Transform12(T12), 
-            cam1(imageWidth, imageHeight, params1), 
-            cam2(imageWidth, imageHeight, params2),
-            dispMax(stereoParams.disparityMax),
-            blockSize(stereoParams.blockSize),
-            lambdaStep(stereoParams.lambdaStep), 
-            lambdaJump(stereoParams.lambdaJump),
-            u0(stereoParams.u0 + stereoParams.disparityMax + stereoParams.blockSize),
-            v0(stereoParams.v0)
+            cam1(stereoParams.imageWidth, stereoParams.imageHeight, params1),
+            cam2(stereoParams.imageWidth, stereoParams.imageHeight, params2),
+            params(stereoParams)
     { 
-        if (stereoParams.width > 0) uMax = u0 + stereoParams.width;
-        else uMax = imageWidth - u0;
-        if (stereoParams.width > 0) vMax = v0 + stereoParams.height;
-        else vMax = imageHeight - v0;
+        params.init();
         init(); 
     }
 
@@ -140,21 +166,7 @@ public:
     
     // index of an object in a linear array corresponding to pixel [row, col] 
     int getLinearIdx(int row, int col) { return cam1.width*row + col; }
-    
-    // from image to small disparity coordiante transform
-    int uSmall(int u) { return (u - u0) / blockSize; }
-    int vSmall(int v) { return (v - v0) / blockSize; }
-    
-    // from small disparity to image coordiante transform    
-    int uBig(int u) { return u * blockSize + halfBlockSize() + u0; }
-    int vBig(int v) { return v * blockSize + halfBlockSize() + v0; }
-    
-    // small disparity size
-    int smallWidth() { return uSmall(uMax - blockSize) + 1; }
-    int smallHeight() { return vSmall(vMax - blockSize) + 1; }
-    
-    int halfBlockSize() { return blockSize / 2; }
-    
+      
     // reconstruction
     Vector3d triangulate(int x1, int y1, int x2, int y2);
     void computeDistance(cv::Mat_<float> & distance);
@@ -177,15 +189,11 @@ private:
     
     vector<Polynomial2> epipolarVec;  // the epipolar curves represented by polynomial functions
     
-    int dispMax; // maximum shift along the epipolar line
-    int u0, v0, uMax, vMax;  // the active rectangle 
-    int blockSize;
-    
-    int lambdaStep, lambdaJump;  // costs for disparity changes
-    
     cv::Mat_<uint8_t> errorBuffer;
     cv::Mat_<int> tableauLeft, tableauRight;
     cv::Mat_<int> tableauTop, tableauBottom;
     cv::Mat_<uint8_t> smallDisparity;
+    
+    StereoParameters params;
 };
 

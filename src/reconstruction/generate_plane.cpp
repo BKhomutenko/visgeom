@@ -94,10 +94,11 @@ int main(int argc, char** argv)
     Transformation<double> TbasePlane(cameraPose.data());
     
     StereoParameters stereoParams;
-    paramFile >> stereoParams.u0;
-    paramFile >> stereoParams.v0;
-    paramFile >> stereoParams.disparityMax;
+    paramFile >> stereoParams.uMargin;
+    paramFile >> stereoParams.vMargin;
+    paramFile >> stereoParams.dispMax;
     paramFile >> stereoParams.blockSize;
+    
     paramFile.ignore();
     
     string imageDir;
@@ -111,6 +112,8 @@ int main(int argc, char** argv)
     for (auto & x : robotPose1) imageStream >> x;
 
     Mat8 img1 = imread(imageDir + imageName, 0);
+    stereoParams.imageWidth = img1.cols;
+    stereoParams.imageHeight = img1.rows;
     int counter = 2;
     while (getline(paramFile, imageInfo))
     {
@@ -125,7 +128,7 @@ int main(int argc, char** argv)
         
         Mat8 img2 = imread(imageDir + imageName, 0);
 
-        EnhancedStereo stereo(TleftRight, img1.cols, img1.rows, params.data(), params.data(), stereoParams);
+        EnhancedStereo stereo(TleftRight, params.data(), params.data(), stereoParams);
 
         cv::Mat_<uint8_t> res;
         auto t2 = clock();
