@@ -145,20 +145,32 @@ int main(int argc, char** argv)
     img2.copyTo(out2);
     
 //    
-    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
-    {
-        out1(x) = 0;
-        out1(x.y + 1, x.x) = 0;
-        out1(x.y, x.x + 1) = 255;
-        out1(x.y + 1, x.x + 1) = 255;
-        stereo.traceEpipolarLine(x, out2);
-    }
+//    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
+//    {
+//        out1(x) = 0;
+//        out1(x.y + 1, x.x) = 0;
+//        out1(x.y, x.x + 1) = 255;
+//        out1(x.y + 1, x.x + 1) = 255;
+//        stereo.traceEpipolarLine(x, out2);
+//    }
     
 
     cv::Mat_<uint8_t> res;
     auto t2 = clock();
-    stereo.comuteStereo(img1, img2, res);
+    stereo.computeCost(img1, img2);
     auto t3 = clock();
+    cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
+    t2 = clock();
+    stereo.computeDynamicProgramming();
+    t3 = clock();
+    cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
+    t2 = clock();
+    stereo.reconstructDisparity();
+    t3 = clock();
+    cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
+    t2 = clock();
+    stereo.upsampleDisparity(img1, res);
+    t3 = clock();
     cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
     
     imshow("out1", out1);

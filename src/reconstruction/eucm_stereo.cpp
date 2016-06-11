@@ -248,7 +248,7 @@ void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t>
             {
                 int bias = integral2(params.blockSize, i + params.blockSize) - integral2(params.blockSize, i);
                 bias = (bias - bias1) / blockSizeSquared;
-                bias = min(3, max(-3, bias));
+                bias = min(10, max(-10, bias));
 //                cout << bias << " ";
                 int acc = 0;
                 for (int x2 = -params.halfBlockSize; x2 <= params.halfBlockSize; x2++)
@@ -383,7 +383,8 @@ void EnhancedStereo::reconstructDisparity()
             {
                 int base = u * params.dispMax;
 //                if (errRow[base + d] > 5) continue;
-                int acc = dynRow1[base + d] + dynRow2[base + d] 
+//                int acc = errRow[base + d];
+                int acc =dynRow1[base + d] + dynRow2[base + d] 
                         + dynRow3[base + d] + dynRow4[base + d] - 2*errRow[base + d];
                 if (bestCost > acc)
                 {
