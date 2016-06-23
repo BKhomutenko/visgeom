@@ -29,8 +29,6 @@ Type definitions
 #include <Eigen/Eigen>
 
 
-#define ZERO T(0.)
-
 // Eigen data structures
 template<typename T>
 using Vector2 = Eigen::Matrix<T, 2, 1>;

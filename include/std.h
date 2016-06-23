@@ -27,8 +27,6 @@ STL types and methods
 #include <random>
 #include <cmath>
 
-#define ZERO T(0.)
-
 // Containers
 using std::vector;
 using std::array;
