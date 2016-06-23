@@ -36,8 +36,6 @@ Semi-global block matching algorithm for non-rectified images
 #include "camera/eucm.h"
 #include "curve_rasterizer.h"
 
-using namespace std;
-
 typedef CurveRasterizer<Polynomial2> EpipolarRasterizer;
 
 struct StereoParameters

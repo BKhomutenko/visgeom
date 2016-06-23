@@ -37,7 +37,10 @@ public:
 
     Transformation(const Vector3<T> & trans, const Quaternion<T> & qrot)
     : mtrans(trans), mrot(qrot.toRotationVector()) {}
-
+    
+    Transformation(const Vector3<T> & trans, const Matrix3<T> & R)
+    : mtrans(trans), mrot(rotationVector(R)) {}
+    
     Transformation(const T * const data) : mtrans(data), mrot(data + 3) {}
 
     Transformation(T x, T y, T z, T rx, T ry, T rz)
@@ -202,7 +205,9 @@ public:
     template<typename T2>
     Transformation<T2> cast() const
     {
-        return Transformation<T2>(mtrans.template cast<T2>(), mrot.template cast<T2>());
+        Vector3<T2> trans = mtrans.template cast<T2>();
+        Vector3<T2> rot = mrot.template cast<T2>();
+        return Transformation<T2>(trans, rot);
     }
     
 private:
