@@ -1,18 +1,12 @@
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <ctime>
-
-#include <Eigen/Eigen>
-#include <opencv2/opencv.hpp>
+#include "io.h"
+#include "ocv.h"
+#include "eigen.h"
 
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_stereo.h"
 
-using namespace cv;
 using namespace std;
-
-typedef cv::Mat_<uint8_t> Mat8;
+using namespace cv;
 
 void showHistogram(const string & name, const Mat & img)
 {
@@ -35,15 +29,15 @@ void showHistogram(const string & name, const Mat & img)
 
     // Plot the histogram
     int hist_w = 512; int hist_h = 400;
-    int bin_w = cvRound( (double) hist_w/histSize );
+    int bin_w = round( (double) hist_w/histSize );
 
     Mat histImage( hist_h, hist_w, CV_8UC1, Scalar( 0,0,0) );
     normalize(hist, hist, 0, histImage.rows, NORM_MINMAX, -1, Mat() );
     
     for( int i = 1; i < histSize; i++ )
     {
-      line( histImage, Point( bin_w*(i-1), hist_h - cvRound(hist.at<float>(i-1)) ) ,
-                       Point( bin_w*(i), hist_h - cvRound(hist.at<float>(i)) ),
+      line( histImage, Point( bin_w*(i-1), hist_h - round(hist.at<float>(i-1)) ) ,
+                       Point( bin_w*(i), hist_h - round(hist.at<float>(i)) ),
                        Scalar( 255, 0, 0), 2, 8, 0  );
     }
 
@@ -141,7 +135,7 @@ int main(int argc, char** argv)
     imageStream >> imageName;
     for (auto & x : robotPose1) imageStream >> x;
 
-    Mat8 img1 = imread(imageDir + imageName, 0);
+    Mat8u img1 = imread(imageDir + imageName, 0);
     int counter = 2;
     while (getline(paramFile, imageInfo))
     {
@@ -154,22 +148,22 @@ int main(int argc, char** argv)
         Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         
         
-        Mat8 img2 = imread(imageDir + imageName, 0);
+        Mat8u img2 = imread(imageDir + imageName, 0);
 
         EnhancedStereo stereo(TleftRight, img1.cols, img1.rows, params.data(), params.data(), stereoParams);
 
-        cv::Mat_<uint8_t> res;
+        Mat8u res;
         auto t2 = clock();
         stereo.comuteStereo(img1, img2, res);
         auto t3 = clock();
 //        cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
-        Mat_<float> distMat;
-        Mat_<float> planeMat;
+        Mat32f distMat;
+        Mat32f planeMat;
         
         stereo.computeDistance(distMat);
         Transformation<double> T0Camera = T01.compose(TbaseCamera);
         stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), planeMat,
-         vector<Vector3d>{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
+         Vector3dVec{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
                           Vector3d(-0.1 + 3 * 0.45, 0.5, 0), Vector3d(-0.1, 0.5, 0) } );
         imshow("dist" + to_string(counter) , distMat);
         imshow("plane" , planeMat);
@@ -179,7 +173,7 @@ int main(int argc, char** argv)
         double dist = 0;
         int N = 0;
         int Nmax = 0;
-        Mat_<float> inlierMat(planeMat.size());
+        Mat32f inlierMat(planeMat.size());
         inlierMat.setTo(0);
         for (int u = 0; u < distMat.cols; u++)
         {

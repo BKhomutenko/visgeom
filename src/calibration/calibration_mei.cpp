@@ -15,18 +15,14 @@ You should have received a copy of the GNU General Public License
 along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
-#include <opencv2/opencv.hpp>
-#include <Eigen/Eigen>
-#include <iomanip>
-
-#include <boost/format.hpp>
+#include "io.h"
+#include "ocv.h"
+#include "eigen.h"
 
 #include "geometry/geometry.h"
 #include "camera/mei.h"
 #include "calibration/calibration.h"
 
-using namespace cv;
-using Eigen::JacobiSVD;
 int main(int argc, char** argv) {
 
     // Intrinsic calibration

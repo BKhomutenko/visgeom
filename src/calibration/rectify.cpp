@@ -15,30 +15,20 @@ You should have received a copy of the GNU General Public License
 along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
-#include <opencv2/opencv.hpp>
-#include <Eigen/Eigen>
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <boost/format.hpp>
+#include "io.h"
+#include "ocv.h"
+#include "eigen.h"
 
 #include "geometry/geometry.h"
 #include "camera/pinhole.h"
 #include "camera/eucm.h"
 
-using namespace std;
-using namespace cv;
-using Eigen::Vector2d;
-using Eigen::Vector3d;
-
-typedef Mat_<float> fMat;
-
 void initRemap(const array<double, 6> & params1, const array<double, 3> & params2,
-    fMat & mapX, fMat & mapY, const array<double, 3> & rot)
+    Mat32f & mapX, Mat32f & mapY, const array<double, 3> & rot)
 {
     EnhancedCamera cam1(params1.data());
     Pinhole cam2(params2[0], params2[1], params2[2]);
-    vector<Vector2d> imagePoints;
+    Vector2dVec imagePoints;
     mapX.create(params2[1]*2, params2[0]*2);
     mapY.create(params2[1]*2, params2[0]*2);
     for (unsigned int i = 0; i < mapX.rows; i++)
@@ -48,7 +38,7 @@ void initRemap(const array<double, 6> & params1, const array<double, 3> & params
             imagePoints.push_back(Vector2d(j, i));
         }
     }
-    vector<Vector3d> pointCloud;
+    Vector3dVec pointCloud;
     cam2.reconstructPointCloud(imagePoints, pointCloud);
     Transformation<double> T(0, 0, 0, rot[0], rot[1], rot[2]);
     T.transform(pointCloud, pointCloud);
@@ -101,16 +91,16 @@ int main(int argc, char** argv) {
     cout << endl;
     paramFile.ignore();
     
-    fMat  mapX, mapY;
+    Mat32f  mapX, mapY;
     initRemap(params, params2, mapX, mapY, rotation);
     
     string dirName, fileName;
     getline(paramFile, dirName);
     while (getline(paramFile, fileName))
     {
-        fMat img = imread(dirName + fileName, 0);
-        fMat img2;
-        remap(img, img2, mapX, mapY, INTER_LINEAR);
+        Mat32f img = imread(dirName + fileName, 0);
+        Mat32f img2;
+        remap(img, img2, mapX, mapY, cv::INTER_LINEAR);
         imshow("orig", img/255);
         imshow("res", img2/255);
         waitKey();

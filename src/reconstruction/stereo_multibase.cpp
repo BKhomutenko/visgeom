@@ -1,18 +1,10 @@
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <ctime>
-
-#include <Eigen/Eigen>
-#include <opencv2/opencv.hpp>
+#include "io.h"
+#include "ocv.h"
+#include "eigen.h"
 
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_stereo.h"
 
-using namespace cv;
-using namespace std;
-
-typedef cv::Mat_<uint8_t> Mat8;
 
 int main(int argc, char** argv)
 {	
@@ -95,7 +87,7 @@ int main(int argc, char** argv)
     imageStream >> imageName;
     for (auto & x : robotPose1) imageStream >> x;
 
-    Mat8 img1 = imread(imageDir + imageName, 0);
+    Mat8u img1 = imread(imageDir + imageName, 0);
     int counter = 2;
     while (getline(paramFile, imageInfo))
     {
@@ -108,11 +100,11 @@ int main(int argc, char** argv)
         Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         
         
-        Mat8 img2 = imread(imageDir + imageName, 0);
+        Mat8u img2 = imread(imageDir + imageName, 0);
 
         EnhancedStereo stereo(TleftRight, img1.cols, img1.rows, params.data(), params.data(), stereoParams);
 
-        cv::Mat_<uint8_t> res;
+        Mat8u res;
         auto t2 = clock();
         stereo.comuteStereo(img1, img2, res);
         auto t3 = clock();

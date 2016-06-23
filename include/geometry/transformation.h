@@ -24,8 +24,6 @@ A template-base coordinate transformation implementation
 // Non-redundant transformation representation
 // using translation and angle-axis
 
-#define ZERO T(0.)
-
 template<typename T>
 class Transformation
 {
@@ -130,13 +128,13 @@ public:
     const T * rotData() const { return mrot.data(); }
     const T * transData() const { return mtrans.data(); }
     
-    friend ostream& operator << (ostream & os, const Transformation & transfo)
+    friend std::ostream& operator << (std::ostream & os, const Transformation & transfo)
     {
         os << transfo.mtrans.transpose() << " # " << transfo.mrot.transpose();
         return os;
     }
 
-    void transform(const vector<Vector3<T>> & src, vector<Vector3<T>> & dst) const
+    void transform(const Vector3Vec<T> & src, Vector3Vec<T> & dst) const
     {
         dst.resize(src.size());
         rotate(src, dst);
@@ -146,7 +144,7 @@ public:
         }
     }
 
-    void inverseTransform(const vector<Vector3<T>> & src, vector<Vector3<T>> & dst) const
+    void inverseTransform(const Vector3Vec<T> & src, Vector3Vec<T> & dst) const
     {
         dst.resize(src.size());
         for (unsigned int i = 0; i < src.size(); i++)
@@ -162,7 +160,7 @@ public:
         inverseRotate(dst, dst);
     }
 
-    void rotate(const vector<Vector3<T>> & src, vector<Vector3<T>> & dst) const
+    void rotate(const Vector3Vec<T> & src, Vector3Vec<T> & dst) const
     {
         dst.resize(src.size());
         Matrix3<T> R = rotMat();
@@ -172,7 +170,7 @@ public:
         }
     }
 
-    void inverseRotate(const vector<Vector3<T>> & src, vector<Vector3<T>> & dst) const
+    void inverseRotate(const Vector3Vec<T> & src, Vector3Vec<T> & dst) const
     {
         dst.resize(src.size());
         Matrix3<T> R = rotMatInv();
@@ -188,18 +186,18 @@ public:
         dst = R * src;
     }
 
-    array<T, 6> toArray() const
+    std::array<T, 6> toArray() const
     {
-        array<T, 6> res;
-        copy(transData(), transData() + 3, res.data());
-        copy(rotData(), rotData() + 3, res.data() + 3);
+        std::array<T, 6> res;
+        std::copy(transData(), transData() + 3, res.data());
+        std::copy(rotData(), rotData() + 3, res.data() + 3);
         return res;
     }
     
     void toArray(T * const data) const
     {
-        copy(transData(), transData() + 3, data);
-        copy(rotData(), rotData() + 3, data + 3);
+        std::copy(transData(), transData() + 3, data);
+        std::copy(rotData(), rotData() + 3, data + 3);
     }
     
     template<typename T2>

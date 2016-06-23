@@ -21,7 +21,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 struct RobotCalibrationData
 {
-    vector<Vector2d> projection;
+    Vector2dVec projection;
     array<double, 6> robotPose;
     string fileName;
 };
@@ -29,8 +29,8 @@ struct RobotCalibrationData
 template<template<typename> class Projector>
 struct TransformedGridProjection 
 {
-    TransformedGridProjection(const vector<Vector2d> & proj,
-            const vector<Vector3d> & grid, 
+    TransformedGridProjection(const Vector2dVec & proj,
+            const Vector3dVec & grid, 
             const Transformation<double> & TterminalGrid)
     : _proj(proj), _grid(grid), _TterminalGrid(TterminalGrid) {}
             
@@ -40,7 +40,7 @@ struct TransformedGridProjection
     {
         Transformation<T> TcameraTerminal(params[1]);
         Transformation<T> TterminalGrid = _TterminalGrid.template cast<T>();
-        vector<Vector3<T>> transformedPoints(_grid.size());
+        Vector3Vec<T> transformedPoints(_grid.size());
         for (int i = 0; i < _grid.size(); i++)
         {
             transformedPoints[i] = _grid[i].template cast<T>();
@@ -67,8 +67,8 @@ struct TransformedGridProjection
     }
     
     const Transformation<double> _TterminalGrid;
-    const vector<Vector2d> _proj;
-    const vector<Vector3d> _grid;
+    const Vector2dVec _proj;
+    const Vector3dVec _grid;
 };
 
 template<template<typename> class Projector>

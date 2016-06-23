@@ -16,47 +16,42 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
 /*
-All necessary geometric transformations.
-This header-based package is completely independent of the rest of the project
-and can be used as a stand-alone lignt-weight 3D geometry library.
-Requires Eigen3
+Type definitions
 */
 
 #pragma once
 
-//Eigen
+// STL
+#include <vector>
+#include <array>
+
+// Eigen
 #include <Eigen/Eigen>
+
 
 #define ZERO T(0.)
 
+// Eigen data structures
 template<typename T>
 using Vector2 = Eigen::Matrix<T, 2, 1>;
+
 template<typename T>
 using Vector3 = Eigen::Matrix<T, 3, 1>;
+
 template<typename T>
 using Matrix3 = Eigen::Matrix<T, 3, 3>;
-template<typename T>
-using Vector3Vec = std::vector<Vector3<T>>;
+
+using Eigen::Matrix;
+using Eigen::Vector2d;
+using Eigen::Vector3d;
+using Eigen::Matrix3d;
+
+// STL containers
+using std::vector;
+using std::array;
 
 template<typename T>
-T sinc(const T & x);
+using Vector3Vec = vector<Vector3<T>>;
 
-template<typename T>
-Matrix3<T> rotationMatrix(const Vector3<T> & v);
-
-template<typename T>
-Vector3<T> rotationVector(const Matrix3<T> & R);
-
-template<typename T>
-Matrix3<T> hat(const Vector3<T> & u);
-
-template<typename T>
-Matrix3<T> interRotOmega(const Vector3<T> & v);
-
-template<typename T>
-Matrix3<T> interOmegaRot(const Vector3<T> & v);
-
-#include "geometry/quaternion.h"
-#include "geometry/transformation.h"
-#include "geometry/geometry_core.h"
-
+using Vector2dVec = vector<Vector2d>;
+using Vector3dVec = vector<Vector3d>;
