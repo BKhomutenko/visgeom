@@ -26,8 +26,8 @@ using ceres::SoftLOneLoss;
 template<template<typename> class Projector>
 struct StereoGridProjection 
 {
-    StereoGridProjection(const vector<Eigen::Vector2d> & proj,
-            const vector<Eigen::Vector3d> & orig) : _proj(proj), _orig(orig) {}
+    StereoGridProjection(const Vector2dVec & proj,
+            const Vector3dVec & orig) : _proj(proj), _orig(orig) {}
             
     template <typename T>
     bool operator()(const T * const* params,
@@ -37,7 +37,7 @@ struct StereoGridProjection
         Transformation<T> TrefCam(params[2]);
         Transformation<T> TcamGrid = TrefCam.inverseCompose(TrefGrid);
         
-        vector<Vector3<T>> transformedPoints(_orig.size());
+        Vector3Vec<T> transformedPoints(_orig.size());
         for (int i = 0; i < _orig.size(); i++)
         {
             transformedPoints[i] = _orig[i].template cast<T>();
@@ -56,14 +56,14 @@ struct StereoGridProjection
         return true;
     }
     
-    const vector<Vector2d> _proj;
-    const vector<Vector3d> _orig;
+    const Vector2dVec _proj;
+    const Vector3dVec _orig;
 };
 
 template<template<typename> class Projector>
 struct StereoEstimate
 {
-    StereoEstimate(const vector<Vector2d> & proj, const vector<Vector3d> & orig,
+    StereoEstimate(const Vector2dVec & proj, const Vector3dVec & orig,
     const vector<double> & camParams, const array<double, 6> & extrinsic) 
     : _proj(proj), _orig(orig), _camParams(camParams),
       _extrinsic(extrinsic) {}
@@ -80,7 +80,7 @@ struct StereoEstimate
         Transformation<T> TrefGrid(extrinsic.data());
         Transformation<T> TrefCam(params[0]);
         Transformation<T> TcamGrid = TrefCam.inverseCompose(TrefGrid);
-        vector<Vector3<T>> transformedPoints(_orig.size());
+        Vector3Vec<T> transformedPoints(_orig.size());
         for (int i = 0; i < _orig.size(); i++)
         {
             transformedPoints[i] = _orig[i].template cast<T>();
@@ -102,15 +102,15 @@ struct StereoEstimate
     
     const array<double, 6> _extrinsic;
     const vector<double> _camParams;
-    const vector<Vector2d> _proj;
-    const vector<Vector3d> _orig;
+    const Vector2dVec _proj;
+    const Vector3dVec _orig;
 };
 
 
 struct StereoCalibrationData
 {
-    vector<Vector2d> projection1;
-    vector<Vector2d> projection2;
+    Vector2dVec projection1;
+    Vector2dVec projection2;
     array<double, 6> extrinsic;
     string fileName1, fileName2;
     
@@ -209,7 +209,7 @@ public:
         while (getline(calibInfoFile, imageName))
         {
             StereoCalibrationData stereoCalibData;
-            vector<Vector2d> point1Vec, point2Vec;
+            Vector2dVec point1Vec, point2Vec;
             bool isExtracted1, isExtracted2;
             
             stereoCalibData.fileName1 = imageFolder + leftPref + imageName;
@@ -237,7 +237,7 @@ public:
 
     void addStereoResidual(Problem & problem, vector<double> & intrinsic, 
             array<double, 6> & extrinsic,
-            const vector<Vector2d> & projection,
+            const Vector2dVec & projection,
             array<double, 6> & gridExtrinsic)
     {
         typedef DynamicAutoDiffCostFunction<StereoGridProjection<Projector>> stereoProjectionCF;

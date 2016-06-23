@@ -18,45 +18,15 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #include <cmath>
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <string>
 #include <algorithm>
-#include <vector>
 
-#include <Eigen/Eigen>
-#include <opencv2/opencv.hpp>
 #include <ceres/ceres.h>
 #include <glog/logging.h>
 
+#include "io.h"
+#include "ocv.h"
+#include "eigen.h"
 #include "cost_functors.h"
-
-using std::vector;
-using std::array;
-using std::string;
-using std::cin;
-using std::cout;
-using std::endl;
-using std::flush;
-using std::setw;
-using std::istringstream;
-using std::ifstream;
-
-// OpenCV data structures
-using cv::Mat_;
-using cv::Mat;
-using cv::Size;
-using cv::Point;
-// OpenCV functions
-using cv::circle;
-using cv::imread;
-using cv::imshow;
-using cv::waitKey;
-using cv::Point2f;
-
-using Eigen::Vector3d;
-using Eigen::Vector2d;
 
 using ceres::DynamicAutoDiffCostFunction;
 using ceres::CostFunction;
@@ -69,7 +39,7 @@ int nObjects = 0;
 
 struct CalibrationData
 {
-    vector<Vector2d> projection;
+    Vector2dVec projection;
     array<double, 6> extrinsic;
     string fileName;
 };
@@ -81,7 +51,7 @@ protected:
     int Nx, Ny;
     double sqSize;
     double outlierThresh;
-    vector<Vector3d> grid;
+    Vector3dVec grid;
 public:
 
     //TODO chanche the file formatting
@@ -125,12 +95,12 @@ public:
         return true;
     }
 
-    bool extractGridProjection(const string & fileName, vector<Vector2d> & projection, bool checkExtraction)
+    bool extractGridProjection(const string & fileName, Vector2dVec & projection, bool checkExtraction)
     {
         Size patternSize(Nx, Ny);
         Mat frame = imread(fileName, 0);
 
-        vector<Point2f> centers;
+        vector<cv::Point2f> centers;
         bool patternIsFound = findChessboardCorners(frame, patternSize, centers);
         if (not patternIsFound)
         {
@@ -168,7 +138,7 @@ public:
     }
 
     void estimateInitialGrid(const vector<double> & intrinsic,
-            const vector<Vector2d> & projection,
+            const Vector2dVec & projection,
             array<double, 6> & extrinsic)
     {
         Problem problem;
@@ -198,7 +168,7 @@ public:
     }
 
     void addIntrinsicResidual(Problem & problem, vector<double> & intrinsic,
-            const vector<Vector2d> & projection,
+            const Vector2dVec & projection,
             array<double, 6> & extrinsic)
     {
         typedef DynamicAutoDiffCostFunction<GridProjection<Projector>> projectionCF;
@@ -214,7 +184,6 @@ public:
     void residualAnalysis(const vector<double> & intrinsic,
             const vector<CalibrationData> & calibDataVec)
     {
-
         double Ex = 0, Ey = 0;
         double Emax = 0;
         Mat_<float> errorPlot(400, 400, 0.f);
@@ -223,11 +192,11 @@ public:
         circle(errorPlot, Point(200, 200), 150, 0.4, 1);
         for (int ptIdx = 0; ptIdx < calibDataVec.size(); ptIdx++)
         {
-                vector<Vector3d> transfModelVec;
+                Vector3dVec transfModelVec;
                 Transformation<double> TcamGrid(calibDataVec[ptIdx].extrinsic.data());
                 TcamGrid.transform(grid, transfModelVec);
 
-                vector<Vector2d> projModelVec(transfModelVec.size());
+                Vector2dVec projModelVec(transfModelVec.size());
                 Projector<double> projector;
                 for (int i = 0; i < transfModelVec.size(); i++)
                 {

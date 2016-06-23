@@ -1,18 +1,8 @@
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <ctime>
-
-#include <Eigen/Eigen>
-#include <opencv2/opencv.hpp>
-
+#include "io.h"
+#include "ocv.h"
+#include "eigen.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_stereo.h"
-
-using namespace cv;
-using namespace std;
-
-typedef cv::Mat_<uint8_t> Mat8;
 
 int main(int argc, char** argv)
 {	
@@ -119,12 +109,12 @@ int main(int argc, char** argv)
     getline(paramFile, fileName1);
     getline(paramFile, fileName2);
     
-    Mat8 img1 = imread(fileName1, 0);
-    Mat8 img2 = imread(fileName2, 0);
-    Mat_<int16_t> img1lap, img2lap;
+    Mat8u img1 = imread(fileName1, 0);
+    Mat8u img2 = imread(fileName2, 0);
+    Mat16s img1lap, img2lap;
+
     stereoParams.imageWidth = img1.cols;
     stereoParams.imageHeight = img1.rows;
-    
 //    
 //    Laplacian(img1, img1lap, CV_16S, 3);
 //    Laplacian(img2, img2lap, CV_16S, 3);
@@ -139,7 +129,7 @@ int main(int argc, char** argv)
 //    
     EnhancedStereo stereo(TleftRight, params1.data(), params2.data(), stereoParams);
     
-    Mat8 out1, out2;
+    Mat8u out1, out2;
     
     img1.copyTo(out1);
     img2.copyTo(out2);
@@ -155,7 +145,7 @@ int main(int argc, char** argv)
 //    }
     
 
-    cv::Mat_<uint8_t> res;
+    Mat8u res;
     auto t2 = clock();
     stereo.computeCost(img1, img2);
     auto t3 = clock();

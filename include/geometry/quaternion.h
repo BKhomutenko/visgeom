@@ -116,7 +116,7 @@ public:
         return Quaternion(xn, yn, zn, wn);
     } 
 
-    friend ostream& operator << (ostream & os, const Quaternion & Q)
+    friend std::ostream& operator << (std::ostream & os, const Quaternion & Q)
     {
         os << Q.x << " " << Q.y << " " << Q.z << " " << Q.w;
         return os;

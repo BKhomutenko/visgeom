@@ -20,18 +20,13 @@ Abstract camera class
 */
 #pragma once
 
-#include <Eigen/Eigen>
+#include "eigen.h"
 #include "geometry/geometry.h"
-
-using Eigen::Matrix;
-using Eigen::Vector2d;
-using Eigen::Vector3d;
-using Eigen::Matrix3d;
 
 class ICamera
 {
 public:
-    vector<double> params;
+    std::vector<double> params;
     int width, height;
 
     /// takes raw image points and apply undistortion model to them
@@ -55,7 +50,7 @@ public:
     
     virtual ICamera * clone() const = 0; 
     
-    bool reconstructPointCloud(const vector<Vector2d> & src, vector<Vector3d> & dst) const
+    bool reconstructPointCloud(const Vector2dVec & src, Vector3dVec & dst) const
     {
         dst.resize(src.size());
         bool res = true;
@@ -66,7 +61,7 @@ public:
         return res;
     }
     
-    bool projectPointCloud(const vector<Vector3d> & src, vector<Vector2d> & dst) const
+    bool projectPointCloud(const Vector3dVec & src, Vector2dVec & dst) const
     {
         dst.resize(src.size());
         bool res = true;

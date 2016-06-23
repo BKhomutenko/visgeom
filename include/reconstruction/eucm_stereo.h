@@ -22,23 +22,15 @@ Semi-global block matching algorithm for non-rectified images
 
 #pragma once
 //STL
-#include <vector>
-#include <array>
 #include <algorithm>
 
-//Eigen
-#include <Eigen/Eigen>
-
-//OpenCV
-#include <opencv2/opencv.hpp>
-
+#include "ocv.h"
+#include "eigen.h"
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 #include "curve_rasterizer.h"
 
-using std::vector;
-
-typedef CurveRasterizer<Polynomial2> EpipolarRasterizer;
+using EpipolarRasterizer = CurveRasterizer<Polynomial2>;
 
 struct StereoParameters
 {
@@ -171,23 +163,23 @@ public:
     Vector3d triangulate(int x1, int y1, int x2, int y2);
     void computeDistance(cv::Mat_<float> & distance);
     void generatePlane(Transformation<double> TcameraPlane, 
-            cv::Mat_<float> & distance, const vector<Vector3d> & polygonVec);
+            cv::Mat_<float> & distance, const Vector3dVec & polygonVec);
     
 private:
     Transformation<double> Transform12;  // pose of the first to the second camera
     EnhancedCamera cam1, cam2;
    
-    vector<Eigen::Vector3d> reconstVec;  // reconstruction of every pixel by cam1
-    vector<Eigen::Vector3d> reconstRotVec;  // reconstVec rotated into the second frame
+    Vector3dVec reconstVec;  // reconstruction of every pixel by cam1
+    Vector3dVec reconstRotVec;  // reconstVec rotated into the second frame
     
     Eigen::Vector2d epipole;  // projection of the first camera center onto the second camera
-    vector<Eigen::Vector2d> pinfVec;  // projection of reconstRotVec by cam2
+    Vector2dVec pinfVec;  // projection of reconstRotVec by cam2
     
     // discretized version
     cv::Point epipolePx;  
-    vector<cv::Point> pinfPxVec;
+    std::vector<cv::Point> pinfPxVec;
     
-    vector<Polynomial2> epipolarVec;  // the epipolar curves represented by polynomial functions
+    std::vector<Polynomial2> epipolarVec;  // the epipolar curves represented by polynomial functions
     
     cv::Mat_<uint8_t> errorBuffer;
     cv::Mat_<int> tableauLeft, tableauRight;

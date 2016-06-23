@@ -19,30 +19,15 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 /*
 Semi-global block matching algorithm for non-rectified images
 */
-
-//STL
-#include <vector>
-#include <array>
-#include <algorithm>
-#include <ctime>
-
-//Eigen
-#include <Eigen/Eigen>
-
-//OpenCV
-#include <opencv2/opencv.hpp>
+#include "std.h"
+#include "io.h"
+#include "ocv.h"
+#include "eigen.h"
 
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_stereo.h"
-
-using namespace std;
-
-using cv::Rect;
-using cv::Point;
-using cv::Mat_;
-using cv::Size;
 
 void EnhancedStereo::computeEpipole()
 {
@@ -142,7 +127,7 @@ void EnhancedStereo::computeEpipolarCurves()
     }    
 }
 
-void EnhancedStereo::traceEpipolarLine(Point pt, Mat_<uint8_t> & out)
+void EnhancedStereo::traceEpipolarLine(Point pt, Mat8u & out)
 {
     int idx = pt.y * cam1.width + pt.x;
     cout << idx << endl;
@@ -168,33 +153,33 @@ void EnhancedStereo::createBuffer()
     int bufferWidth = params.smallWidth*params.dispMax;
     if (errorBuffer.cols != bufferWidth or errorBuffer.rows != params.smallHeight)
     {
-        errorBuffer = Mat_<uint8_t>(Size(bufferWidth, params.smallHeight));
+        errorBuffer = Mat8u(Size(bufferWidth, params.smallHeight));
     }
     if (tableauLeft.cols != bufferWidth or tableauLeft.rows != params.smallHeight)
     {
-        tableauLeft = Mat_<int>(Size(bufferWidth, params.smallHeight));
+        tableauLeft = Mat32s(Size(bufferWidth, params.smallHeight));
     }
     if (tableauRight.cols != bufferWidth or tableauRight.rows != params.smallHeight)
     {
-        tableauRight = Mat_<int>(Size(bufferWidth, params.smallHeight));
+        tableauRight = Mat32s(Size(bufferWidth, params.smallHeight));
     }
     if (tableauTop.cols != bufferWidth or tableauTop.rows != params.smallHeight)
     {
-        tableauTop = Mat_<int>(Size(bufferWidth, params.smallHeight));
+        tableauTop = Mat32s(Size(bufferWidth, params.smallHeight));
     }
     if (tableauBottom.cols != bufferWidth or tableauBottom.rows != params.smallHeight)
     {
-        tableauBottom = Mat_<int>(Size(bufferWidth, params.smallHeight));
+        tableauBottom = Mat32s(Size(bufferWidth, params.smallHeight));
     }
     if (smallDisparity.cols != params.smallWidth or smallDisparity.rows != params.smallHeight)
     {
-        smallDisparity = Mat_<uint8_t>(Size(params.smallWidth, params.smallHeight));
+        smallDisparity = Mat8u(Size(bufferWidth, params.smallHeight));
     }
 }
 
-void EnhancedStereo::comuteStereo(const Mat_<uint8_t> & img1, 
-        const Mat_<uint8_t> & img2,
-        Mat_<uint8_t> & disparity)
+void EnhancedStereo::comuteStereo(const Mat8u & img1, 
+        const Mat8u & img2,
+        Mat8u & disparity)
 {
     computeCost(img1, img2);
     computeDynamicProgramming();
@@ -202,12 +187,12 @@ void EnhancedStereo::comuteStereo(const Mat_<uint8_t> & img1,
     upsampleDisparity(img1, disparity);
 }
 
-void EnhancedStereo::computeCost(const Mat_<uint8_t> & img1, const Mat_<uint8_t> & img2)
+void EnhancedStereo::computeCost(const Mat8u & img1, const Mat8u & img2)
 {
     double T1 = 0, T2 = 0; // time profiling
 //    cout << "cost" << endl;
-    Mat_<uint8_t> img2remap(Size(params.blockSize - 1 + params.dispMax, params.blockSize));
-    Mat_<int> integral1, integral2;
+    Mat8u img2remap(Size(params.blockSize - 1 + params.dispMax, params.blockSize));
+    Mat32s integral1, integral2;
     integral(img1, integral1);
     int blockSizeSquared = params.blockSize * params.blockSize;
     for (int v = 0; v < params.smallHeight; v++)
@@ -365,7 +350,7 @@ void EnhancedStereo::computeDynamicProgramming()
 
 void EnhancedStereo::reconstructDisparity()
 {
-    Mat_<uint16_t> errFinalMat(smallDisparity.size());
+    Mat16s errFinalMat(smallDisparity.size());
     for (int v = 0; v < params.smallHeight; v++)
     {
         int* dynRow1 = (int*)(tableauLeft.row(v).data);
@@ -377,7 +362,7 @@ void EnhancedStereo::reconstructDisparity()
         {
             int bestCost = 100000;
             uint8_t & bestDisp = smallDisparity(v, u);
-            uint16_t & bestErr = errFinalMat(v, u);
+            int16_t & bestErr = errFinalMat(v, u);
             bestDisp = 0;
             for (int d = 0; d < params.dispMax; d++)
             {
@@ -424,7 +409,7 @@ Vector3d EnhancedStereo::triangulate(int x1, int y1, int x2, int y2)
     return (v1*l1 + t + v2*l2)*0.5;
 }
 
-void EnhancedStereo::computeDistance(Mat_<float> & distance)
+void EnhancedStereo::computeDistance(Mat32f & distance)
 {
     distance.create(params.smallHeight, params.smallWidth);
     for (int v = 0; v < params.smallHeight; v++)
@@ -447,12 +432,12 @@ void EnhancedStereo::computeDistance(Mat_<float> & distance)
 }
 
 void EnhancedStereo::generatePlane(Transformation<double> TcameraPlane,
-        Mat_<float> & distance, const vector<Vector3d> & polygonVec)
+        Mat32f & distance, const Vector3dVec & polygonVec)
 {
     distance.create(params.smallHeight, params.smallWidth);
     Vector3d t = TcameraPlane.trans();
     Vector3d z = TcameraPlane.rotMat().col(2);
-    vector<Vector3d> polygonCamVec;
+    Vector3dVec polygonCamVec;
     TcameraPlane.transform(polygonVec, polygonCamVec);
     for (int v = 0; v < params.smallHeight; v++)
     {
@@ -486,7 +471,7 @@ void EnhancedStereo::generatePlane(Transformation<double> TcameraPlane,
     }
 }
 
-void EnhancedStereo::upsampleDisparity(const Mat_<uint8_t> & img1, Mat_<uint8_t> & disparity)
+void EnhancedStereo::upsampleDisparity(const Mat8u & img1, Mat8u & disparity)
 {
     smallDisparity.copyTo(disparity);
 //    resize(smallDisparity, disparity, Size(0, 0), params.blockSize, params.blockSize, 0);

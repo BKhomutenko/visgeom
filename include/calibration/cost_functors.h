@@ -17,18 +17,13 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
     
 #pragma once
 
-#include <vector>
-#include <Eigen/Eigen>
+#include "eigen.h"
 
-using std::vector;
-
-using Eigen::Vector3d;
-using Eigen::Vector2d;
 
 template<template<typename> class Projector>
 struct GridProjection 
 {
-    GridProjection(const vector<Vector2d> & proj, const vector<Vector3d> & grid)
+    GridProjection(const Vector2dVec & proj, const Vector3dVec & grid)
     : _proj(proj), _grid(grid) {}
             
     template <typename T>
@@ -36,7 +31,7 @@ struct GridProjection
                     T* residual) const 
     {
         Transformation<T> TbaseGrid(params[1]);
-        vector<Vector3<T>> transformedPoints(_grid.size());
+        Vector3Vec<T> transformedPoints(_grid.size());
         for (int i = 0; i < _grid.size(); i++)
         {
             transformedPoints[i] = _grid[i].template cast<T>();
@@ -62,30 +57,30 @@ struct GridProjection
         return true;
     }
     
-    const vector<Vector2d> _proj;
-    const vector<Vector3d> _grid;
+    const Vector2dVec _proj;
+    const Vector3dVec _grid;
 };
 
     
 template<template<typename> class Projector>
 struct GridEstimate
 {
-    GridEstimate(const vector<Vector2d> & proj, const vector<Vector3d> & grid,
-    const vector<double> & camParams) : _proj(proj), _grid(grid), _camParams(camParams) {}
+    GridEstimate(const Vector2dVec & proj, const Vector3dVec & grid,
+    const std::vector<double> & camParams) : _proj(proj), _grid(grid), _camParams(camParams) {}
             
     template <typename T>
     bool operator()(const T * const * params,
                     T* residual) const 
     {
         Transformation<T> TbaseGrid(params[0]);
-        vector<Vector3<T>> transformedPoints(_grid.size());
+        Vector3Vec<T> transformedPoints(_grid.size());
         for (int i = 0; i < _grid.size(); i++)
         {
             transformedPoints[i] = _grid[i].template cast<T>();
         }
         TbaseGrid.transform(transformedPoints, transformedPoints);
 
-        vector<T> camParamsT(_camParams.begin(), _camParams.end());
+        std::vector<T> camParamsT(_camParams.begin(), _camParams.end());
         Projector<T> projector;
         for (unsigned int i = 0; i < transformedPoints.size(); i++)
         {
@@ -105,8 +100,8 @@ struct GridEstimate
         return true;
     }
     
-    const vector<double> _camParams;
-    const vector<Vector2d> _proj;
-    const vector<Vector3d> _grid;
+    const std::vector<double> _camParams;
+    const Vector2dVec _proj;
+    const Vector3dVec _grid;
 };
 
