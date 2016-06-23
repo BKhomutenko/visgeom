@@ -17,6 +17,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <opencv2/opencv.hpp>
 #include <Eigen/Eigen>
+#include <iostream>
 #include <iomanip>
 #include <fstream>
 #include <boost/format.hpp>
@@ -26,7 +27,6 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "camera/eucm.h"
 
 using namespace std;
-
 using namespace cv;
 using Eigen::Vector2d;
 using Eigen::Vector3d;
