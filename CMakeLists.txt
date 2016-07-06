@@ -52,6 +52,7 @@ TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
 add_executable( stereo 
    src/reconstruction/stereo_test.cpp
    src/reconstruction/eucm_stereo.cpp
+   src/reconstruction/depth_map.cpp
 )
 
 target_link_libraries( stereo ${OpenCV_LIBS} )

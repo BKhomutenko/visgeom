@@ -33,19 +33,19 @@ struct Polynomial2
 //    Polynomial2(const std::array<double, 6> & coeffs) : coeffArr(coeffs) {}
 //    std::array<double, 6> coeffArr;
     double kuu, kuv, kvv, ku, kv, k1;
-    double operator() (int x, int y) const
+    double operator() (double x, double y) const
     {
         return (kuu*x + kuv*y + ku)*x 
                 + (kvv*y + kv)*y 
                 + k1;
     }
     
-    double gradx(int x, int y) const
+    double gradx(double x, double y) const
     {
         return 2*kuu*x + kuv*y + ku;
     }
     
-    double grady(int x, int y) const
+    double grady(double x, double y) const
     {
         return kuv*x + 2*kvv*y + + kv;
     }
@@ -57,62 +57,62 @@ inline int sign(double x)
     return 2*int(x > 0) - 1;
 }
 
-template<typename T>
-struct CurveRasterizer2
-{
-    double delta;
-    double fx, fy;
-    int eps;
-    int x, y;
-    T surf; 
-    
-    CurveRasterizer2(int x, int y, int ex, int ey, const T & surf) :
-            x(x), y(y), surf(surf)
-    {
-        fx = surf.gradx(x, y);
-        fy = surf.grady(x, y);
-        delta = surf(x, y);
-        if (fx*(ey - y) - fy*(ex - x) > 0) eps = 1;
-        else eps = -1;
-    }
-    
-//    void moveX(int dx)
+//template<typename T>
+//struct CurveRasterizer2
+//{
+//    double delta;
+//    double fx, fy;
+//    int eps;
+//    int x, y;
+//    T surf; 
+//    
+//    CurveRasterizer2(int x, int y, int ex, int ey, const T & surf) :
+//            x(x), y(y), surf(surf)
 //    {
-//        if (dx == 0) return;
-//        x += dx;
-//        double fx2 = surf.gradx(x, y);
-//        delta += 0.5*dx*(fx + fx2);
-//        fx = fx2;
-//        fy = surf.grady(x, y); 
+//        fx = surf.gradx(x, y);
+//        fy = surf.grady(x, y);
+//        delta = surf(x, y);
+//        if (fx*(ey - y) - fy*(ex - x) > 0) eps = 1;
+//        else eps = -1;
 //    }
 //    
-//    void moveY(int dy)
+////    void moveX(int dx)
+////    {
+////        if (dx == 0) return;
+////        x += dx;
+////        double fx2 = surf.gradx(x, y);
+////        delta += 0.5*dx*(fx + fx2);
+////        fx = fx2;
+////        fy = surf.grady(x, y); 
+////    }
+////    
+////    void moveY(int dy)
+////    {
+////        if (dy == 0) return;
+////        y += dy;
+////        double fy2 = surf.grady(x, y);
+////        delta += 0.5*dy*(fy + fy2);
+////        fy = fy2;
+////        fx = surf.gradx(x, y); 
+////    }
+//    
+//    void step()
 //    {
-//        if (dy == 0) return;
-//        y += dy;
-//        double fy2 = surf.grady(x, y);
-//        delta += 0.5*dy*(fy + fy2);
-//        fy = fy2;
-//        fx = surf.gradx(x, y); 
+//        double fx = surf.gradx(x, y);
+//        double fy = surf.grady(x, y);
+//        if (abs(fx) > abs(fy))  // go along y
+//        {
+//            y += eps*sign(fx);
+//            x -= round(surf(x, y)/surf.gradx(x, y));
+//        }   
+//        else  // go along x
+//        {
+//            x -= eps*sign(fy);
+//            y -= round(surf(x, y)/surf.grady(x, y));
+//        }
 //    }
-    
-    void step()
-    {
-        double fx = surf.gradx(x, y);
-        double fy = surf.grady(x, y);
-        if (abs(fx) > abs(fy))  // go along y
-        {
-            y += eps*sign(fx);
-            x -= round(surf(x, y)/surf.gradx(x, y));
-        }   
-        else  // go along x
-        {
-            x -= eps*sign(fy);
-            y -= round(surf(x, y)/surf.grady(x, y));
-        }
-    }
-    
-};
+//    
+//};
 
 template<typename T>
 struct CurveRasterizer
@@ -120,7 +120,7 @@ struct CurveRasterizer
     double delta;
     double fx, fy;
     int eps;
-    int x, y;
+    double x, y;
     T surf; 
     
     CurveRasterizer(int x, int y, int ex, int ey, const T & surf) :
