@@ -123,7 +123,7 @@ struct CurveRasterizer
     double x, y;
     T surf; 
     
-    CurveRasterizer(int x, int y, int ex, int ey, const T & surf) :
+    CurveRasterizer(double x, double y, double ex, double ey, const T & surf) :
             x(x), y(y), surf(surf)
     {
         fx = surf.gradx(x, y);

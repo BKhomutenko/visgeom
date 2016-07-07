@@ -19,19 +19,44 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 /*
 Depth container
 */
+#pragma once
 
 #include "std.h"
 #include "eigen.h"
 
-#include "camera/eucm.h"
+#include "camera/generic_camera.h"
+
+const double DEFAULT_DEPTH = 1;
+const double DEFAULT_SIGMA_DEPTH = 100;
 
 class DepthMap
 {
 public:
-    DepthMap(const EnhancedCamera & camera, int w, int h, double u0, double v0, double scale) :
-            camera(camera), width(w), height(h), u0(u0), v0(v0), scale(scale),
-            valVec(w*h, 1),  sigmaVec(w*h, 100)  {}
-    virtual ~DepthMap() {}
+    DepthMap() : cameraPtr(NULL) {}
+    
+    //copy constructor
+    DepthMap(const DepthMap & depth) :
+            cameraPtr(depth.cameraPtr->clone()),
+            width(depth.width),
+            height(depth.height),
+            u0(depth.u0),
+            v0(depth.v0),
+            scale(depth.scale),
+            valVec(depth.width*depth.height, DEFAULT_DEPTH),
+            sigmaVec(depth.width*depth.height, DEFAULT_SIGMA_DEPTH)  {}
+    
+    //basic constructor        
+    DepthMap(const ICamera * camera, int w, int h, double u0, double v0, double scale) :
+            cameraPtr(camera->clone()), width(w), height(h), u0(u0), v0(v0), scale(scale),
+            valVec(w*h, DEFAULT_DEPTH),  sigmaVec(w*h, DEFAULT_SIGMA_DEPTH)  {}
+
+    virtual ~DepthMap() 
+    {
+        if (cameraPtr != NULL)
+        {
+            delete cameraPtr;
+        }
+    }
     
     // nearest neighbor interpolation
     double nearest(double u, double v);
@@ -68,7 +93,7 @@ public:
     std::vector<double> sigmaVec; // uncertainty
     
 private:
-    EnhancedCamera camera;
+    ICamera * cameraPtr;
     int width;
     int height;
     

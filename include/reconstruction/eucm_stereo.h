@@ -29,6 +29,7 @@ Semi-global block matching algorithm for non-rectified images
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 #include "curve_rasterizer.h"
+#include "depth_map.h"
 
 using EpipolarRasterizer = CurveRasterizer<Polynomial2>;
 
@@ -36,7 +37,7 @@ struct StereoParameters
 {
     // basic parameters
     int dispMax = 48; // maximum disparity
-    int blockSize = 3;
+    int scale = 3;
     int uMargin = 0, vMargin = 0;  // RoI left upper corner
     int width = -1, height = -1;  // RoI size
     int lambdaStep = 5;
@@ -52,28 +53,32 @@ struct StereoParameters
     // to be called before using
     void init()
     {
-        u0 = uMargin + dispMax + blockSize; 
+        u0 = uMargin + dispMax + scale; 
         v0 = vMargin;
         
         if (width > 0) uMax = u0 + width;
-        else uMax = imageWidth - uMargin - blockSize;
+        else uMax = imageWidth - uMargin - scale;
         
         if (height > 0) vMax = v0 + height;
-        else vMax = imageHeight - vMargin - blockSize;
+        else vMax = imageHeight - vMargin - scale;
         
         smallWidth = uSmall(uMax) + 1;
         smallHeight = vSmall(vMax) + 1;
         
-        halfBlockSize =  blockSize / 2; 
+        halfBlockSize =  scale / 2; 
     }
     
     // from image to small disparity coordiante transform
-    int uSmall(int u) { return (u - u0) / blockSize; }
-    int vSmall(int v) { return (v - v0) / blockSize; }
+    int uSmall(int u) { return (u - u0) / scale; }
+    int vSmall(int v) { return (v - v0) / scale; }
     
     // from small disparity to image coordiante transform    
-    int uBig(int u) { return u * blockSize + halfBlockSize + u0; }
-    int vBig(int v) { return v * blockSize + halfBlockSize + v0; }
+    int uBig(int u) { return (u + 0.5) * scale - 0.5 + u0; }
+    int vBig(int v) { return (v + 0.5) * scale - 0.5 + v0; }
+    
+    // from small disparity to image block corner transform 
+    int uCorner(int u) { return u * scale + u0; }
+    int vCorner(int v) { return v * scale + v0; }
 };
 
 class EnhancedStereo
@@ -131,20 +136,24 @@ public:
     void computeEpipolarCurves();
     
     // to visualize the epipolar lines
-    void traceEpipolarLine(cv::Point pt, cv::Mat_<uint8_t> & out);
+    void traceEpipolarLine(cv::Point pt, Mat8u & out);
     
     
     //// DYNAMIC PROGRAMMING
     
     // fills up the output with photometric errors between the val = I1(pi) and 
     // the values from I2 on the epipolar curve
-    void comuteStereo(const cv::Mat_<uint8_t> & img1, 
-            const cv::Mat_<uint8_t> & img2,
-            cv::Mat_<uint8_t> & disparity);
+    void comuteStereo(const Mat8u & img1, 
+            const Mat8u & img2,
+            Mat8u & disparity);
     
+    void comuteStereo(const Mat8u & img1, 
+            const Mat8u & img2,
+            DepthMap & disparity);
+            
     void createBuffer();
     
-    void computeCost(const cv::Mat_<uint8_t> & img1, const cv::Mat_<uint8_t> & img2);
+    void computeCost(const Mat8u & img1, const Mat8u & img2);
     
     void computeDynamicProgramming();
     
@@ -152,23 +161,27 @@ public:
     
     void reconstructDisparity();  // using the result of the dynamic programming
     
-    void upsampleDisparity(const cv::Mat_<uint8_t> & img1, cv::Mat_<uint8_t> & disparity);
+    // TODO implement
+    void upsampleDisparity(const Mat8u & img1, Mat8u & disparity);
     
     //// MISCELLANEOUS
     
     // index of an object in a linear array corresponding to pixel [row, col] 
-    int getLinearIdx(int row, int col) { return cam1.width*row + col; }
+    //TODO change this to the disparity-based indexing
+    int getLinearIdx(int u, int v) { return params.smallWidth*v + u; }
       
     // reconstruction
     Vector3d triangulate(int x1, int y1, int x2, int y2);
-    void computeDistance(cv::Mat_<float> & distance);
+    void computeDistance(Mat32f & distance);
+    void computeDistance(DepthMap & disparity);
     void generatePlane(Transformation<double> TcameraPlane, 
-            cv::Mat_<float> & distance, const Vector3dVec & polygonVec);
+            Mat32f & distance, const Vector3dVec & polygonVec);
     
 private:
     Transformation<double> Transform12;  // pose of the first to the second camera
     EnhancedCamera cam1, cam2;
    
+    //TODO replace by disparity map points
     Vector3dVec reconstVec;  // reconstruction of every pixel by cam1
     Vector3dVec reconstRotVec;  // reconstVec rotated into the second frame
     
@@ -176,15 +189,16 @@ private:
     Vector2dVec pinfVec;  // projection of reconstRotVec by cam2
     
     // discretized version
+    //TODO remove
     cv::Point epipolePx;  
     std::vector<cv::Point> pinfPxVec;
     
     std::vector<Polynomial2> epipolarVec;  // the epipolar curves represented by polynomial functions
     
-    cv::Mat_<uint8_t> errorBuffer;
+    Mat8u errorBuffer;
     cv::Mat_<int> tableauLeft, tableauRight;
     cv::Mat_<int> tableauTop, tableauBottom;
-    cv::Mat_<uint8_t> smallDisparity;
+    Mat8u smallDisparity;
     
     StereoParameters params;
 };

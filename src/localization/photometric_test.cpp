@@ -75,7 +75,7 @@ int main (int argc, char const* argv[])
     paramFile >> stereoParams.uMargin;
     paramFile >> stereoParams.vMargin;
     paramFile >> stereoParams.dispMax;
-    paramFile >> stereoParams.blockSize;
+    paramFile >> stereoParams.scale;
     paramFile.ignore();
     
     string imageDir;

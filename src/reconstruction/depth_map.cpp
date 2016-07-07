@@ -98,7 +98,7 @@ void DepthMap::reconstruct(Vector3dVec & result)
             pointVec.emplace_back(x, y);
         }
     }
-    camera.reconstructPointCloud(pointVec, result);
+    cameraPtr->reconstructPointCloud(pointVec, result);
     for (int i = 0; i < valVec.size(); i++)
     {
         result[i] = result[i].normalized()*valVec[i];
@@ -115,7 +115,7 @@ void DepthMap::reconstruct(const vector<int> & indexVec, Vector3dVec & result)
         int y = index / width;
         pointVec.emplace_back(x, y);
     }
-    camera.reconstructPointCloud(pointVec, result);
+    cameraPtr->reconstructPointCloud(pointVec, result);
     for (int i = 0; i < indexVec.size(); i++)
     {
         result[i] = result[i].normalized()*valVec[indexVec[i]];
@@ -124,7 +124,7 @@ void DepthMap::reconstruct(const vector<int> & indexVec, Vector3dVec & result)
 
 void DepthMap::reconstruct(const Vector2dVec & pointVec, Vector3dVec & result)
 {
-    camera.reconstructPointCloud(pointVec, result);
+    cameraPtr->reconstructPointCloud(pointVec, result);
     for (int i = 0; i < valVec.size(); i++)
     {
         result[i] = result[i].normalized()*nearest(pointVec[i]);

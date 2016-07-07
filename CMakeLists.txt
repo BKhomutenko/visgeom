@@ -60,6 +60,7 @@ target_link_libraries( stereo ${OpenCV_LIBS} )
 add_executable( multistereo 
    src/reconstruction/stereo_multibase.cpp
    src/reconstruction/eucm_stereo.cpp
+   src/reconstruction/depth_map.cpp
 )
 
 target_link_libraries( multistereo ${OpenCV_LIBS} )
@@ -67,6 +68,7 @@ target_link_libraries( multistereo ${OpenCV_LIBS} )
 add_executable( generate_plane 
    src/reconstruction/generate_plane.cpp
    src/reconstruction/eucm_stereo.cpp
+   src/reconstruction/depth_map.cpp
 )
 
 target_link_libraries( generate_plane ${OpenCV_LIBS} )
@@ -75,6 +77,7 @@ add_executable( photometric
    src/localization/photometric_test.cpp
    src/localization/photometric.cpp
    src/reconstruction/eucm_stereo.cpp
+   src/reconstruction/depth_map.cpp
 )
 
 target_link_libraries( photometric ${OpenCV_LIBS} )

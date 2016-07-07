@@ -28,6 +28,7 @@ Semi-global block matching algorithm for non-rectified images
 #include "camera/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_stereo.h"
+#include "reconstruction/depth_map.h"
 
 void EnhancedStereo::computeEpipole()
 {
@@ -37,15 +38,16 @@ void EnhancedStereo::computeEpipole()
     epipolePx.y = round(epipole[1]);
 }
 
+//TODO reconstruct the depth points, not everything
 void EnhancedStereo::computeReconstructed()
 {
-    vector<Eigen::Vector2d> imagePointVec;
-    imagePointVec.reserve(cam1.width*cam1.height);
-    for (int v = 0; v < cam1.height; v++)
+    Vector2dVec imagePointVec;
+    imagePointVec.reserve(params.smallHeight*params.smallWidth);
+    for (int v = 0; v < params.smallHeight; v++)
     {
-        for (int u = 0; u < cam1.width; u++)
+        for (int u = 0; u < params.smallWidth; u++)
         {
-            imagePointVec.emplace_back(u, v);
+            imagePointVec.emplace_back(params.uBig(u), params.vBig(v));
         }
     }
     cam1.reconstructPointCloud(imagePointVec, reconstVec);
@@ -173,7 +175,8 @@ void EnhancedStereo::createBuffer()
     }
     if (smallDisparity.cols != params.smallWidth or smallDisparity.rows != params.smallHeight)
     {
-        smallDisparity = Mat8u(Size(bufferWidth, params.smallHeight));
+        smallDisparity = Mat8u(Size(params.smallWidth, params.smallHeight));
+        cout << smallDisparity.size() << endl;
     }
 }
 
@@ -184,68 +187,121 @@ void EnhancedStereo::comuteStereo(const Mat8u & img1,
     computeCost(img1, img2);
     computeDynamicProgramming();
     reconstructDisparity();
-    upsampleDisparity(img1, disparity);
+    smallDisparity.copyTo(disparity);
 }
 
-void EnhancedStereo::computeCost(const Mat8u & img1, const Mat8u & img2)
+void EnhancedStereo::comuteStereo(const Mat8u & img1, 
+        const Mat8u & img2,
+        DepthMap & depth)
 {
-    double T1 = 0, T2 = 0; // time profiling
-//    cout << "cost" << endl;
-    Mat8u img2remap(Size(params.blockSize - 1 + params.dispMax, params.blockSize));
-    Mat32s integral1, integral2;
-    integral(img1, integral1);
-    int blockSizeSquared = params.blockSize * params.blockSize;
+    computeCost(img1, img2);
+    computeDynamicProgramming();
+    reconstructDisparity();
+    //TODO fuse the following code with computeDistance
+    depth = DepthMap(&cam1, params.smallHeight, params.smallWidth,
+            params.u0, params.v0, params.scale);
     for (int v = 0; v < params.smallHeight; v++)
     {
         for (int u = 0; u < params.smallWidth; u++)
         {
+            if (smallDisparity(v, u) == 0) 
+            {
+                depth.at(u, v) = 100;
+                continue;
+            }
             int idx = getLinearIdx(params.vBig(v), params.uBig(u));
-            uint8_t * outPtr = errorBuffer.row(v).data + u*params.dispMax;
-            
             Point pinf = pinfPxVec[idx];
             CurveRasterizer<Polynomial2> raster(pinf.x, pinf.y, epipolePx.x, epipolePx.y, epipolarVec[idx]);
+            raster.step(smallDisparity(v, u));
+            Vector3d X = triangulate(params.uBig(u), params.vBig(v), raster.x, raster.y);
+            depth.at(u, v) = X.norm();
+        }
+    }
+}
+          
+void EnhancedStereo::computeCost(const Mat8u & img1, const Mat8u & img2)
+{
+    double T1 = 0, T2 = 0; // time profiling
+//    cout << "cost" << endl;
+    Mat8u img2remap(Size(params.scale + params.dispMax - 1, params.scale));
+    Mat32s integral1, integral2;
+    integral(img1, integral1);
+    int scaleSquared = params.scale * params.scale;
+    int hblock = int((params.scale - 1.) / 2.);
+    for (int v = 0; v < params.smallHeight; v++)
+    {
+        for (int u = 0; u < params.smallWidth; u++)
+        {
+            int idx = getLinearIdx(u, v);
+            //FIXME this makes the algorithm dependent on the motion direction
+            uint8_t * outPtr = errorBuffer.row(v).data + u*params.dispMax;
             
-            // the remap Mat
+//            Point pPxinf = pinfPxVec[idx];
+            Vector2d pinf = pinfVec[idx];
+            CurveRasterizer<Polynomial2> raster(pinf[0], pinf[1], epipole[0], epipole[1], epipolarVec[idx]);
+            
+            // Remap the band
             img2remap.setTo(0);
-            for (int i = 0; i < img2remap.cols; i++, raster.step())
+            
+            // the right end
+            int uBase = ceil(pinf[0]);
+            int vBase = int(floor(pinf[1])) - hblock;
+            int dstBase = params.dispMax - 1 + hblock;
+            for (int i = 0; i <= hblock; i++)
             {
-                int u2 = raster.x + params.halfBlockSize;
+                int u2 = uBase + i;
                 if (u2 < 0 or u2 >= img2.cols) continue;
-                for (int j = -params.halfBlockSize; j <= params.halfBlockSize; j++)
+                for (int j = 0; j <= params.scale; j++)
                 {
-                    int v2 = raster.y + j;
+                    int v2 = vBase + j;
                     if (v2 < 0 or v2 >= img2.rows) continue;
-                    img2remap(params.halfBlockSize + j, i) = img2(v2, u2);
+                    img2remap(j, dstBase + i) = img2(v2, u2);
                 }
             }
             
+            // the middle and the left
+            for (int i = params.dispMax - 2 + hblock; i  >= 0; i--, raster.step())
+            {
+                int u2 = ceil(raster.x);
+                int vBase = int(floor(raster.y)) - hblock;
+                if (u2 < 0 or u2 >= img2.cols) continue;
+                for (int j = 0; j < params.scale; j++)
+                {
+                    int v2 = vBase + j;
+                    if (v2 < 0 or v2 >= img2.rows) continue;
+                    img2remap(j, i) = img2(v2, u2);
+                }
+            }
+                       
+            
             //compute bias
-            int u1 = params.uBig(u) - params.halfBlockSize;
-            int v1 = params.vBig(v) - params.halfBlockSize;
-            int bias1 = integral1(v1, u1) + integral1(v1 + params.blockSize, u1 + params.blockSize) -
-                         integral1(v1 + params.blockSize, u1) - integral1(v1, u1 + params.blockSize);
+            int u1 = params.uBig(u) - hblock;
+            int v1 = params.vBig(v) - hblock;
+            int bias1 = integral1(v1, u1) + integral1(v1 + params.scale, u1 + params.scale) -
+                         integral1(v1 + params.scale, u1) - integral1(v1, u1 + params.scale);
 //            
 //            
             integral(img2remap, integral2);
             
             // compute the actual error
+            
             for (int i = 0; i < params.dispMax; i++, outPtr++)
             {
-                int bias = integral2(params.blockSize, i + params.blockSize) - integral2(params.blockSize, i);
-                bias = (bias - bias1) / blockSizeSquared;
+                int bias = integral2(params.scale, i + params.scale) - integral2(params.scale, i);
+                bias = (bias - bias1) / scaleSquared;
                 bias = min(10, max(-10, bias));
 //                cout << bias << " ";
                 int acc = 0;
-                for (int x2 = -params.halfBlockSize; x2 <= params.halfBlockSize; x2++)
+                for (int x2 = -hblock; x2 <= hblock; x2++)
                 {
-                    for (int x1 = -params.halfBlockSize; x1 <= params.halfBlockSize; x1++)
+                    for (int x1 = -hblock; x1 <= hblock; x1++)
                     {
-                        acc += abs(img1(params.vBig(v) + x2, params.uBig(u)- x1) - 
-                            img2remap(params.halfBlockSize + x2, i + params.halfBlockSize + x1) + bias);
+                        acc += abs(img1(v1 + x2, u1- x1) - 
+                            img2remap(hblock + x2, i + hblock + x1) - bias);
                     }
                 }
                 
-                *outPtr = acc / blockSizeSquared;
+                *outPtr = acc / scaleSquared;
             }
 //            cout << endl;
         }
@@ -473,7 +529,8 @@ void EnhancedStereo::generatePlane(Transformation<double> TcameraPlane,
 
 void EnhancedStereo::upsampleDisparity(const Mat8u & img1, Mat8u & disparity)
 {
+    cout << smallDisparity.size() << endl;
     smallDisparity.copyTo(disparity);
-//    resize(smallDisparity, disparity, Size(0, 0), params.blockSize, params.blockSize, 0);
+//    resize(smallDisparity, disparity, Size(0, 0), params.scale, params.scale, 0);
 }
 

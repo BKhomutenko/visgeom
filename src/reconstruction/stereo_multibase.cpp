@@ -77,7 +77,7 @@ int main(int argc, char** argv)
     paramFile >> stereoParams.uMargin;
     paramFile >> stereoParams.vMargin;
     paramFile >> stereoParams.dispMax;
-    paramFile >> stereoParams.blockSize;
+    paramFile >> stereoParams.scale;
     paramFile.ignore();
     string imageDir;
     getline(paramFile, imageDir);
