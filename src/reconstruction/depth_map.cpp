@@ -49,21 +49,21 @@ const double & DepthMap::at (int x, int y) const
 // image coordinates of depth points
 double DepthMap::u (int x)
 {
-    return (x + 0.5)*scale;
+    return (x + 0.5)*scale + u0;
 }
 double DepthMap::v (int y)
 {
-    return (y + 0.5)*scale;
+    return (y + 0.5)*scale + v0;
 }
 
 // image coordinates of the block corner
 int DepthMap::uc (int x)
 {
-    return x*scale;
+    return x*scale + u0;
 }
 int DepthMap::vc (int y)
 {
-    return y*scale;
+    return y*scale + v0;
 }
 
 // depth coordinates of image points
@@ -92,6 +92,23 @@ void DepthMap::reconstruct(Vector3dVec & result)
     for (int i = 0; i < valVec.size(); i++)
     {
         result[i] = result[i].normalized()*valVec[i];
+    }
+}
+
+void DepthMap::reconstruct(const vector<int> & indexVec, Vector3dVec & result)
+{
+    Vector2dVec pointVec;
+    pointVec.reserve(indexVec.size());
+    for (int index : indexVec) // TODO make safe
+    {
+        int x = index % width;
+        int y = index / width;
+        pointVec.emplace_back(x, y);
+    }
+    camera.reconstructPointCloud(pointVec, result);
+    for (int i = 0; i < indexVec.size(); i++)
+    {
+        result[i] = result[i].normalized()*valVec[indexVec[i]];
     }
 }
 

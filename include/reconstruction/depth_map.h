@@ -41,6 +41,10 @@ public:
     double & at (int x, int y);
     const double & at (int x, int y) const;
     
+    // to access the elements directly
+    double & sigma (int x, int y);
+    const double & sigma (int x, int y) const;
+    
     // image coordinates of depth points
     double u (int x);
     double v (int y);
@@ -54,14 +58,19 @@ public:
     int y (double v);
     
     void reconstruct(Vector3dVec & result);
+    void reconstruct(const vector<int> & indexVec, Vector3dVec & result);
     void reconstruct(const Vector2dVec & pointVec, Vector3dVec & result);
+    
+    int getWidth() { return width; }
+    int getHeight() { return height; }
+    
+    std::vector<double> valVec;
+    std::vector<double> sigmaVec; // uncertainty
     
 private:
     EnhancedCamera camera;
     int width;
     int height;
-    std::vector<double> valVec;
-    std::vector<double> sigmaVec; // uncertainty
     
     double u0, v0; // image coordinates of the [0, 0] point
     double scale; // normally > 1, x = (u - u0) / ration 
