@@ -34,28 +34,28 @@ public:
     virtual ~DepthMap() {}
     
     // nearest neighbor interpolation
-    double nearest (double u, double v);
-    double nearest (Vector2d pt);
+    double nearest(double u, double v);
+    double nearest(Vector2d pt);
     
     // to access the elements directly
-    double & at (int x, int y);
-    const double & at (int x, int y) const;
+    double & at(int x, int y);
+    const double & at(int x, int y) const;
     
-    // to access the elements directly
-    double & sigma (int x, int y);
-    const double & sigma (int x, int y) const;
+    // to access the uncertainty directly
+    double & sigma(int x, int y);
+    const double & sigma(int x, int y) const;
     
     // image coordinates of depth points
-    double u (int x);
-    double v (int y);
+    double u(int x);
+    double v(int y);
     
     // image coordinates of the block corner
-    int uc (int x);
-    int vc (int y);
+    int uc(int x);
+    int vc(int y);
     
     // depth coordinates of image points
-    int x (double u);
-    int y (double v);
+    int x(double u);
+    int y(double v);
     
     void reconstruct(Vector3dVec & result);
     void reconstruct(const vector<int> & indexVec, Vector3dVec & result);

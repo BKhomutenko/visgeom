@@ -25,54 +25,64 @@ Depth container
 #include "eigen.h"
 
 // nearest neighbor interpolation
-double DepthMap::nearest (double u, double v)
+double DepthMap::nearest(double u, double v)
 {
     return at(x(u), y(v));
 }
 
 // nearest neighbor interpolation
-double DepthMap::nearest (Vector2d pt)
+double DepthMap::nearest(Vector2d pt)
 {
     return at(x(pt[0]), y(pt[1]));
 }
 
 // to access the elements directly
-double & DepthMap::at (int x, int y)
+double & DepthMap::at(int x, int y)
 {
     return valVec[x + y*width];
 }
-const double & DepthMap::at (int x, int y) const
+const double & DepthMap::at(int x, int y) const
+{
+    return valVec[x + y*width];
+}
+
+// to access the uncertainty directly
+double & DepthMap::sigma(int x, int y)
+{
+    return valVec[x + y*width];
+}
+const double & DepthMap::sigma(int x, int y) const
 {
     return valVec[x + y*width];
 }
 
 // image coordinates of depth points
-double DepthMap::u (int x)
+double DepthMap::u(int x)
 {
-    return (x + 0.5)*scale + u0;
+    return(x + 0.5)*scale + u0;
 }
-double DepthMap::v (int y)
+double DepthMap::v(int y)
 {
-    return (y + 0.5)*scale + v0;
+    return(y + 0.5)*scale + v0;
 }
 
 // image coordinates of the block corner
-int DepthMap::uc (int x)
+int DepthMap::uc(int x)
 {
     return x*scale + u0;
 }
-int DepthMap::vc (int y)
+int DepthMap::vc(int y)
 {
     return y*scale + v0;
 }
 
 // depth coordinates of image points
-int DepthMap::x (double u)
+int DepthMap::x(double u)
 {
     return floor((u - u0) / scale);
 }
 
-int DepthMap::y (double v)
+int DepthMap::y(double v)
 {
     return floor((v - v0) / scale);
 }
