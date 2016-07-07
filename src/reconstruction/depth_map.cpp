@@ -56,13 +56,23 @@ double DepthMap::v (int y)
     return (y + 0.5)*scale;
 }
 
+// image coordinates of the block corner
+int DepthMap::uc (int x)
+{
+    return x*scale;
+}
+int DepthMap::vc (int y)
+{
+    return y*scale;
+}
+
 // depth coordinates of image points
-double DepthMap::x (int u)
+int DepthMap::x (double u)
 {
     return floor((u - u0) / scale);
 }
 
-double DepthMap::y (int v)
+int DepthMap::y (double v)
 {
     return floor((v - v0) / scale);
 }

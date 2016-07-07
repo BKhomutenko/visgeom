@@ -45,9 +45,13 @@ public:
     double u (int x);
     double v (int y);
     
+    // image coordinates of the block corner
+    int uc (int x);
+    int vc (int y);
+    
     // depth coordinates of image points
-    double x (int u);
-    double y (int v);
+    int x (double u);
+    int y (double v);
     
     void reconstruct(Vector3dVec & result);
     void reconstruct(const Vector2dVec & pointVec, Vector3dVec & result);
