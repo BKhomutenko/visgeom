@@ -35,7 +35,7 @@ bool ReprojectedDepth::reprojectionBetweenFrames(const DepthMap& dMap1, const De
 
 	//Step 3 : Reproject points into second camera
 	vector<Vector2d> reproj;
-	pCamera->projectPointCloud(cloud12, reproj);
+	dMap2.getCamera().projectPointCloud(cloud12, reproj);
 
 	//Step 4 : For reprojected points, reconstruct point-cloud of second camera in second frame
 	vector<Vector3d> cloud2_filtered;

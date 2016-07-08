@@ -63,6 +63,7 @@ public:
     
     int getWidth() { return width; }
     int getHeight() { return height; }
+    const EnhancedCamera& getCamera() { return camera; } const
     
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty

@@ -37,10 +37,9 @@ This new depthmap is the reprojected depthmap.
 class ReprojectedDepth
 {
 public:
-	ReprojectedDepth(const ICamera * _pCamera)
-	: pCamera(_pCamera) {}
+	ReprojectedDepth() {}
 
 	bool reprojectionBetweenFrames(const DepthMap& dMap1, const DepthMap& dMap2, const Transformation<double> T12, DepthMap& output);
 private:
-	ICamera * pCamera;
+	//null
 };
