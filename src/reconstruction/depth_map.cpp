@@ -59,11 +59,11 @@ const double & DepthMap::sigma(int x, int y) const
 // image coordinates of depth points
 double DepthMap::u(int x)
 {
-    return(x + 0.5)*scale + u0;
+    return (x + 0.5)*scale + u0;
 }
 double DepthMap::v(int y)
 {
-    return(y + 0.5)*scale + v0;
+    return (y + 0.5)*scale + v0;
 }
 
 // image coordinates of the block corner

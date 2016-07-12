@@ -42,4 +42,5 @@ using std::sin;
 using std::cos;
 using std::exp;
 using std::log;
+using std::abs;
 

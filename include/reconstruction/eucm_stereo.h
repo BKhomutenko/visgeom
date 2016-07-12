@@ -31,7 +31,21 @@ Semi-global block matching algorithm for non-rectified images
 #include "curve_rasterizer.h"
 #include "depth_map.h"
 
-using EpipolarRasterizer = CurveRasterizer<Polynomial2>;
+//using EpipolarRasterizer = CurveRasterizer<Polynomial2>;
+
+//TODO put it elsewhere
+template<typename T, typename Q>
+T bilinear(const Mat_<T> & src, Q x, Q y)
+{
+    int u(x), v(y);
+    Q dx = x - u;
+    Q dy = y - v;
+    const T i00 = src(v, u);
+    const T i01 = src(v, u + 1);
+    const T i10 = src(v + 1, u);
+    const T i11 = src(v + 1, u + 1);
+    return (i11*dx + i10*(1-dx))*dy + (i01*dx + i00*(1-dx))*(1-dy);
+}
 
 struct StereoParameters
 {
@@ -43,7 +57,10 @@ struct StereoParameters
     int lambdaStep = 5;
     int lambdaJump = 32;
     int imageWidth = 0, imageHeight = 0;
+    int maxBias = 10;
     
+    int verbosity = 1;
+    int maxDistance = 100;
     // precomputed parameters
     int u0, v0;
     int uMax, vMax;
@@ -53,8 +70,8 @@ struct StereoParameters
     // to be called before using
     void init()
     {
-        u0 = uMargin + dispMax + scale; 
-        v0 = vMargin;
+        u0 = uMargin + scale; 
+        v0 = vMargin + scale;
         
         if (width > 0) uMax = u0 + width;
         else uMax = imageWidth - uMargin - scale;
@@ -69,16 +86,19 @@ struct StereoParameters
     }
     
     // from image to small disparity coordiante transform
-    int uSmall(int u) { return (u - u0) / scale; }
-    int vSmall(int v) { return (v - v0) / scale; }
+    int uSmall(int u) { return round((u - u0) / double(scale)); }
+    int vSmall(int v) { return round((v - v0) / double(scale)); }
     
     // from small disparity to image coordiante transform    
-    int uBig(int u) { return (u + 0.5) * scale - 0.5 + u0; }
-    int vBig(int v) { return (v + 0.5) * scale - 0.5 + v0; }
+//    double uBig(double u) { return (u + 0.5) * scale - 0.5 + u0; }
+//    double vBig(double v) { return (v + 0.5) * scale - 0.5 + v0; }
+    //FIXME to test with even blocks
+    double uBig(double u) { return u * scale + u0; }
+    double vBig(double v) { return v * scale + v0; }
     
     // from small disparity to image block corner transform 
-    int uCorner(int u) { return u * scale + u0; }
-    int vCorner(int v) { return v * scale + v0; }
+//    int uCorner(int u) { return u * scale + u0; }
+//    int vCorner(int v) { return v * scale + v0; }
 };
 
 class EnhancedStereo
@@ -111,6 +131,7 @@ public:
     // Only data invalidated after the transformation change are recomputed
     void initAfterTransformation()
     {
+        computeEpipolarDirections();
         computeEpipole();
         computeRotated();
         computePinf();
@@ -125,6 +146,11 @@ public:
     // computes reconstRotVec -- reconstVec rotated into the second frame
     void computeRotated();
     
+    
+    // computes epipolarDirectionVec -- computed by shifting the reconstructed points in the direction 
+    // of motion infinitesimally and projecting them back
+    void computeEpipolarDirections();
+    
     // f2(t21) -- projection of the first camera's projection center
     void computeEpipole();
     
@@ -135,8 +161,8 @@ public:
     // calculate the coefficients of the polynomials for all the 
     void computeEpipolarCurves();
     
-    // to visualize the epipolar lines
-    void traceEpipolarLine(cv::Point pt, Mat8u & out);
+    // draws an epipolar line  on the right image that corresponds to (x, y) on the left image
+    void traceEpipolarLine(int x, int y, Mat8u & out);
     
     
     //// DYNAMIC PROGRAMMING
@@ -153,7 +179,11 @@ public:
             
     void createBuffer();
     
+    // fill up the error buffer using SxS blocks as local desctiprtors
     void computeCost(const Mat8u & img1, const Mat8u & img2);
+    
+    // fill up the error buffer using 2*S-1 pixs along epipolar lines as local desctiprtors
+    void computeCurveCost(const Mat8u & img1, const Mat8u & img2);
     
     void computeDynamicProgramming();
     
@@ -167,31 +197,36 @@ public:
     //// MISCELLANEOUS
     
     // index of an object in a linear array corresponding to pixel [row, col] 
-    //TODO change this to the disparity-based indexing
-    int getLinearIdx(int u, int v) { return params.smallWidth*v + u; }
+    int getLinearIndex(int u, int v) { return params.smallWidth*v + u; }
       
+    CurveRasterizer<int, Polynomial2> getCurveRasteriser(int idx);
+    
     // reconstruction
-    Vector3d triangulate(int x1, int y1, int x2, int y2);
+    bool triangulate(double x1, double y1, double x2, double y2, Vector3d & X);
     void computeDistance(Mat32f & distance);
     void computeDistance(DepthMap & disparity);
+    
     void generatePlane(Transformation<double> TcameraPlane, 
             Mat32f & distance, const Vector3dVec & polygonVec);
     
+    double computeDistance(int u, int v);
 private:
+    
+    
     Transformation<double> Transform12;  // pose of the first to the second camera
     EnhancedCamera cam1, cam2;
    
-    //TODO replace by disparity map points
+    Vector2dVec pointVec1;  // the depth points on the image 1
     Vector3dVec reconstVec;  // reconstruction of every pixel by cam1
     Vector3dVec reconstRotVec;  // reconstVec rotated into the second frame
     
     Eigen::Vector2d epipole;  // projection of the first camera center onto the second camera
     Vector2dVec pinfVec;  // projection of reconstRotVec by cam2
+    Vector2dVec epipolarDirectionVec;  // direction of the epipolar lines on the first image
     
     // discretized version
-    //TODO remove
-    cv::Point epipolePx;  
-    std::vector<cv::Point> pinfPxVec;
+    Vector2i epipolePx;  
+    Vector2iVec pinfPxVec;
     
     std::vector<Polynomial2> epipolarVec;  // the epipolar curves represented by polynomial functions
     

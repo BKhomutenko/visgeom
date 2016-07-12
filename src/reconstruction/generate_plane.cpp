@@ -120,26 +120,28 @@ int main(int argc, char** argv)
         Transformation<double> T01(robotPose1.data()), T02(robotPose2.data());
         Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         
-        
+        cout << 111 << endl;
         Mat8u img2 = imread(imageDir + imageName, 0);
-
+        cout << 111111 << endl;
         EnhancedStereo stereo(TleftRight, params.data(), params.data(), stereoParams);
 
         Mat8u res;
         auto t2 = clock();
+         cout << 222 << endl;
         stereo.comuteStereo(img1, img2, res);
         auto t3 = clock();
 //        cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
         Mat32f distMat;
         Mat32f planeMat;
-        
+         cout << 333 << endl;
         stereo.computeDistance(distMat);
         Transformation<double> T0Camera = T01.compose(TbaseCamera);
         stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), planeMat,
          Vector3dVec{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
                           Vector3d(-0.1 + 3 * 0.45, 0.5, 0), Vector3d(-0.1, 0.5, 0) } );
-        imshow("dist" + to_string(counter) , distMat);
-        imshow("plane" , planeMat);
+        imshow("dist" + to_string(counter) , distMat/2);
+        imshow("disp" + to_string(counter) , res*4);
+        imshow("plane" , planeMat/2);
         imwrite("/home/bogdan/projects/plane.png", planeMat);
         double err = 0;
         double err2 = 0;
@@ -169,6 +171,7 @@ int main(int argc, char** argv)
 //                << " & " << 100 * N / double(Nmax) << "\\\\" << endl << "\\hline" << endl;
         cout << "avg err : " << err / N *1000 << " avg err2 : " 
 << sqrt(err2 / N)*1000  << " number of inliers : " << 100 * N / double(Nmax) << endl;
+        cout << planeMat.size() << " " <<  distMat.size() << endl;
         imshow("diff" + to_string(counter), abs(planeMat - distMat));
         imshow("inliers" + to_string(counter), inlierMat);
         counter++;

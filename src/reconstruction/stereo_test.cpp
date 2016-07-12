@@ -118,15 +118,15 @@ int main(int argc, char** argv)
 //    
 //    Laplacian(img1, img1lap, CV_16S, 3);
 //    Laplacian(img2, img2lap, CV_16S, 3);
-    
-//    GaussianBlur(img1, img1, Size(5, 5), 0, 0);
-//    GaussianBlur(img2, img2, Size(5, 5), 0, 0);
-    
+//    
+//    GaussianBlur(img1, img1, Size(3, 3), 0, 0);
+//    GaussianBlur(img2, img2, Size(3, 3), 0, 0);
+//    
 //    img1lap = img1lap + 128;
 //    img2lap = img2lap + 128;
 //    img1lap.copyTo(img1);
 //    img2lap.copyTo(img2);
-//    
+////    
     EnhancedStereo stereo(TleftRight, params1.data(), params2.data(), stereoParams);
     
     Mat8u out1, out2;
@@ -147,7 +147,7 @@ int main(int argc, char** argv)
 
     Mat8u res;
     auto t2 = clock();
-    stereo.computeCost(img1, img2);
+    stereo.computeCurveCost(img1, img2);
     auto t3 = clock();
     cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
     t2 = clock();

@@ -74,6 +74,7 @@ int main(int argc, char** argv)
     
     
     StereoParameters stereoParams;
+//    stereoParams.verbosity = 3;
     paramFile >> stereoParams.uMargin;
     paramFile >> stereoParams.vMargin;
     paramFile >> stereoParams.dispMax;
@@ -107,11 +108,13 @@ int main(int argc, char** argv)
         EnhancedStereo stereo(TleftRight, params.data(), params.data(), stereoParams);
 
         Mat8u res;
+        Mat32f depth;
         auto t2 = clock();
         stereo.comuteStereo(img1, img2, res);
+        stereo.computeDistance(depth);
         auto t3 = clock();
         cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
-        imwrite(imageDir + "res" + to_string(counter++) + ".png", res*3);
+        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
     }
     return 0;
 }

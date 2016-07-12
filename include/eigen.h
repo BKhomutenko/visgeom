@@ -43,6 +43,7 @@ using Eigen::Matrix;
 using Eigen::Vector2d;
 using Eigen::Vector3d;
 using Eigen::Matrix3d;
+using Eigen::Vector2i;
 
 // STL containers
 using std::vector;
@@ -53,3 +54,6 @@ using Vector3Vec = vector<Vector3<T>>;
 
 using Vector2dVec = vector<Vector2d>;
 using Vector3dVec = vector<Vector3d>;
+
+using Vector2iVec = vector<Vector2i>;
+
