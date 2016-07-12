@@ -15,21 +15,17 @@ You should have received a copy of the GNU General Public License
 along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
-#include <vector>
+#include "localization/photometric.h"
 
-#include <Eigen/Eigen>
-#include <opencv2/opencv.hpp>
+#include "io.h"
+#include "std.h"
+#include "eigen.h"
+#include "ocv.h"
 
 #include <ceres/ceres.h>
 #include <ceres/cubic_interpolation.h>
 
-#include "localization/photometric.h"
 #include "camera/eucm.h"
-
-using std::vector;
-
-using std::cout;
-using std::endl;
 
 using ceres::DynamicAutoDiffCostFunction;
 using ceres::CostFunction;
@@ -38,9 +34,7 @@ using ceres::Solver;
 using ceres::Solve;
 using ceres::SoftLOneLoss;
 
-typedef cv::Mat_<float> Matf;
-
-bool PhotometricLocalization::computePose(const Matf & img2, Transformation<double> & T12)
+bool PhotometricLocalization::computePose(const Mat32f & img2, Transformation<double> & T12)
 {
     Problem problem;
     array<double, 6> pose = T12.toArray();
@@ -65,7 +59,7 @@ bool PhotometricLocalization::computePose(const Matf & img2, Transformation<doub
     return true;
 }
 
-bool PhotometricLocalization::wrapImage(const cv::Mat_<float> & img2, cv::Mat_<float> & imgOut,
+bool PhotometricLocalization::wrapImage(const Mat32f & img2, Mat32f & imgOut,
         Transformation<double> & T12)
 {
     imgOut.create(cam1.height, cam1.width);
@@ -88,7 +82,7 @@ bool PhotometricLocalization::wrapImage(const cv::Mat_<float> & img2, cv::Mat_<f
 
 const int step = 27;
 
-bool PhotometricLocalization::initCloud(const cv::Mat_<float> & img1, const cv::Mat_<float> & dist)
+bool PhotometricLocalization::initCloud(const Mat32f & img1, const Mat32f & dist)
 {
     vector<Vector2d> imagePointVec;
     vector<double> distVec;

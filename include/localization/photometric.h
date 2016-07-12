@@ -21,10 +21,9 @@ Relative camera pose estimation based on photometric error and depth map
 
 #pragma once
 
-#include <vector>
-
-#include <Eigen/Eigen>
-#include <opencv2/opencv.hpp>
+#include "std.h"
+#include "eigen.h"
+#include "ocv.h"
 
 #include <ceres/ceres.h>
 #include <ceres/cubic_interpolation.h>
@@ -32,11 +31,6 @@ Relative camera pose estimation based on photometric error and depth map
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 #include "reconstruction/eucm_stereo.h"
-
-using std::vector;
-
-using Eigen::Vector2d;
-using Eigen::Vector3d;
 
 using ceres::BiCubicInterpolator;
 
@@ -74,7 +68,7 @@ template<template<typename> class Projector>
 struct PhotometricError 
 {
     PhotometricError(vector<double> & projectionParams, const PhotometricPack & dataPack,
-            const cv::Mat_<float> & img2)
+            const Mat32f & img2)
     : _projectionParams(projectionParams), _dataPack(dataPack), _img2(img2) {}
             
     template <typename T>
@@ -117,7 +111,7 @@ struct PhotometricError
     
     vector<double> & _projectionParams;
     const PhotometricPack & _dataPack;
-    const cv::Mat_<float> & _img2;
+    const Mat32f & _img2;
 };
 
 
@@ -136,11 +130,11 @@ public:
             
     virtual ~PhotometricLocalization() {}
     
-    bool computePose(const cv::Mat_<float> & img2, Transformation<double> & T12);
+    bool computePose(const Mat32f & img2, Transformation<double> & T12);
     
-    bool initCloud(const cv::Mat_<float> & img1, const cv::Mat_<float> & dist);
+    bool initCloud(const Mat32f & img1, const Mat32f & dist);
     
-    bool wrapImage(const cv::Mat_<float> & img2, cv::Mat_<float> & imgOut, Transformation<double> & T12);
+    bool wrapImage(const Mat32f & img2, Mat32f & imgOut, Transformation<double> & T12);
     
 private:
     EnhancedCamera cam1, cam2;

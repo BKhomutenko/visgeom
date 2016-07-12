@@ -21,8 +21,7 @@ A template-base coordinate transformation implementation
 
 #pragma once
 
-#include <array>
-
+#include "std.h"
 #include "eigen.h"
 
 // Curves in images
@@ -151,7 +150,7 @@ struct CurveRasterizer
     }
 };*/
 
-template<typename T, typename Surface>
+template<typename T, class Surface>
 struct CurveRasterizer
 {
     double delta;
