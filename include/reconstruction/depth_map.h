@@ -116,3 +116,26 @@ private:
     int u0, v0; // image coordinates of the [0, 0] point
     int scale; // normally > 1, x = (u - u0) / ration 
 };
+
+
+class DepthReprojector
+{
+
+public:
+	DepthReprojector() {}
+    
+    /*
+    Takes the depthmap from the first image, reconstructs the pointcloud
+    in the frame of the second image, then reprojects into second image
+    frame. Reconstructs the cloud at the image points specified by the 
+    first pointcloud, and sends this back to the first image. This 
+    pointcloud is transformed into the frame of the first image, and each
+    point in this cloud is projected onto the line of it's original point.
+    This new depthmap is the reprojected depthmap.
+    */
+	bool wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
+	        const Transformation<double> T12, DepthMap& output);
+private:
+	//null
+};
+
