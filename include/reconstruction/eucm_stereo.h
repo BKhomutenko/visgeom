@@ -64,7 +64,7 @@ struct StereoParameters
     // precomputed parameters
     int u0, v0;
     int uMax, vMax;
-    int smallWidth, smallHeight;
+    int dispWidth, dispHeight;
     int halfBlockSize;
     
     // to be called before using
@@ -79,22 +79,19 @@ struct StereoParameters
         if (height > 0) vMax = v0 + height;
         else vMax = imageHeight - vMargin - scale;
         
-        smallWidth = uSmall(uMax) + 1;
-        smallHeight = vSmall(vMax) + 1;
+        dispWidth = uDisp(uMax) + 1;
+        dispHeight = vDisp(vMax) + 1;
         
         halfBlockSize =  scale / 2; 
     }
     
     // from image to small disparity coordiante transform
-    int uSmall(int u) { return round((u - u0) / double(scale)); }
-    int vSmall(int v) { return round((v - v0) / double(scale)); }
+    int uDisp(double u) { return round((u - u0) / scale); }
+    int vDisp(double v) { return round((v - v0) / scale); }
     
     // from small disparity to image coordiante transform    
-//    double uBig(double u) { return (u + 0.5) * scale - 0.5 + u0; }
-//    double vBig(double v) { return (v + 0.5) * scale - 0.5 + v0; }
-    //FIXME to test with even blocks
-    double uBig(double u) { return u * scale + u0; }
-    double vBig(double v) { return v * scale + v0; }
+    double uImg(int u) { return u * scale + u0; }
+    double vImg(int v) { return v * scale + v0; }
     
     // from small disparity to image block corner transform 
 //    int uCorner(int u) { return u * scale + u0; }
@@ -192,23 +189,25 @@ public:
     void reconstructDisparity();  // using the result of the dynamic programming
     
     // TODO implement
-    void upsampleDisparity(const Mat8u & img1, Mat8u & disparity);
+    void upsampleDisparity(const Mat8u & img1, Mat8u & disparityMat);
     
     //// MISCELLANEOUS
     
     // index of an object in a linear array corresponding to pixel [row, col] 
-    int getLinearIndex(int u, int v) { return params.smallWidth*v + u; }
+    int getLinearIndex(int u, int v) { return params.dispWidth*v + u; }
       
     CurveRasterizer<int, Polynomial2> getCurveRasteriser(int idx);
     
     // reconstruction
     bool triangulate(double x1, double y1, double x2, double y2, Vector3d & X);
-    void computeDistance(Mat32f & distance);
-    void computeDistance(DepthMap & disparity);
+    void computeDistance(Mat32f & distanceMat);
     
     void generatePlane(Transformation<double> TcameraPlane, 
             Mat32f & distance, const Vector3dVec & polygonVec);
-    
+            
+    void generatePlane(Transformation<double> TcameraPlane, 
+            DepthMap & distance, const Vector3dVec & polygonVec);
+            
     double computeDistance(int u, int v);
 private:
     

@@ -28,9 +28,12 @@ Relative camera pose estimation based on photometric error and depth map
 #include <ceres/ceres.h>
 #include <ceres/cubic_interpolation.h>
 
+#include "reconstruction/depth_map.h"
+#include "localization/scale_space.h"
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
-#include "reconstruction/eucm_stereo.h"
+
+//TODO make it not only for EUCM
 
 using ceres::BiCubicInterpolator;
 
@@ -68,8 +71,8 @@ template<template<typename> class Projector>
 struct PhotometricError 
 {
     PhotometricError(vector<double> & projectionParams, const PhotometricPack & dataPack,
-            const Mat32f & img2)
-    : _projectionParams(projectionParams), _dataPack(dataPack), _img2(img2) {}
+            const Mat32f & img2, double scale)
+    : _projectionParams(projectionParams), _dataPack(dataPack), _img2(img2), _scale(scale) {}
             
     template <typename T>
     bool operator()(const T * const* params,
@@ -98,7 +101,7 @@ struct PhotometricError
             if (projector(projectionParamsT.data(), transformedPoints[i].data(), pt.data())) 
             {
                 T res;
-                imageIterpolator.Evaluate(pt[1], pt[0], &res);
+                imageIterpolator.Evaluate(pt[1] / T(_scale), pt[0] / T(_scale), &res);
                 residual[i] = T(_dataPack.colorVec[i]) - res;
             }
             else
@@ -112,35 +115,86 @@ struct PhotometricError
     vector<double> & _projectionParams;
     const PhotometricPack & _dataPack;
     const Mat32f & _img2;
+    const double _scale; 
 };
 
-
-//TODO implement multiscale
-class PhotometricLocalization
+//TODO add assertions
+class ScalePhotometric
 {
 public:
-    PhotometricLocalization(const double * params1, const double * params2,
-            const StereoParameters & stereoParams) : 
-            cam1(stereoParams.imageWidth, stereoParams.imageHeight, params1),
-            cam2(stereoParams.imageWidth, stereoParams.imageHeight, params2),
-            params(stereoParams) 
-            {
-                params.init();
-            }
+    ScalePhotometric(int nScales, EnhancedCamera cam2) :
+            scaleSpace1(nScales),
+            scaleSpace2(nScales),
+            camPtr2(cam2.clone()),
+            verbosity(0) {}
             
-    virtual ~PhotometricLocalization() {}
+    ScalePhotometric() : camPtr2(NULL) {}
+    virtual ~ScalePhotometric()
+    {
+        delete camPtr2;
+    }
     
-    bool computePose(const Mat32f & img2, Transformation<double> & T12);
+    void setCamera(const EnhancedCamera & cam)
+    {
+        delete camPtr2;
+        camPtr2 = cam.clone();
+    }
     
-    bool initCloud(const Mat32f & img1, const Mat32f & dist);
+    void setNumberScales(int numScales)
+    {
+        scaleSpace1.setNumberScales(numScales);
+        scaleSpace2.setNumberScales(numScales);
+    }
     
-    bool wrapImage(const Mat32f & img2, Mat32f & imgOut, Transformation<double> & T12);
+    const DepthMap & depth() const { return depthMap; }
+    DepthMap & depth() { return depthMap; }
+    
+    void computeBaseScaleSpace(const Mat32f & img1);
+    
+    PhotometricPack initPhotometricData(int scaleIdx);
+    
+    void computePose(const Mat32f & img2, Transformation<double> & T12);
+    
+    // assumes that scaleSpace2 is initialized
+    void computePose(int scaleIdx, Transformation<double> & T12);
+    
+    void setVerbosity(int newVerbosity) { verbosity = newVerbosity; }
     
 private:
-    EnhancedCamera cam1, cam2;
-    PhotometricPack dataPack; // to wrap the image
-    StereoParameters params;
+    BinaryScalSpace scaleSpace1;
+    BinaryScalSpace scaleSpace2;
+    EnhancedCamera * camPtr2;
+    DepthMap depthMap;
+    
+    int verbosity;
 };
+
+////TODO implement multiscale
+//class PhotometricLocalization
+//{
+//public:
+//    PhotometricLocalization(const double * params1, const double * params2,
+//            const StereoParameters & stereoParams) : 
+//            cam1(stereoParams.imageWidth, stereoParams.imageHeight, params1),
+//            cam2(stereoParams.imageWidth, stereoParams.imageHeight, params2),
+//            params(stereoParams) 
+//            {
+//                params.init();
+//            }
+//            
+//    virtual ~PhotometricLocalization() {}
+//    
+//    bool computePose(const Mat32f & img2, Transformation<double> & T12);
+//    
+//    bool initCloud(const Mat32f & img1, const Mat32f & dist);
+//    
+//    bool wrapImage(const Mat32f & img2, Mat32f & imgOut, Transformation<double> & T12);
+//    
+//private:
+//    EnhancedCamera cam1, cam2; //TODO get rid of it
+//    PhotometricPack dataPack; // to wrap the image
+//    StereoParameters params; //TODO get rid of it
+//};
 
 
 

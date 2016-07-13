@@ -16,24 +16,39 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
 /*
-Depth container
+Depth container. 
+NOTE:
+(u, v) is an image point 
+(x, y) is a depth map point
 */
 
 #include "reconstruction/depth_map.h"
 
+#include "io.h"
 #include "std.h"
 #include "eigen.h"
 
 // nearest neighbor interpolation
-double DepthMap::nearest(double u, double v)
+double DepthMap::nearest(int u, int v)
 {
-    return at(x(u), y(v));
+    int xd = x(u);
+    int yd = y(v);
+    if (isValid(xd, yd)) return at(xd, yd);
+    else return 0;
+}
+
+bool DepthMap::isValid(int x, int y)
+{
+    return (x >= 0 and x < width and y >= 0 and y < height);
 }
 
 // nearest neighbor interpolation
 double DepthMap::nearest(Vector2d pt)
 {
-    return at(x(pt[0]), y(pt[1]));
+    int xd = x(pt[0]);
+    int yd = y(pt[1]);
+    if (isValid(xd, yd)) return at(xd, yd);
+    else return 0;
 }
 
 // to access the elements directly
@@ -57,34 +72,24 @@ const double & DepthMap::sigma(int x, int y) const
 }
 
 // image coordinates of depth points
-double DepthMap::u(int x)
+int DepthMap::u(int x) const
 {
-    return (x + 0.5)*scale + u0;
+    return x * scale + u0;
 }
-double DepthMap::v(int y)
+int DepthMap::v(int y) const
 {
-    return (y + 0.5)*scale + v0;
-}
-
-// image coordinates of the block corner
-int DepthMap::uc(int x)
-{
-    return x*scale + u0;
-}
-int DepthMap::vc(int y)
-{
-    return y*scale + v0;
+    return y * scale + v0;
 }
 
 // depth coordinates of image points
-int DepthMap::x(double u)
+int DepthMap::x(int u) const
 {
-    return floor((u - u0) / scale);
+    return round(double(u - u0) / scale);
 }
 
-int DepthMap::y(double v)
+int DepthMap::y(int v) const
 {
-    return floor((v - v0) / scale);
+    return round(double(v - v0) / scale);
 }
 
 void DepthMap::reconstruct(Vector3dVec & result)
@@ -95,7 +100,7 @@ void DepthMap::reconstruct(Vector3dVec & result)
     {
         for (int x = 0; x < width; x++)
         {
-            pointVec.emplace_back(x, y);
+            pointVec.emplace_back(u(x), v(y));
         }
     }
     cameraPtr->reconstructPointCloud(pointVec, result);
@@ -113,7 +118,7 @@ void DepthMap::reconstruct(const vector<int> & indexVec, Vector3dVec & result)
     {
         int x = index % width;
         int y = index / width;
-        pointVec.emplace_back(x, y);
+        pointVec.emplace_back(u(x), v(y));
     }
     cameraPtr->reconstructPointCloud(pointVec, result);
     for (int i = 0; i < indexVec.size(); i++)
@@ -125,9 +130,9 @@ void DepthMap::reconstruct(const vector<int> & indexVec, Vector3dVec & result)
 void DepthMap::reconstruct(const Vector2dVec & pointVec, Vector3dVec & result)
 {
     cameraPtr->reconstructPointCloud(pointVec, result);
-    for (int i = 0; i < valVec.size(); i++)
+    for (int i = 0; i < pointVec.size(); i++)
     {
-        result[i] = result[i].normalized()*nearest(pointVec[i]);
+        result[i] = result[i].normalized() * nearest(pointVec[i]);
     }
 }
 

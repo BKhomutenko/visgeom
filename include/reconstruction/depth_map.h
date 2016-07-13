@@ -18,9 +18,15 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 /*
 Depth container
+NOTE:
+TODO change it to a more developed convention
+(u, v) is an image point 
+(x, y) is a depth map point 
 */
+
 #pragma once
 
+#include "io.h"
 #include "std.h"
 #include "eigen.h"
 
@@ -42,24 +48,37 @@ public:
             u0(depth.u0),
             v0(depth.v0),
             scale(depth.scale),
-            valVec(depth.width*depth.height, DEFAULT_DEPTH),
-            sigmaVec(depth.width*depth.height, DEFAULT_SIGMA_DEPTH)  {}
+            valVec(depth.valVec),
+            sigmaVec(depth.sigmaVec) {}
     
     //basic constructor        
-    DepthMap(const ICamera * camera, int w, int h, double u0, double v0, double scale) :
+    DepthMap(const ICamera * camera, int w, int h, double u0, double v0, int scale) :
             cameraPtr(camera->clone()), width(w), height(h), u0(u0), v0(v0), scale(scale),
             valVec(w*h, DEFAULT_DEPTH),  sigmaVec(w*h, DEFAULT_SIGMA_DEPTH)  {}
 
     virtual ~DepthMap() 
     {
-        if (cameraPtr != NULL)
-        {
-            delete cameraPtr;
-        }
+        delete cameraPtr;
+        cameraPtr = NULL;
     }
     
+    DepthMap operator = (const DepthMap & other)
+    {
+        cameraPtr = other.cameraPtr->clone();
+        width = other.width;
+        height = other.height;
+        u0 = other.u0;
+        v0 = other.v0;
+        scale = other.scale;
+        valVec = other.valVec;
+        sigmaVec = other.sigmaVec;
+        return *this;
+    }
+    
+    bool isValid(int x, int y);
+    
     // nearest neighbor interpolation
-    double nearest(double u, double v);
+    double nearest(int u, int v);
     double nearest(Vector2d pt);
     
     // to access the elements directly
@@ -71,32 +90,28 @@ public:
     const double & sigma(int x, int y) const;
     
     // image coordinates of depth points
-    double u(int x);
-    double v(int y);
-    
-    // image coordinates of the block corner
-    int uc(int x);
-    int vc(int y);
-    
+    int u(int x) const;
+    int v(int y) const;
+
     // depth coordinates of image points
-    int x(double u);
-    int y(double v);
+    int x(int u) const;
+    int y(int v) const;
     
     void reconstruct(Vector3dVec & result);
     void reconstruct(const vector<int> & indexVec, Vector3dVec & result);
     void reconstruct(const Vector2dVec & pointVec, Vector3dVec & result);
     
-    int getWidth() { return width; }
-    int getHeight() { return height; }
+    int getWidth() const { return width; }
+    int getHeight() const { return height; }
     
+private:
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty
     
-private:
     ICamera * cameraPtr;
     int width;
     int height;
     
-    double u0, v0; // image coordinates of the [0, 0] point
-    double scale; // normally > 1, x = (u - u0) / ration 
+    int u0, v0; // image coordinates of the [0, 0] point
+    int scale; // normally > 1, x = (u - u0) / ration 
 };

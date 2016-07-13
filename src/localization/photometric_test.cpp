@@ -14,19 +14,15 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
-
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-
-#include <opencv2/opencv.hpp>
-
 #include "localization/photometric.h"
+
+#include "io.h"
+#include "ocv.h"
+#include "reconstruction/eucm_stereo.h"
+
 
 using namespace cv;
 using namespace std;
-
-typedef cv::Mat_<float> Matf;
 
 // TODO separate the ground truth generation from the stereo 
 int main (int argc, char const* argv[])
@@ -89,33 +85,30 @@ int main (int argc, char const* argv[])
     imageStream >> imageName;
     for (auto & x : robotPose1) imageStream >> x;
     
-    Matf img1 = imread(imageDir + imageName, 0);
+    Mat32f img1 = imread(imageDir + imageName, 0);
     
     stereoParams.imageWidth = img1.cols;
     stereoParams.imageHeight = img1.rows;
     
-    const int sigma = 20;
-    GaussianBlur(img1, img1, Size(0, 0), sigma, sigma);
-    
     // Init the distance map
-    Matf distanceMat;
     Transformation<double> T01(robotPose1.data());
     Transformation<double> T0Camera = T01.compose(TbaseCamera);
     EnhancedStereo stereo(Transformation<double>(),
                 params.data(), params.data(), stereoParams);
-    stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), distanceMat,
+    
+    
+//     Init the localizer
+    ScalePhotometric localizer;
+    localizer.setVerbosity(3);
+    localizer.setCamera(EnhancedCamera(params.data()));
+    localizer.setNumberScales(6);
+    localizer.computeBaseScaleSpace(img1);
+    stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), localizer.depth(),
          vector<Vector3d>{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
                           Vector3d(-0.1 + 3 * 0.45, 0.5, 0), Vector3d(-0.1, 0.5, 0) } );
-    imshow("distance", distanceMat);
     
-    
-    
-    // Init the localizer
-    PhotometricLocalization localizer(params.data(), params.data(), stereoParams);   
-    localizer.initCloud(img1, distanceMat);
-    
-    
-                    
+     
+    imshow("img1", img1/255);
     while (getline(paramFile, imageInfo))
     {
         istringstream imageStream(imageInfo);
@@ -128,21 +121,20 @@ int main (int argc, char const* argv[])
         cout << "REAL POSE : " << T12 << endl;
         T12 = T12.compose(Transformation<double>(-0.1, 0.05, -0.1, 0.03, 0.03, 0.05));
 //        T12 = T12.compose(Transformation<double>(-0.001, 0.005, -0.01, 0.001, 0.001, 0.001));
-        Matf img2 = imread(imageDir + imageName, 0);
-        GaussianBlur(img2, img2, Size(0, 0), sigma, sigma);
-        
-        Matf img11, img12;
-        localizer.wrapImage(img2, img11, T12);
+        Mat32f img2 = imread(imageDir + imageName, 0);
+        imshow("img2", img2/255);
+        Mat32f img11, img12;
+//        localizer.wrapImage(img2, img11, T12);
         cout << T12 << endl;
         for (int iter = 0; iter < 1; iter++)
         {
             localizer.computePose(img2, T12);
             cout << T12 << endl;
-            localizer.wrapImage(img2, img12, T12);
-            imshow("img11", img11/256);
-            imshow("img12", img12/256);
-            imshow("delta img11", abs(img1 - img11)/250);
-            imshow("delta img12", abs(img1 - img12)/250);
+//            localizer.wrapImage(img2, img12, T12);
+//            imshow("img11", img11/256);
+//            imshow("img12", img12/256);
+//            imshow("delta img11", abs(img1 - img11)/250);
+//            imshow("delta img12", abs(img1 - img12)/250);
             waitKey(50);
         }
     }
