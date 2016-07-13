@@ -75,19 +75,34 @@ public:
         return *this;
     }
     
+    //check the limits
     bool isValid(int x, int y) const;
     
     // nearest neighbor interpolation
     double nearest(int u, int v) const;
     double nearest(Vector2d pt) const;
     
+    // nearest neighbor interpolation for the uncertainty
+    double nearestSigma(int u, int v) const;
+    double nearestSigma(Vector2d pt) const;
+    
     // to access the elements directly
     double & at(int x, int y);
     const double & at(int x, int y) const;
     
+    // to access the elements directly
+    double & at(int idx);
+    const double & at(int idx) const;
+    
     // to access the uncertainty directly
     double & sigma(int x, int y);
     const double & sigma(int x, int y) const;
+    
+    // to access the uncertainty directly
+    double & sigma(int idx);
+    const double & sigma(int idx) const;
+    
+    
     
     // image coordinates of depth points
     int u(int x) const;
@@ -133,7 +148,7 @@ public:
     point in this cloud is projected onto the line of it's original point.
     This new depthmap is the reprojected depthmap.
     */
-	bool wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
+	void wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
 	        const Transformation<double> T12, DepthMap& output);
 private:
 	//null

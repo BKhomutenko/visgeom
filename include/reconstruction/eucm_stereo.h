@@ -170,6 +170,7 @@ public:
             const Mat8u & img2,
             Mat8u & disparity);
     
+    //TODO compute the uncertainty
     void comuteStereo(const Mat8u & img1, 
             const Mat8u & img2,
             DepthMap & disparity);
@@ -202,9 +203,11 @@ public:
     bool triangulate(double x1, double y1, double x2, double y2, Vector3d & X);
     void computeDistance(Mat32f & distanceMat);
     
+    //TODO put generatePlane elsewhere
     void generatePlane(Transformation<double> TcameraPlane, 
             Mat32f & distance, const Vector3dVec & polygonVec);
             
+    //TODO put generatePlane elsewhere        
     void generatePlane(Transformation<double> TcameraPlane, 
             DepthMap & distance, const Vector3dVec & polygonVec);
             

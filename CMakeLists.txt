@@ -79,7 +79,7 @@ target_link_libraries( generate_plane ${OpenCV_LIBS} )
 
 add_executable( reproject_plane
    test/reconstruction/reproject_test.cpp
-   src/reconstruction/reproject_depth.cpp
+   src/reconstruction/eucm_stereo.cpp
    src/reconstruction/depth_map.cpp
 )
 

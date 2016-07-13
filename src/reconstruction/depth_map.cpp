@@ -28,6 +28,12 @@ NOTE:
 #include "std.h"
 #include "eigen.h"
 
+//check the limits
+bool DepthMap::isValid(int x, int y) const
+{
+    return (x >= 0 and x < width and y >= 0 and y < height);
+}
+
 // nearest neighbor interpolation
 double DepthMap::nearest(int u, int v) const
 {
@@ -37,17 +43,30 @@ double DepthMap::nearest(int u, int v) const
     else return 0;
 }
 
-bool DepthMap::isValid(int x, int y) const
-{
-    return (x >= 0 and x < width and y >= 0 and y < height);
-}
-
 // nearest neighbor interpolation
 double DepthMap::nearest(Vector2d pt) const
 {
     int xd = x(pt[0]);
     int yd = y(pt[1]);
     if (isValid(xd, yd)) return at(xd, yd);
+    else return 0;
+}
+
+// nearest neighbor interpolation
+double DepthMap::nearestSigma(int u, int v) const
+{
+    int xd = x(u);
+    int yd = y(v);
+    if (isValid(xd, yd)) return sigma(xd, yd);
+    else return 0;
+}
+
+// nearest neighbor interpolation
+double DepthMap::nearestSigma(Vector2d pt) const
+{
+    int xd = x(pt[0]);
+    int yd = y(pt[1]);
+    if (isValid(xd, yd)) return sigma(xd, yd);
     else return 0;
 }
 
@@ -61,6 +80,16 @@ const double & DepthMap::at(int x, int y) const
     return valVec[x + y*width];
 }
 
+// to access the elements directly
+double & DepthMap::at(int idx)
+{
+    return valVec[idx];
+}
+const double & DepthMap::at(int idx) const
+{
+    return valVec[idx];
+}
+
 // to access the uncertainty directly
 double & DepthMap::sigma(int x, int y)
 {
@@ -69,6 +98,16 @@ double & DepthMap::sigma(int x, int y)
 const double & DepthMap::sigma(int x, int y) const
 {
     return valVec[x + y*width];
+}
+
+// to access the uncertainty directly
+double & DepthMap::sigma(int idx)
+{
+    return valVec[idx];
+}
+const double & DepthMap::sigma(int idx) const
+{
+    return valVec[idx];
 }
 
 // image coordinates of depth points
@@ -141,8 +180,9 @@ void DepthMap::project(const Vector3dVec & pointVec, Vector2dVec & result) const
     cameraPtr->projectPointCloud(pointVec, result);
 }
 
-
-bool DepthReprojector::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
+//TODO do not reconstruct all thhe points but a selected subset
+// to avoid reconstruction of points with bad disparity
+void DepthReprojector::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
         const Transformation<double> T12, DepthMap& output)
 {
 	//Step 1 : Get point-cloud of first camera in first frame
@@ -166,30 +206,13 @@ bool DepthReprojector::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
 	T12.inverseTransform(cloud2_filtered, cloud21);
 
 	//Step 6 : Project above points along corresponding depth vectors
-	vector<double> reconstdist; // Holds the reconstructed distances
-	vector<double> reconstsigma; //Holds the reconstructed sigmas
-	
+    output = dMap1;
 	for(int i=0; i<cloud21.size(); ++i)
 	{
-		const Vector3d point2 = cloud21[i];
-		const Vector3d point1 = cloud1[i];
+		const Vector3d & point2 = cloud21[i];
+		const Vector3d & point1 = cloud1[i];
 		//Calculate dot-product to get the distance as the projection along the line
-		const double lineproj = (point1.normalized()).dot(point2);
-		reconstdist.push_back(lineproj);
-		const double sigma = dMap2.sigma( dMap2.x(reproj[i][0]), dMap2.y(reproj[i][1]) );
-		reconstsigma.push_back( sigma ); // Assume the uncertainty remains same even after transform
+		output.at(i) = point2.dot(point1.normalized());
+		output.sigma(i) = dMap2.nearestSigma(reproj[i]);
 	}
-
-	output = dMap1; // Clone the input headers (also clones vectors)
-	const int width=dMap1.getWidth(), height=dMap1.getHeight();
-	for (int y=0; y<height; ++y)
-	{
-		for(int x=0; x<width; ++x)
-		{
-			output.at(x,y) = reconstdist[y*width + x];
-			output.sigma(x,y) = reconstsigma[y*width + x];
-		}
-	}
-
-	return true;
 }
