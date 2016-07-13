@@ -29,8 +29,6 @@ This new depthmap is the reprojected depthmap.
 
 #pragma once
 
-#include <opencv2/opencv.hpp>
-
 #include "geometry/geometry.h"
 #include "reconstruction/depth_map.h"
 
@@ -39,7 +37,8 @@ class ReprojectedDepth
 public:
 	ReprojectedDepth() {}
 
-	bool reprojectionBetweenFrames(const DepthMap& dMap1, const DepthMap& dMap2, const Transformation<double> T12, DepthMap& output);
+	bool reprojectionBetweenFrames(const DepthMap& dMap1, const DepthMap& dMap2,
+	        const Transformation<double> T12, DepthMap& output);
 private:
 	//null
 };

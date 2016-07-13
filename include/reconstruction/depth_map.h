@@ -75,11 +75,11 @@ public:
         return *this;
     }
     
-    bool isValid(int x, int y);
+    bool isValid(int x, int y) const;
     
     // nearest neighbor interpolation
-    double nearest(int u, int v);
-    double nearest(Vector2d pt);
+    double nearest(int u, int v) const;
+    double nearest(Vector2d pt) const;
     
     // to access the elements directly
     double & at(int x, int y);
@@ -97,9 +97,10 @@ public:
     int x(int u) const;
     int y(int v) const;
     
-    void reconstruct(Vector3dVec & result);
-    void reconstruct(const vector<int> & indexVec, Vector3dVec & result);
-    void reconstruct(const Vector2dVec & pointVec, Vector3dVec & result);
+    void reconstruct(Vector3dVec & result) const;
+    void reconstruct(const vector<int> & indexVec, Vector3dVec & result) const;
+    void reconstruct(const Vector2dVec & pointVec, Vector3dVec & result) const;
+    void project(const Vector3dVec & pointVec, Vector2dVec & result) const;
     
     int getWidth() const { return width; }
     int getHeight() const { return height; }

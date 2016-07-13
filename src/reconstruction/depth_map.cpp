@@ -29,7 +29,7 @@ NOTE:
 #include "eigen.h"
 
 // nearest neighbor interpolation
-double DepthMap::nearest(int u, int v)
+double DepthMap::nearest(int u, int v) const
 {
     int xd = x(u);
     int yd = y(v);
@@ -37,13 +37,13 @@ double DepthMap::nearest(int u, int v)
     else return 0;
 }
 
-bool DepthMap::isValid(int x, int y)
+bool DepthMap::isValid(int x, int y) const
 {
     return (x >= 0 and x < width and y >= 0 and y < height);
 }
 
 // nearest neighbor interpolation
-double DepthMap::nearest(Vector2d pt)
+double DepthMap::nearest(Vector2d pt) const
 {
     int xd = x(pt[0]);
     int yd = y(pt[1]);
@@ -92,7 +92,7 @@ int DepthMap::y(int v) const
     return round(double(v - v0) / scale);
 }
 
-void DepthMap::reconstruct(Vector3dVec & result)
+void DepthMap::reconstruct(Vector3dVec & result) const
 {
     Vector2dVec pointVec;
     pointVec.reserve(width * height);
@@ -110,7 +110,7 @@ void DepthMap::reconstruct(Vector3dVec & result)
     }
 }
 
-void DepthMap::reconstruct(const vector<int> & indexVec, Vector3dVec & result)
+void DepthMap::reconstruct(const vector<int> & indexVec, Vector3dVec & result) const
 {
     Vector2dVec pointVec;
     pointVec.reserve(indexVec.size());
@@ -127,12 +127,17 @@ void DepthMap::reconstruct(const vector<int> & indexVec, Vector3dVec & result)
     }
 }
 
-void DepthMap::reconstruct(const Vector2dVec & pointVec, Vector3dVec & result)
+void DepthMap::reconstruct(const Vector2dVec & pointVec, Vector3dVec & result) const
 {
     cameraPtr->reconstructPointCloud(pointVec, result);
     for (int i = 0; i < pointVec.size(); i++)
     {
         result[i] = result[i].normalized() * nearest(pointVec[i]);
     }
+}
+
+void DepthMap::project(const Vector3dVec & pointVec, Vector2dVec & result) const
+{
+    cameraPtr->projectPointCloud(pointVec, result);
 }
 

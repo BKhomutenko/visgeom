@@ -83,6 +83,15 @@ add_executable( photometric
 target_link_libraries( photometric ${OpenCV_LIBS} )
 TARGET_LINK_LIBRARIES( photometric ${CERES_LIBRARIES})
 
+add_executable( reproject_plane
+   src/reconstruction/reproject_test.cpp
+   src/reconstruction/reproject_depth.cpp
+   src/reconstruction/depth_map.cpp
+)
+
+target_link_libraries( reproject_plane ${OpenCV_LIBS} )
+
+
 if(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS "-O2")        ## Optimize
     set(CMAKE_EXE_LINKER_FLAGS "-s")  ## Strip binary

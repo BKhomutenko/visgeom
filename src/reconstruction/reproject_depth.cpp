@@ -16,14 +16,19 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
 
-#include <vector>
 
-#include "reconstruction/reprojected_depth.h"
 
+#include "reconstruction/reproject_depth.h"
+
+#include "std.h"
+
+#include "geometry/geometry.h"
+#include "reconstruction/depth_map.h"
 
 using std::vector;
 
-bool ReprojectedDepth::reprojectionBetweenFrames(const DepthMap& dMap1, const DepthMap& dMap2, const Transformation<double> T12, DepthMap& output)
+bool ReprojectedDepth::reprojectionBetweenFrames(const DepthMap& dMap1, const DepthMap& dMap2,
+        const Transformation<double> T12, DepthMap& output)
 {
 	//Step 1 : Get point-cloud of first camera in first frame
 	vector<Vector3d> cloud1;
@@ -35,11 +40,11 @@ bool ReprojectedDepth::reprojectionBetweenFrames(const DepthMap& dMap1, const De
 
 	//Step 3 : Reproject points into second camera
 	vector<Vector2d> reproj;
-	dMap2.getCamera().projectPointCloud(cloud12, reproj);
+	dMap2.project(cloud12, reproj);
 
 	//Step 4 : For reprojected points, reconstruct point-cloud of second camera in second frame
 	vector<Vector3d> cloud2_filtered;
-	dMap2.reconstruct(reproj, cloud2_filtered)
+	dMap2.reconstruct(reproj, cloud2_filtered);
 
 	//Step 5 : Transform above into first frame
 	vector<Vector3d> cloud21;
