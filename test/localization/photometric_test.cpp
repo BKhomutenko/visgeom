@@ -99,7 +99,7 @@ int main (int argc, char const* argv[])
     
 //     Init the localizer
     ScalePhotometric localizer;
-    localizer.setVerbosity(3);
+    localizer.setVerbosity(0);
     localizer.setCamera(EnhancedCamera(params.data()));
     localizer.setNumberScales(6);
     localizer.computeBaseScaleSpace(img1);

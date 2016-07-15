@@ -44,6 +44,7 @@ using Eigen::Vector2d;
 using Eigen::Vector3d;
 using Eigen::Matrix3d;
 using Eigen::Vector2i;
+using Eigen::Map;
 
 // STL containers
 using std::vector;

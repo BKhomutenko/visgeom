@@ -90,23 +90,48 @@ void ScalePhotometric::computePose(int scaleIdx, Transformation<double> & T12)
     }
     PhotometricPack dataPack = initPhotometricData(scaleIdx);
     scaleSpace2.setActiveScale(scaleIdx);
+//    const Mat32f & img1 = scaleSpace1.get();
     const Mat32f & img2 = scaleSpace2.get();
     array<double, 6> pose = T12.toArray();
-    typedef DynamicAutoDiffCostFunction<PhotometricError<EnhancedProjector>> photometricCF;
-    PhotometricError<EnhancedProjector> * errorFunctor;
-    errorFunctor = new PhotometricError<EnhancedProjector>(camPtr2->params, dataPack,
-                             img2, scaleSpace2.getActiveScale());
-    photometricCF * costFunction = new photometricCF(errorFunctor);
-    costFunction->AddParameterBlock(6);
-    costFunction->SetNumResiduals(dataPack.cloud.size());
+//    array<double, 6> pose2 = T12.toArray();
+//    typedef DynamicAutoDiffCostFunction<PhotometricError<EnhancedProjector>> photometricCF;
+//    PhotometricError<EnhancedProjector> * errorFunctor;
+//    errorFunctor = new PhotometricError<EnhancedProjector>(camPtr2->params, dataPack,
+//                             img2, scaleSpace2.getActiveScale());
+//    photometricCF * costFunction = new photometricCF(errorFunctor);
+//    costFunction->AddParameterBlock(6);
+//    costFunction->SetNumResiduals(dataPack.cloud.size());
+//    
+//    
+//    
+//    Problem problem;
+//    problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), pose.data());
     
     Problem problem;
+    PhotometricCostFunction * costFunction = new PhotometricCostFunction(camPtr2, dataPack,
+                                                        img2, scaleSpace2.getActiveScale());
     problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), pose.data());
+    
+    
     
     //run the solver
     Solver::Options options;
     options.linear_solver_type = ceres::DENSE_QR;
-    options.max_num_iterations = 15;
+    options.max_num_iterations = 150;
+    options.function_tolerance = 1e-3;
+    options.gradient_tolerance = 1e-3;
+//    double cost, cost2;
+//    vector<double> residuals, residuals2;
+//    vector<double> gradient, gradient2;
+//    ceres::CRSMatrix jac, jac2;
+//    problem.Evaluate(Problem::EvaluateOptions(), &cost, &residuals, &gradient, &jac);
+//    problem2.Evaluate(Problem::EvaluateOptions(), &cost2, &residuals2, &gradient2, &jac2);
+//    
+//    cout << "GRADIENT:" << endl;
+//    for (int i = 0; i < gradient.size(); i++)
+//    {
+//        cout << "    " << gradient[i] << "    " << gradient2[i] << endl;
+//    }
     if (verbosity > 2) options.minimizer_progress_to_stdout = true;
     Solver::Summary summary;
     Solve(options, &problem, &summary);
