@@ -120,12 +120,16 @@ public:
         double gamma = 1. - alpha;
         double d = alpha * rho + gamma * z;
         double k = 1. / d / d;
-        Jac(0, 0) = fu * k * (gamma * z + alpha * rho - alpha * beta * x * x / rho);
-        Jac(0, 1) = -fu * k * alpha * beta * x * y / rho;
-        Jac(0, 2) = -fu * k * x * (gamma + alpha * z / rho);
-        Jac(1, 0) = -fv * k * alpha * beta * x * y / rho;    
-        Jac(1, 1) = fv * k * (gamma * z + alpha * rho - alpha * beta * y * y / rho);
-        Jac(1, 2) = -fv * k * y * (gamma + alpha * z / rho);
+        double abrho = alpha * beta / rho;
+        double Jxy = k * abrho * x * y;
+        double Jz = k * (gamma + alpha * z / rho);
+        double Jx = gamma * z + alpha * rho;
+        Jac(0, 0) = fu * k * (Jx - abrho * x * x);
+        Jac(0, 1) = -fu * Jxy;
+        Jac(0, 2) = -fu * x * Jz;
+        Jac(1, 0) = -fv * Jxy;    
+        Jac(1, 1) = fv * k * (Jx - abrho * y * y);
+        Jac(1, 2) = -fv * y * Jz;
 
         return true;
 
