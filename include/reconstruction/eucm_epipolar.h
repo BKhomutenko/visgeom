@@ -123,7 +123,7 @@ public:
     
     }
     
-    int idx(double theta)
+    int index(double theta) const
     {
         int res = round((theta + HALF_PI) / step);
         if (res < 0)
@@ -137,12 +137,19 @@ public:
         return res;
     }
     
-    double theta(Vector3d X)
+    double theta(Vector3d X) const
     {
         X = orthProjector * X;
         double s = t12n.dot(base.cross(X));
         double c = base.dot(X);
         return atan2(s, c);
+    }
+    
+    const Polynomial2 & getCurve(int idx) const { return epipolarVec[idx]; }
+    const Polynomial2 & getCurve(Vector3d X) const 
+    { 
+        double th = theta(X);
+        return epipolarVec[index(th)]; 
     }
     
 private:

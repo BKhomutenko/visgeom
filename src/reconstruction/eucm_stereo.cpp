@@ -41,7 +41,7 @@ void EnhancedStereo::computeEpipole()
 CurveRasterizer<int, Polynomial2> EnhancedStereo::getCurveRasteriser(int idx)
 {
     Vector2i pinfPx = pinfPxVec[idx];
-    return CurveRasterizer<int, Polynomial2>(pinfPx, epipolePx, epipolarVec[idx]);
+    return CurveRasterizer<int, Polynomial2>(pinfPx, epipolePx, epipolar.getCurve(reconstVec[idx]));
 }
 
 //TODO reconstruct the depth points, not everything
@@ -93,62 +93,62 @@ void EnhancedStereo::computePinf()
 
 void EnhancedStereo::computeEpipolarCurves()
 {
-    if (params.verbosity > 0) cout << "EnhancedStereo::computeEpipolarCurves" << endl;
-    Vector3d t21 = Transform12.transInv();
-    epipolarVec.clear();
-    const double & alpha = cam2.params[0];
-    const double & beta = cam2.params[1];
-    const double & fu = cam2.params[2];
-    const double & fv = cam2.params[3];
-    const double & u0 = cam2.params[4];
-    const double & v0 = cam2.params[5];
-    
-    double gamma = 1 - alpha;
-    double ag = (alpha - gamma);
-    double a2b = alpha*alpha*beta;
-    
-    double fufv = fu * fv;
-    double fufu = fu * fu;
-    double fvfv = fv * fv;
-    
-    for (const auto & pt : reconstRotVec)
-    {
-        epipolarVec.emplace_back();
-        Polynomial2 & surf = epipolarVec.back();
-        Vector3d plane = pt.cross(t21);
-        const double & A = plane[0];
-        const double & B = plane[1];
-        const double & C = plane[2];
-        double AA = A * A;
-        double BB = B * B;
-        double CC = C * C;
-        double CCfufv = CC * fufv;
-        if (CCfufv/(AA + BB) < 0.5) // the curve passes through the projection center
-        {
-            surf.kuu = surf.kuv = surf.kvv = 0;
-            surf.ku = A/fu;
-            surf.kv = B/fv;
-            surf.k1 = -u0*A/fu - v0*B/fv;
-        }
-        else
-        {
-            // compute first 4 coefficients directly
-            surf.kuu = (AA*ag + CC*a2b)/(CC*fufu);  // kuu
-            surf.kuv = 2*A*B*ag/(CCfufv);  // kuv
-            surf.kvv = (BB*ag + CC*a2b)/(CC*fvfv);  // kvv
-            surf.ku = 2*(-(AA*fv*u0 + A*B*fu*v0)*ag - 
-                            A*C*fufv*gamma - CC*a2b*fv*u0)/(CCfufv*fu);  // kv
-            surf.kv = 2*(-(BB*fu*v0 + A*B*fv*u0)*ag - 
-                            B*C*fufv*gamma - CC*a2b*fu*v0)/(CCfufv*fv);  // kv
-                            
-            // the last one is computed using the fact that
-            // the epipolar curves pass through the epipole
-            surf.k1 = -(surf.kuu*epipole[0]*epipole[0] 
-                            + surf.kuv*epipole[0]*epipole[1] 
-                            + surf.kvv*epipole[1]*epipole[1] 
-                            + surf.ku*epipole[0] + surf.kv*epipole[1]);
-        }
-    }    
+//    if (params.verbosity > 0) cout << "EnhancedStereo::computeEpipolarCurves" << endl;
+//    Vector3d t21 = Transform12.transInv();
+//    epipolarVec.clear();
+//    const double & alpha = cam2.params[0];
+//    const double & beta = cam2.params[1];
+//    const double & fu = cam2.params[2];
+//    const double & fv = cam2.params[3];
+//    const double & u0 = cam2.params[4];
+//    const double & v0 = cam2.params[5];
+//    
+//    double gamma = 1 - alpha;
+//    double ag = (alpha - gamma);
+//    double a2b = alpha*alpha*beta;
+//    
+//    double fufv = fu * fv;
+//    double fufu = fu * fu;
+//    double fvfv = fv * fv;
+//    
+//    for (const auto & pt : reconstRotVec)
+//    {
+//        epipolarVec.emplace_back();
+//        Polynomial2 & surf = epipolarVec.back();
+//        Vector3d plane = pt.cross(t21);
+//        const double & A = plane[0];
+//        const double & B = plane[1];
+//        const double & C = plane[2];
+//        double AA = A * A;
+//        double BB = B * B;
+//        double CC = C * C;
+//        double CCfufv = CC * fufv;
+//        if (CCfufv/(AA + BB) < 0.5) // the curve passes through the projection center
+//        {
+//            surf.kuu = surf.kuv = surf.kvv = 0;
+//            surf.ku = A/fu;
+//            surf.kv = B/fv;
+//            surf.k1 = -u0*A/fu - v0*B/fv;
+//        }
+//        else
+//        {
+//            // compute first 4 coefficients directly
+//            surf.kuu = (AA*ag + CC*a2b)/(CC*fufu);  // kuu
+//            surf.kuv = 2*A*B*ag/(CCfufv);  // kuv
+//            surf.kvv = (BB*ag + CC*a2b)/(CC*fvfv);  // kvv
+//            surf.ku = 2*(-(AA*fv*u0 + A*B*fu*v0)*ag - 
+//                            A*C*fufv*gamma - CC*a2b*fv*u0)/(CCfufv*fu);  // kv
+//            surf.kv = 2*(-(BB*fu*v0 + A*B*fv*u0)*ag - 
+//                            B*C*fufv*gamma - CC*a2b*fu*v0)/(CCfufv*fv);  // kv
+//                            
+//            // the last one is computed using the fact that
+//            // the epipolar curves pass through the epipole
+//            surf.k1 = -(surf.kuu*epipole[0]*epipole[0] 
+//                            + surf.kuv*epipole[0]*epipole[1] 
+//                            + surf.kvv*epipole[1]*epipole[1] 
+//                            + surf.ku*epipole[0] + surf.kv*epipole[1]);
+//        }
+//    }    
 }
 
 void EnhancedStereo::traceEpipolarLine(int x, int y, Mat8u & out)

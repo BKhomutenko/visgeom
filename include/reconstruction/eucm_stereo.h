@@ -88,11 +88,13 @@ class EnhancedStereo
 {
 public:
     EnhancedStereo(Transformation<double> T12,
-            const double * params1, const double * params2, const StereoParameters & stereoParams)
-            : Transform12(T12), 
+            const double * params1, const double * params2, const StereoParameters & stereoParams) :
+            // initialize members
+            Transform12(T12), 
             cam1(stereoParams.imageWidth, stereoParams.imageHeight, params1),
             cam2(stereoParams.imageWidth, stereoParams.imageHeight, params2),
-            params(stereoParams)
+            params(stereoParams),
+            epipolar(T12, params1, params2, 1500)
     { 
         params.init();
         init(); 
@@ -118,7 +120,7 @@ public:
         computeEpipole();
         computeRotated();
         computePinf();
-        computeEpipolarCurves();
+//        computeEpipolarCurves();
     }
     
     //// EPIPOLAR GEOMETRY
@@ -200,8 +202,9 @@ public:
     double computeDistance(int u, int v);
 private:
     
+    EnhancedEpipolar epipolar;
     
-    Transformation<double> Transform12;  // pose of the first to the second camera
+    Transformation<double> Transform12;  // pose of camera 2 wrt camera 1
     EnhancedCamera cam1, cam2;
    
     Vector2dVec pointVec1;  // the depth points on the image 1
@@ -216,7 +219,7 @@ private:
     Vector2i epipolePx;  
     Vector2iVec pinfPxVec;
     
-    std::vector<Polynomial2> epipolarVec;  // the epipolar curves represented by polynomial functions
+    std::vector<int> epipolarIdxVec;  // the epipolar curves represented by polynomial functions
     
     Mat8u errorBuffer;
     cv::Mat_<int> tableauLeft, tableauRight;
