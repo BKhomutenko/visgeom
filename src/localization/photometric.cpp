@@ -47,25 +47,41 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
     dataPack.scaleIdx = scaleIdx;
     scaleSpace1.setActiveScale(scaleIdx);
     const Mat32f & img1 = scaleSpace1.get();
+    const Mat32f & gradU1 = scaleSpace1.getGradU();
+    const Mat32f & gradV1 = scaleSpace1.getGradV();
+    double scale = scaleSpace1.getActiveScale();
     vector<double> distVec;
     vector<Vector2d> imagePointVec;
+    vector<Vector2d> imageGradPointVec;
     if (verbosity > 3) cout << "    scaled image size : " << img1.size() << endl;
     for (int vs = 0; vs < img1.rows; vs++)
     {
         for (int us = 0; us < img1.cols; us++)
         {
+            double gu = gradU1(vs, us);
+            double gv = gradV1(vs, us);
+            if (gu*gu + gv*gv < GRAD_THRESH) continue;
             int ub = scaleSpace1.uBase(us);
             int vb = scaleSpace1.vBase(vs);
             double dist = depthMap.nearest(ub, vb);
             if (dist < 0.01) continue;
             if (verbosity > 3) cout << "    " << vs << " " << us << endl;
             dataPack.colorVec.push_back(img1(vs, us));
+            dataPack.gradValVec.push_back(sqrt(gu*gu + gv*gv) / scale);
             imagePointVec.emplace_back(ub, vb);
+            imageGradPointVec.emplace_back(ub + gu/GRAD_MAX, vb + gv/GRAD_MAX);
             dataPack.idxVec.push_back(vs*img1.cols + us);
         }
     }
     // TODO check the reconstruction and discard bad points
+    vector<Vector3d> cloudGradPointVec;
+    depthMap.reconstruct(imageGradPointVec, cloudGradPointVec);
     depthMap.reconstruct(imagePointVec, dataPack.cloud);
+    for (int i = 0; i < dataPack.cloud.size(); i++)
+    {
+        dataPack.gradientVec.push_back( (cloudGradPointVec[i] - dataPack.cloud[i]).normalized() );
+        
+    }
     return dataPack;
 }
 
@@ -79,6 +95,7 @@ void ScalePhotometric::computePose(const Mat32f & img2, Transformation<double> &
     for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 2; scaleIdx--)
     {
         computePose(scaleIdx, T12);
+//        break;
     }
 }
 
@@ -90,51 +107,58 @@ void ScalePhotometric::computePose(int scaleIdx, Transformation<double> & T12)
     }
     PhotometricPack dataPack = initPhotometricData(scaleIdx);
     scaleSpace2.setActiveScale(scaleIdx);
-//    const Mat32f & img1 = scaleSpace1.get();
     const Mat32f & img2 = scaleSpace2.get();
     array<double, 6> pose = T12.toArray();
-//    array<double, 6> pose2 = T12.toArray();
-//    typedef DynamicAutoDiffCostFunction<PhotometricError<EnhancedProjector>> photometricCF;
-//    PhotometricError<EnhancedProjector> * errorFunctor;
-//    errorFunctor = new PhotometricError<EnhancedProjector>(camPtr2->params, dataPack,
-//                             img2, scaleSpace2.getActiveScale());
-//    photometricCF * costFunction = new photometricCF(errorFunctor);
-//    costFunction->AddParameterBlock(6);
-//    costFunction->SetNumResiduals(dataPack.cloud.size());
-//    
-//    
-//    
-//    Problem problem;
-//    problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), pose.data());
-    
     Problem problem;
     PhotometricCostFunction * costFunction = new PhotometricCostFunction(camPtr2, dataPack,
                                                         img2, scaleSpace2.getActiveScale());
     problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), pose.data());
     
     
-    
     //run the solver
     Solver::Options options;
     options.linear_solver_type = ceres::DENSE_QR;
     options.max_num_iterations = 150;
-    options.function_tolerance = 1e-3;
-    options.gradient_tolerance = 1e-3;
-//    double cost, cost2;
-//    vector<double> residuals, residuals2;
-//    vector<double> gradient, gradient2;
-//    ceres::CRSMatrix jac, jac2;
-//    problem.Evaluate(Problem::EvaluateOptions(), &cost, &residuals, &gradient, &jac);
-//    problem2.Evaluate(Problem::EvaluateOptions(), &cost2, &residuals2, &gradient2, &jac2);
-//    
-//    cout << "GRADIENT:" << endl;
-//    for (int i = 0; i < gradient.size(); i++)
-//    {
-//        cout << "    " << gradient[i] << "    " << gradient2[i] << endl;
-//    }
     if (verbosity > 2) options.minimizer_progress_to_stdout = true;
     Solver::Summary summary;
     Solve(options, &problem, &summary);
+    if (verbosity > 2) cout << summary.FullReport() << endl;
+    else if (verbosity > 1) cout << summary.BriefReport() << endl;
+    T12 = Transformation<double>(pose.data());
+}
+
+// Optimization using the auto differentiation
+void ScalePhotometric::computePoseAuto(int scaleIdx, Transformation<double> & T12)
+{
+    if (verbosity > 1) 
+    {
+        cout << "ScalePhotometric::computePoseAuto with scaleIdx = " << scaleIdx << endl;
+    }
+    PhotometricPack dataPack = initPhotometricData(scaleIdx);
+    scaleSpace2.setActiveScale(scaleIdx);
+//    const Mat32f & img1 = scaleSpace1.get();
+    const Mat32f & img2 = scaleSpace2.get();
+    array<double, 6> pose = T12.toArray();
+    typedef DynamicAutoDiffCostFunction<PhotometricError<EnhancedProjector>> photometricCF;
+    PhotometricError<EnhancedProjector> * errorFunctor;
+    errorFunctor = new PhotometricError<EnhancedProjector>(camPtr2->params, dataPack,
+                             img2, scaleSpace2.getActiveScale());
+    photometricCF * costFunctionAuto = new photometricCF(errorFunctor);
+    costFunctionAuto->AddParameterBlock(6);
+    costFunctionAuto->SetNumResiduals(dataPack.cloud.size());
+    
+    
+    
+    Problem problemAuto;
+    problemAuto.AddResidualBlock(costFunctionAuto, new SoftLOneLoss(1), pose.data());
+ 
+    //run the solver
+    Solver::Options options;
+    options.linear_solver_type = ceres::DENSE_QR;
+    options.max_num_iterations = 150;
+    if (verbosity > 2) options.minimizer_progress_to_stdout = true;
+    Solver::Summary summary;
+    Solve(options, &problemAuto, &summary);
     if (verbosity > 2) cout << summary.FullReport() << endl;
     else if (verbosity > 1) cout << summary.BriefReport() << endl;
     T12 = Transformation<double>(pose.data());

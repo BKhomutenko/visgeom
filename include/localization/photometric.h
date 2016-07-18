@@ -43,12 +43,9 @@ struct Grid2D
             
     void GetValue(int v, int u, double* val) const
     {
-        if (u < 0 or u >= uMax or v < 0 or v >= vMax) 
-        {
-            *val = 0.;
-            return;
-        }
-        *val = double(data[v*uMax + u]);
+        if (u < 0 or u >= uMax or v < 0 or v >= vMax) *val = 0.;
+        else *val = double(data[v*uMax + u]);
+        
     }
     
     int uMax, vMax;
@@ -61,6 +58,8 @@ struct PhotometricPack
 {
     vector<float> colorVec;
     vector<Vector3d> cloud;
+    vector<Vector3d> gradientVec;
+    vector<double> gradValVec;
     vector<int> idxVec;
     int scaleIdx;
 };
@@ -138,9 +137,6 @@ struct PhotometricCostFunction : ceres::CostFunction
                 double f;
                 if (computeJac)
                 {
-
-                    
-                    
                     // image interpolation and gradient
                     Matrix<double, 1, 2> grad;
                     imageInterpolator.Evaluate(pt[1] / _scale, pt[0] / _scale,
@@ -155,8 +151,12 @@ struct PhotometricCostFunction : ceres::CostFunction
                     Matrix3d R21 = T12.rotMatInv();
                     Matrix3d M21 = R21 * interOmegaRot(T12.rot());
                     
+                    // computing the eqilibrium gradient
+                    Vector3d gradEq3 = R21 * _dataPack.gradientVec[i];
+                    Vector2d gradEq2 = (projJac * gradEq3).normalized() * _dataPack.gradValVec[i]; 
+                    
                     // intermediate matrix
-                    Matrix<double, 1, 3> dfdX = grad * projJac;
+                    Matrix<double, 1, 3> dfdX = (grad + 0. * gradEq2.transpose()) * projJac;
                     
                     // fill up the corresponding jacobian row
                     Map<Matrix<double, 1, 3>> jacV(jacobian[0] + i*6);
@@ -197,7 +197,8 @@ struct PhotometricCostFunction : ceres::CostFunction
 
 
 /*
-This struct is ment for the automatic differentiation by ceres-solver
+This struct is ment for the automatic differentiation by ceres-solver.
+class Projector must be known at the compilation time.
 */
 template<template<typename> class Projector>
 struct PhotometricError 
@@ -293,6 +294,7 @@ public:
     
     // scaleSpace2 must be initialized
     void computePose(int scaleIdx, Transformation<double> & T12);
+    void computePoseAuto(int scaleIdx, Transformation<double> & T12);
     
     void setVerbosity(int newVerbosity) { verbosity = newVerbosity; }
     
@@ -302,6 +304,10 @@ private:
     EnhancedCamera * camPtr2;
     DepthMap depthMap;
     
+    //TODO make a parameter structure
+    // minimal squared norm of gradient for a pixel to be accepted
+    const double GRAD_THRESH = 400;
+    const double GRAD_MAX = 255;
     int verbosity;
 };
 

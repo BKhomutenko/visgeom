@@ -18,6 +18,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "io.h"
 #include "ocv.h"
+#include "timer.h"
+
 #include "reconstruction/eucm_stereo.h"
 
 
@@ -101,7 +103,7 @@ int main (int argc, char const* argv[])
     ScalePhotometric localizer;
     localizer.setVerbosity(0);
     localizer.setCamera(EnhancedCamera(params.data()));
-    localizer.setNumberScales(6);
+    localizer.setNumberScales(5);
     localizer.computeBaseScaleSpace(img1);
     stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), localizer.depth(),
          vector<Vector3d>{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
@@ -109,6 +111,9 @@ int main (int argc, char const* argv[])
     
      
     imshow("img1", img1/255);
+    
+    std::chrono::high_resolution_clock clock_;
+    
     while (getline(paramFile, imageInfo))
     {
         istringstream imageStream(imageInfo);
@@ -119,7 +124,7 @@ int main (int argc, char const* argv[])
         Transformation<double> T02(robotPose2.data());
         Transformation<double> T12 = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         cout << "REAL POSE : " << T12 << endl;
-        T12 = T12.compose(Transformation<double>(-0.1, 0.05, -0.1, 0.03, 0.03, 0.05));
+        T12 = T12.compose(Transformation<double>(-0.01, -0.01, -0.3, -0.003, -0.003, -0.005));
 //        T12 = T12.compose(Transformation<double>(-0.001, 0.005, -0.01, 0.001, 0.001, 0.001));
         Mat32f img2 = imread(imageDir + imageName, 0);
         imshow("img2", img2/255);
@@ -128,8 +133,11 @@ int main (int argc, char const* argv[])
         cout << T12 << endl;
         for (int iter = 0; iter < 1; iter++)
         {
+            Timer timer;
             localizer.computePose(img2, T12);
+            cout << timer.elapsed() << endl;
             cout << T12 << endl;
+            
 //            localizer.wrapImage(img2, img12, T12);
 //            imshow("img11", img11/256);
 //            imshow("img12", img12/256);

@@ -1,6 +1,7 @@
 #include "io.h"
 #include "ocv.h"
 #include "eigen.h"
+#include "timer.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_stereo.h"
 
@@ -127,8 +128,10 @@ int main(int argc, char** argv)
 //    img1lap.copyTo(img1);
 //    img2lap.copyTo(img2);
 ////    
-    EnhancedStereo stereo(TleftRight, params1.data(), params2.data(), stereoParams);
     
+    Timer timer;
+    EnhancedStereo stereo(TleftRight, params1.data(), params2.data(), stereoParams);
+    cout << "    initialization time : " << timer.elapsed() << endl;
     Mat8u out1, out2;
     
     img1.copyTo(out1);
@@ -146,22 +149,18 @@ int main(int argc, char** argv)
     
 
     Mat8u res;
-    auto t2 = clock();
+    timer.reset();
     stereo.computeCurveCost(img1, img2);
-    auto t3 = clock();
-    cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
-    t2 = clock();
+    cout << timer.elapsed() << endl;
+    timer.reset();
     stereo.computeDynamicProgramming();
-    t3 = clock();
-    cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
-    t2 = clock();
+    cout << timer.elapsed() << endl;
+    timer.reset();
     stereo.reconstructDisparity();
-    t3 = clock();
-    cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
-    t2 = clock();
+    cout << timer.elapsed() << endl;
+    timer.reset();
     stereo.upsampleDisparity(img1, res);
-    t3 = clock();
-    cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
+    cout << timer.elapsed() << endl;
     
     imshow("out1", out1);
     imshow("out2", out2);

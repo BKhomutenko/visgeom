@@ -27,20 +27,34 @@ Scale space for multiscale optimization
 class BinaryScalSpace
 {
 public:
-    BinaryScalSpace(int numScales) : activeScale(1), activeScaleIdx(0)
-    {
-        imgVec.resize(numScales);
-    }
-    
-    BinaryScalSpace() : activeScale(1), activeScaleIdx(0)
-    {
-        imgVec.resize(1);
-    }
-    
-    void setNumberScales(int numScales)
+    BinaryScalSpace(int numScales = 1, bool withGradient = true) : 
+            activeScale(1), 
+            activeScaleIdx(0), 
+            gradientOn(withGradient)
     {
         assert(numScales > 0);
         imgVec.resize(numScales);
+        if (gradientOn)
+        {
+            gradUVec.resize(numScales);
+            gradVVec.resize(numScales);
+        }
+    }
+    
+    void setGradient(bool val)
+    {
+        gradientOn = val  ; 
+    }
+    
+    void setNumberScales(int val)
+    {
+        assert(val > 0);
+        imgVec.resize(val);
+        if (gradientOn)
+        {
+            gradUVec.resize(val);
+            gradVVec.resize(val);
+        }
     }
     
 //    virtual ~ScalSpace();
@@ -64,10 +78,17 @@ public:
             Mat32f blured;
             GaussianBlur(imgVec[i - 1], blured, Size(3, 3), 0, 0);
             resize(blured, imgVec[i], Size(blured.cols/2, blured.rows/2));
+            if (gradientOn)
+            {
+                Sobel(imgVec[i], gradUVec[i], CV_32F, 1, 0, 3, 1./8);
+                Sobel(imgVec[i], gradVVec[i], CV_32F, 0, 1, 3, 1./8);
+            }
         }
     }
     
     const Mat32f & get() const { return imgVec[activeScaleIdx]; }
+    const Mat32f & getGradU() const { return gradUVec[activeScaleIdx]; }
+    const Mat32f & getGradV() const { return gradVVec[activeScaleIdx]; }
     
     int size() const { return imgVec.size(); }
     
@@ -97,6 +118,9 @@ public:
     
 private:
     std::vector<Mat32f> imgVec;
+    std::vector<Mat32f> gradUVec;
+    std::vector<Mat32f> gradVVec;
     int activeScale;
     int activeScaleIdx;
+    bool gradientOn;
 };
