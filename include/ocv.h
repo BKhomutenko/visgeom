@@ -45,3 +45,18 @@ using cv::imwrite;
 using cv::waitKey;
 
 using cv::circle;
+
+//TODO put it elsewhere
+template<typename T, typename Q>
+T bilinear(const Mat_<T> & src, Q x, Q y)
+{
+    int u(x), v(y);
+    Q dx = x - u;
+    Q dy = y - v;
+    Q dx2 = 1 - dx;
+    const T i00 = src(v, u);
+    const T i01 = src(v, u + 1);
+    const T i10 = src(v + 1, u);
+    const T i11 = src(v + 1, u + 1);
+    return (i11*dx + i10*dx2)*dy + (i01*dx + i00*dx2)*(1-dy);
+}

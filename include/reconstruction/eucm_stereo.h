@@ -22,30 +22,16 @@ Semi-global block matching algorithm for non-rectified images
 
 #pragma once
 //STL
-#include <algorithm>
-
+#include "std.h"
 #include "ocv.h"
 #include "eigen.h"
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 #include "curve_rasterizer.h"
 #include "depth_map.h"
+#include "eucm_epipolar.h"
 
 //using EpipolarRasterizer = CurveRasterizer<Polynomial2>;
-
-//TODO put it elsewhere
-template<typename T, typename Q>
-T bilinear(const Mat_<T> & src, Q x, Q y)
-{
-    int u(x), v(y);
-    Q dx = x - u;
-    Q dy = y - v;
-    const T i00 = src(v, u);
-    const T i01 = src(v, u + 1);
-    const T i10 = src(v + 1, u);
-    const T i11 = src(v + 1, u + 1);
-    return (i11*dx + i10*(1-dx))*dy + (i01*dx + i00*(1-dx))*(1-dy);
-}
 
 struct StereoParameters
 {
