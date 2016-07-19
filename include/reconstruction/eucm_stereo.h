@@ -21,7 +21,7 @@ Semi-global block matching algorithm for non-rectified images
 */
 
 #pragma once
-//STL
+
 #include "std.h"
 #include "ocv.h"
 #include "eigen.h"
@@ -30,6 +30,7 @@ Semi-global block matching algorithm for non-rectified images
 #include "curve_rasterizer.h"
 #include "depth_map.h"
 #include "eucm_epipolar.h"
+#include "timer.h"
 
 //using EpipolarRasterizer = CurveRasterizer<Polynomial2>;
 
@@ -94,7 +95,7 @@ public:
             cam1(stereoParams.imageWidth, stereoParams.imageHeight, params1),
             cam2(stereoParams.imageWidth, stereoParams.imageHeight, params2),
             params(stereoParams),
-            epipolar(T12, params1, params2, 1500)
+            epipolar(T12, params1, params2, 1600)
     { 
         params.init();
         init(); 
@@ -110,17 +111,26 @@ public:
     {
         createBuffer();
         computeReconstructed();
+        
         initAfterTransformation();
+        
     }
     
     // Only data invalidated after the transformation change are recomputed
     void initAfterTransformation()
     {
+        Timer timer;
         computeEpipolarDirections();
+        cout << "    computeEpipolarDirections : " << timer.elapsed() << endl;
+        timer.reset();
         computeEpipole();
+        cout << "    computeEpipole : " << timer.elapsed() << endl;
+        timer.reset();
         computeRotated();
+        cout << "    computeRotated : " << timer.elapsed() << endl;
+        timer.reset();
         computePinf();
-//        computeEpipolarCurves();
+        cout << "    computePinf : " << timer.elapsed() << endl;
     }
     
     //// EPIPOLAR GEOMETRY
@@ -144,7 +154,7 @@ public:
     void computePinf();
     
     // calculate the coefficients of the polynomials for all the 
-    void computeEpipolarCurves();
+    void computeEpipolarIndices();
     
     // draws an epipolar line  on the right image that corresponds to (x, y) on the left image
     void traceEpipolarLine(int x, int y, Mat8u & out);
@@ -218,8 +228,6 @@ private:
     // discretized version
     Vector2i epipolePx;  
     Vector2iVec pinfPxVec;
-    
-    std::vector<int> epipolarIdxVec;  // the epipolar curves represented by polynomial functions
     
     Mat8u errorBuffer;
     cv::Mat_<int> tableauLeft, tableauRight;

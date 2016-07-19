@@ -120,20 +120,16 @@ int main(int argc, char** argv)
         Transformation<double> T01(robotPose1.data()), T02(robotPose2.data());
         Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         
-        cout << 111 << endl;
         Mat8u img2 = imread(imageDir + imageName, 0);
-        cout << 111111 << endl;
         EnhancedStereo stereo(TleftRight, params.data(), params.data(), stereoParams);
 
         Mat8u res;
         auto t2 = clock();
-         cout << 222 << endl;
         stereo.comuteStereo(img1, img2, res);
         auto t3 = clock();
 //        cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
         Mat32f distMat;
         Mat32f planeMat;
-         cout << 333 << endl;
         stereo.computeDistance(distMat);
         Transformation<double> T0Camera = T01.compose(TbaseCamera);
         stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), planeMat,

@@ -22,6 +22,7 @@ Semi-global block matching algorithm for non-rectified images
 
 #pragma once
 //STL
+#include "timer.h"
 #include "std.h"
 #include "eigen.h"
 #include "geometry/geometry.h"
@@ -38,32 +39,29 @@ public:
             Transform12(T12), 
             cam1(params1), //TODO implement first image directions
             cam2(params2),
-            step(M_PI / numberSteps),
+            step(4. / numberSteps),
             nSteps(numberSteps)
     {
+        assert(nSteps % 2 == 0);
+        Timer timer;
         //TODO put this code into setTransformation(Transformation<double>);
-        t12n = T12.trans().normalized();
-        if (t12n[2]*t12n[2] > t12n[0]*t12n[0] + t12n[1]*t12n[1])
+        zBase = -T12.trans().normalized();
+        if (zBase[2]*zBase[2] > zBase[0]*zBase[0] + zBase[1]*zBase[1])
         {
-            base << 1, 0, 0;
+            xBase << 1, 0, 0;
         }
         else
         {
-            base << 0, 0, 1;
+            xBase << 0, 0, 1;
         }
-        orthProjector = Matrix3d::Identity() - t12n*t12n.transpose();
-        base = orthProjector * base;
-        base.normalize();
+        Matrix3d orthProjector = Matrix3d::Identity() - zBase*zBase.transpose();
+        xBase = orthProjector * xBase;
+        xBase.normalize();
+        yBase = zBase.cross(xBase);
         
         Matrix3d R21 = Transform12.rotMatInv();
-        Vector3d t21n = -R21 * t12n;
-        Vector3d base2 = R21 * base;
-        
-        Vector3d duTheta = t21n * step;
-        Vector3d u90 = -t21n * HALF_PI;
-        Matrix3d dR = rotationMatrix(duTheta);
-        Matrix3d R90 = rotationMatrix(u90);
-        Vector3d X = R90*base2;
+        Vector3d t21n = R21 * zBase;
+        Vector3d xBase2 = R21 * xBase;
         
         const double & alpha = cam2.params[0];
         const double & beta = cam2.params[1];
@@ -72,18 +70,33 @@ public:
         const double & u0 = cam2.params[4];
         const double & v0 = cam2.params[5];
         
+        // intermediate variables
         double gamma = 1 - alpha;
         double ag = (alpha - gamma);
         double a2b = alpha*alpha*beta;
-        
         double fufv = fu * fv;
         double fufu = fu * fu;
         double fvfv = fv * fv;
         
         cam2.projectPoint(t21n, epipole);
         
-        for (int idx = 0; idx < numberSteps; idx++, X = R90*X)
+        
+        for (int idx = 0; idx < numberSteps; idx++)
         {
+            Vector3d X;
+            if (idx < numberSteps/2)
+            {
+                //tangent part
+                double s = step * idx - 1;
+                X = xBase + s*yBase;
+            }
+            else
+            {
+                //cotangent part
+                double c = step * (-idx + numberSteps/2) + 1;
+                X = c * xBase + yBase;
+            }
+            X = R21 * X;
             epipolarVec.emplace_back();
             Polynomial2 & surf = epipolarVec.back();
             Vector3d plane = X.cross(t21n);
@@ -119,37 +132,35 @@ public:
                                 + surf.kvv*epipole[1]*epipole[1] 
                                 + surf.ku*epipole[0] + surf.kv*epipole[1]);
             }
-        }  
-    
+        }
+        epipolarVec.emplace_back(epipolarVec.front());
+        cout << "    epipolar init time : " << timer.elapsed() << endl;
     }
-    
-    int index(double theta) const
+  
+    int index(Vector3d X) const
     {
-        int res = round((theta + HALF_PI) / step);
-        if (res < 0)
+        double c = X.dot(xBase);
+        double ac = abs(c);
+        double s = X.dot(yBase);
+        double as = abs(s);
+        if (ac + as < 1e-4) //TODO check the constant 
         {
-            res = nSteps - (-res % nSteps);
+            return 0;
+        }
+        else if (ac > as)
+        {
+            return round((s/c + 1) / step);
         }
         else
         {
-            res = res % nSteps;
+            return round((1 - c/s) / step) + nSteps/2;
         }
-        return res;
-    }
-    
-    double theta(Vector3d X) const
-    {
-        X = orthProjector * X;
-        double s = t12n.dot(base.cross(X));
-        double c = base.dot(X);
-        return atan2(s, c);
     }
     
     const Polynomial2 & getCurve(int idx) const { return epipolarVec[idx]; }
     const Polynomial2 & getCurve(Vector3d X) const 
     { 
-        double th = theta(X);
-        return epipolarVec[index(th)]; 
+        return epipolarVec[index(X)]; 
     }
     
 private:
@@ -159,16 +170,17 @@ private:
     EnhancedCamera cam1, cam2;
    
     // angular distance between two plains that represent the epipolar lines
+    
+    int nSteps; //must be even
     double step;
-    int nSteps;
-    // the vector that represents 0 for epipolarVec
+    
     Vector2d epipole;
-    Vector3d base;
-    Vector3d t12n;
-    Matrix3d orthProjector;
+    
+    // the basis in which the input vector is decomposed
+    Vector3d xBase, yBase, zBase;
+    
     // the epipolar curves represented by polynomial functions
     // epipolarVec[0] corresponds to base rotated about t by -pi/2
     std::vector<Polynomial2> epipolarVec;  
-    
 };
 
