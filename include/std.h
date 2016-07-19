@@ -44,3 +44,5 @@ using std::exp;
 using std::log;
 using std::abs;
 
+//constants
+const double HALF_PI = M_PI / 2;

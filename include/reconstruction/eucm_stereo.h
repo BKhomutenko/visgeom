@@ -95,7 +95,7 @@ public:
             cam1(stereoParams.imageWidth, stereoParams.imageHeight, params1),
             cam2(stereoParams.imageWidth, stereoParams.imageHeight, params2),
             params(stereoParams),
-            epipolar(T12, params1, params2, 1600)
+            epipolar(T12, params2, 2500)
     { 
         params.init();
         init(); 
