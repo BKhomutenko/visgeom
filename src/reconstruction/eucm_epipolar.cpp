@@ -29,21 +29,17 @@ Semi-global block matching algorithm for non-rectified images
 #include "camera/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
 
-EnhancedEpipolar::EnhancedEpipolar(Transformation<double> T12,
-        const double * params2, const int numberSteps) :
-        // initialize the members
-        Transform12(T12),
-        camera2(params2),
-        step(4. / numberSteps),
-        nSteps(numberSteps)
+
+void EnhancedEpipolar::initialize()        
 {
     assert(nSteps % 2 == 0);
+    if (verbosity > 0) cout << "EnhancedEpipolar::initialize" << endl;
     Timer timer;
     // compute the epipolar basis
     // it is used to quickly access epipolar lines by a direction vector
     
     // translation vector defines z
-    zBase = -T12.trans().normalized();
+    zBase = -Transform12.trans().normalized();
     
     // find a vector perpendicular to z
     if (zBase[2]*zBase[2] > zBase[0]*zBase[0] + zBase[1]*zBase[1])
@@ -69,10 +65,10 @@ EnhancedEpipolar::EnhancedEpipolar(Transformation<double> T12,
     camera2.projectPoint(t21n, epipole);
     prepareCamera();
     
-    for (int idx = 0; idx < numberSteps; idx++)
+    for (int idx = 0; idx < nSteps; idx++)
     {
         Vector3d X;
-        if (idx < numberSteps/2)
+        if (idx < nSteps/2)
         {
             //tangent part
             double s = step * idx - 1;
@@ -81,7 +77,7 @@ EnhancedEpipolar::EnhancedEpipolar(Transformation<double> T12,
         else
         {
             //cotangent part
-            double c = step * (-idx + numberSteps/2) + 1;
+            double c = step * (-idx + nSteps/2) + 1;
             X = c * xBase + yBase;
         }
         X = R21 * X;
@@ -90,7 +86,7 @@ EnhancedEpipolar::EnhancedEpipolar(Transformation<double> T12,
         computePolynomial(plane, epipolarVec.back());
     }
     epipolarVec.emplace_back(epipolarVec.front());
-    cout << "    epipolar init time : " << timer.elapsed() << endl;
+    if (verbosity > 1) cout << "    epipolar init time : " << timer.elapsed() << endl;
 }
 
 

@@ -30,9 +30,6 @@ Semi-global block matching algorithm for non-rectified images
 #include "curve_rasterizer.h"
 #include "depth_map.h"
 #include "eucm_epipolar.h"
-#include "timer.h"
-
-//using EpipolarRasterizer = CurveRasterizer<Polynomial2>;
 
 struct StereoParameters
 {
@@ -46,7 +43,7 @@ struct StereoParameters
     int imageWidth = 0, imageHeight = 0;
     int maxBias = 10;
     
-    int verbosity = 1;
+    int verbosity = 0;
     int maxDistance = 100;
     // precomputed parameters
     int u0, v0;
@@ -119,18 +116,10 @@ public:
     // Only data invalidated after the transformation change are recomputed
     void initAfterTransformation()
     {
-        Timer timer;
         computeEpipolarDirections();
-        cout << "    computeEpipolarDirections : " << timer.elapsed() << endl;
-        timer.reset();
         computeEpipole();
-        cout << "    computeEpipole : " << timer.elapsed() << endl;
-        timer.reset();
         computeRotated();
-        cout << "    computeRotated : " << timer.elapsed() << endl;
-        timer.reset();
         computePinf();
-        cout << "    computePinf : " << timer.elapsed() << endl;
     }
     
     //// EPIPOLAR GEOMETRY

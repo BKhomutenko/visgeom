@@ -21,6 +21,7 @@ Semi-global block matching algorithm for non-rectified images
 */
 
 #pragma once
+
 #include "std.h"
 #include "eigen.h"
 #include "geometry/geometry.h"
@@ -31,9 +32,20 @@ class EnhancedEpipolar
 {
 public:
     EnhancedEpipolar(Transformation<double> T12,
-            const double * params2, const int numberSteps);
+        const double * params2, const int numberSteps, int verbosity = 0) :
+        // initialize the members
+        Transform12(T12),
+        camera2(params2),
+        step(4. / numberSteps),
+        nSteps(numberSteps),
+        verbosity(verbosity)
+    {
+        initialize();
+    }
     
     const Polynomial2 & getCurve(Vector3d X) const { return epipolarVec[index(X)]; }
+    
+    void initialize();
     
 private:
     
@@ -77,5 +89,7 @@ private:
     // the epipolar curves represented by polynomial functions
     // epipolarVec[0] corresponds to base rotated about t by -pi/2
     std::vector<Polynomial2> epipolarVec;  
+    
+    int verbosity;
 };
 
