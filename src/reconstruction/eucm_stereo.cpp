@@ -221,7 +221,7 @@ void EnhancedStereo::comuteStereo(const Mat8u & img1,
 
 
 //TODO change u,v to x,y
-//TODO possibly change the step length along the curve to reduce the computation cost
+//TODO make step change scaleable and define in in a loop
 void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::computeCurveCost" << endl;
