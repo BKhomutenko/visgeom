@@ -57,35 +57,64 @@ void EnhancedEpipolar::initialize()
     // the last component of the basis
     yBase = zBase.cross(xBase);
     
-    // the 
-    Matrix3d R21 = Transform12.rotMatInv();
-    Vector3d t21n = R21 * zBase;
     
-    // prepare reused variables
-    camera2.projectPoint(t21n, epipole);
-    prepareCamera();
     
+    
+    
+    // prepare different directions
+    Vector3dVec directionVec;
     for (int idx = 0; idx < nSteps; idx++)
     {
-        Vector3d X;
         if (idx < nSteps/2)
         {
             //tangent part
             double s = step * idx - 1;
-            X = xBase + s*yBase;
+            directionVec.emplace_back(xBase + s*yBase);
         }
         else
         {
             //cotangent part
             double c = step * (-idx + nSteps/2) + 1;
-            X = c * xBase + yBase;
+            directionVec.emplace_back(c * xBase + yBase);
         }
-        X = R21 * X;
-        epipolarVec.emplace_back();
-        Vector3d plane = X.cross(t21n);
-        computePolynomial(plane, epipolarVec.back());
     }
-    epipolarVec.emplace_back(epipolarVec.front());
+    
+    // ## camera 1 ##
+    // prepare reused variables
+    if (not camera1.projectPoint(zBase, epipole))
+    {
+        camera1.projectPoint(-zBase, epipole);
+    }
+    prepareCamera(camera1);
+    
+    for (const auto & dir : directionVec)
+    {
+        Vector3d plane = dir.cross(zBase);
+        epipolar1Vec.emplace_back(computePolynomial(plane));
+    }
+    epipolar1Vec.emplace_back(epipolar1Vec.front());
+    
+    // ## camera 2 ##
+    
+    // the transformation to frame 2
+    Matrix3d R21 = Transform12.rotMatInv();
+    Vector3d t21n = R21 * zBase;
+    
+    // prepare reused variables
+    if (not camera2.projectPoint(t21n, epipole))
+    {
+        camera2.projectPoint(-t21n, epipole);
+    }
+    prepareCamera(camera2);
+    
+    for (const auto & dir : directionVec)
+    {
+        Vector3d dir2 = R21 * dir;
+        Vector3d plane = dir2.cross(t21n);
+        epipolar2Vec.emplace_back(computePolynomial(plane));
+    }
+    epipolar2Vec.emplace_back(epipolar2Vec.front());
+    
     if (verbosity > 1) cout << "    epipolar init time : " << timer.elapsed() << endl;
 }
 
@@ -110,8 +139,9 @@ int EnhancedEpipolar::index(Vector3d X) const
     }
 }
 
-void EnhancedEpipolar::computePolynomial(Vector3d plane, Polynomial2 & surf) const
+Polynomial2 EnhancedEpipolar::computePolynomial(Vector3d plane) const
 {
+    Polynomial2 surf;
     const double & A = plane[0];
     const double & B = plane[1];
     const double & C = plane[2];
@@ -144,16 +174,17 @@ void EnhancedEpipolar::computePolynomial(Vector3d plane, Polynomial2 & surf) con
                         + surf.kvv*epipole[1]*epipole[1] 
                         + surf.ku*epipole[0] + surf.kv*epipole[1]);
     }
+    return surf;
 }
 
-void EnhancedEpipolar::prepareCamera()
+void EnhancedEpipolar::prepareCamera(const EnhancedCamera & camera)
 {
-    alpha = camera2.params[0];
-    beta = camera2.params[1];
-    fu = camera2.params[2];
-    fv = camera2.params[3];
-    u0 = camera2.params[4];
-    v0 = camera2.params[5];
+    alpha = camera.params[0];
+    beta = camera.params[1];
+    fu = camera.params[2];
+    fv = camera.params[3];
+    u0 = camera.params[4];
+    v0 = camera.params[5];
     
     // intermediate variables
     gamma = 1 - alpha;

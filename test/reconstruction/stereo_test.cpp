@@ -99,6 +99,7 @@ int main(int argc, char** argv)
     Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
     
     StereoParameters stereoParams;
+    stereoParams.verbosity = 1;
     paramFile >> stereoParams.uMargin;
     paramFile >> stereoParams.vMargin;
     paramFile >> stereoParams.dispMax;
@@ -164,7 +165,7 @@ int main(int argc, char** argv)
     
     imshow("out1", out1);
     imshow("out2", out2);
-    imshow("res", res);
+    imshow("res", res*3);
     waitKey(); 
     return 0;
 }

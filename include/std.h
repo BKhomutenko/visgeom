@@ -34,6 +34,8 @@ using std::array;
 // Algorithms
 using std::copy;
 using std::sort;
+using std::fill;
+using std::accumulate;
 
 // Math
 using std::min;

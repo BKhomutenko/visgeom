@@ -88,6 +88,7 @@ int main(int argc, char** argv)
     Transformation<double> TbasePlane(cameraPose.data());
     
     StereoParameters stereoParams;
+    stereoParams.verbosity = 2;
     paramFile >> stereoParams.uMargin;
     paramFile >> stereoParams.vMargin;
     paramFile >> stereoParams.dispMax;

@@ -74,17 +74,40 @@ struct StereoParameters
     int vDisp(double v) { return round((v - v0) / scale); }
     
     // from small disparity to image coordiante transform    
-    double uImg(int u) { return u * scale + u0; }
-    double vImg(int v) { return v * scale + v0; }
+    int uImg(int u) { return u * scale + u0; }
+    int vImg(int v) { return v * scale + v0; }
     
     // from small disparity to image block corner transform 
 //    int uCorner(int u) { return u * scale + u0; }
 //    int vCorner(int v) { return v * scale + v0; }
 };
 
+//TODO bring it away
+const std::array<int32_t, 3> KERNEL_3 = {1, 2, 1};
+const std::array<int32_t, 5> KERNEL_5 = {1, 4, 6, 4, 1};
+const std::array<int32_t, 7> KERNEL_7 = {1, 6, 15, 20, 15, 6, 1};
+const std::array<int32_t, 9> KERNEL_9 = {1, 8, 28, 56, 70, 56, 28, 8, 1};
+
+const std::array<int32_t, 3> WAVE_3 = {1, -2, 1};
+const std::array<int32_t, 5> WAVE_5 = {1, -4, 6, -4, 1};
+const std::array<int32_t, 7> WAVE_7 = {1, -6, 15, -20, 15, -6, 1};
+const std::array<int32_t, 9> WAVE_9 = {1, -8, 28, -56, 70, -56, 28, -8, 1};
+
+const int NORMALIZER_3 = 4;
+const int NORMALIZER_5 = 16;
+const int NORMALIZER_7 = 64;
+const int NORMALIZER_9 = 256;
+
+const int WAVE_NORM_3 = 2;
+const int WAVE_NORM_5 = 8;
+const int WAVE_NORM_7 = 30;
+const int WAVE_NORM_9 = 90;
+    
 class EnhancedStereo
 {
 public:
+    enum CameraIdx {CAMERA_1, CAMERA_2};
+    
     EnhancedStereo(Transformation<double> T12,
             const double * params1, const double * params2, const StereoParameters & stereoParams) :
             // initialize members
@@ -92,7 +115,7 @@ public:
             cam1(stereoParams.imageWidth, stereoParams.imageHeight, params1),
             cam2(stereoParams.imageWidth, stereoParams.imageHeight, params2),
             params(stereoParams),
-            epipolar(T12, params2, 2500)
+            epipolar(T12, params1, params2, 2500)
     { 
         params.init();
         init(); 
@@ -145,8 +168,9 @@ public:
     // calculate the coefficients of the polynomials for all the 
     void computeEpipolarIndices();
     
+    // TODO remove from this class
     // draws an epipolar line  on the right image that corresponds to (x, y) on the left image
-    void traceEpipolarLine(int x, int y, Mat8u & out);
+    void traceEpipolarLine(int x, int y, Mat8u & out, CameraIdx camIdx);
     
     
     //// DYNAMIC PROGRAMMING
@@ -182,12 +206,13 @@ public:
     //// MISCELLANEOUS
     
     // index of an object in a linear array corresponding to pixel [row, col] 
-    int getLinearIndex(int u, int v) { return params.dispWidth*v + u; }
+    int getLinearIndex(int x, int y) { return params.dispWidth*y + x; }
       
-    CurveRasterizer<int, Polynomial2> getCurveRasteriser(int idx);
+    CurveRasterizer<int, Polynomial2> getCurveRasteriser1(int idx);
+    CurveRasterizer<int, Polynomial2> getCurveRasteriser2(int idx);
     
     // reconstruction
-    bool triangulate(double x1, double y1, double x2, double y2, Vector3d & X);
+    bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X);
     void computeDistance(Mat32f & distanceMat);
     
     //TODO put generatePlane elsewhere
@@ -198,29 +223,34 @@ public:
     void generatePlane(Transformation<double> TcameraPlane, 
             DepthMap & distance, const Vector3dVec & polygonVec);
             
-    double computeDistance(int u, int v);
-private:
+    double computeDistance(int x, int y);
+    bool computeDistance(int x, int y, double & dist, double & sigma);
     
+private:
     EnhancedEpipolar epipolar;
     
     Transformation<double> Transform12;  // pose of camera 2 wrt camera 1
     EnhancedCamera cam1, cam2;
    
+    std::vector<bool> maskVec;
+    
     Vector2dVec pointVec1;  // the depth points on the image 1
     Vector3dVec reconstVec;  // reconstruction of every pixel by cam1
     Vector3dVec reconstRotVec;  // reconstVec rotated into the second frame
     
-    Eigen::Vector2d epipole;  // projection of the first camera center onto the second camera
+    bool epipoleInverted1, epipoleInverted2;
+    Vector2d epipole1, epipole2;  // projection of the first camera center onto the second camera
     Vector2dVec pinfVec;  // projection of reconstRotVec by cam2
     Vector2dVec epipolarDirectionVec;  // direction of the epipolar lines on the first image
     
     // discretized version
-    Vector2i epipolePx;  
+    Vector2iVec pointPxVec1;
+    Vector2i epipolePx1, epipolePx2;  
     Vector2iVec pinfPxVec;
     
     Mat8u errorBuffer;
-    cv::Mat_<int> tableauLeft, tableauRight;
-    cv::Mat_<int> tableauTop, tableauBottom;
+    Mat32s tableauLeft, tableauRight; //FIXME check the type through the code
+    Mat32s tableauTop, tableauBottom;
     Mat8u smallDisparity;
     
     StereoParameters params;

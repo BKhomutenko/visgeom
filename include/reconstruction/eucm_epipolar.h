@@ -31,10 +31,11 @@ Semi-global block matching algorithm for non-rectified images
 class EnhancedEpipolar
 {
 public:
-    EnhancedEpipolar(Transformation<double> T12,
+    EnhancedEpipolar(Transformation<double> T12, const double * params1,
         const double * params2, const int numberSteps, int verbosity = 0) :
         // initialize the members
         Transform12(T12),
+        camera1(params1),
         camera2(params2),
         step(4. / numberSteps),
         nSteps(numberSteps),
@@ -43,14 +44,16 @@ public:
         initialize();
     }
     
-    const Polynomial2 & getCurve(Vector3d X) const { return epipolarVec[index(X)]; }
+    const Polynomial2 & getFirst(Vector3d X) const { return epipolar1Vec[index(X)]; }
+    
+    const Polynomial2 & getSecond(Vector3d X) const { return epipolar2Vec[index(X)]; }
     
     void initialize();
     
 private:
     
-    void prepareCamera();
-    void computePolynomial(Vector3d plane, Polynomial2 & surf) const;
+    void prepareCamera(const EnhancedCamera & camera);
+    Polynomial2 computePolynomial(Vector3d plane) const;
     int index(Vector3d X) const;
     
     // variables for the epipolar computations
@@ -74,7 +77,7 @@ private:
     
     // pose of the first to the second camera
     Transformation<double> Transform12;  
-    EnhancedCamera camera2;
+    EnhancedCamera camera1, camera2;
    
     // total number of plains
     // must be even
@@ -87,8 +90,10 @@ private:
     Vector3d xBase, yBase, zBase;
     
     // the epipolar curves represented by polynomial functions
-    // epipolarVec[0] corresponds to base rotated about t by -pi/2
-    std::vector<Polynomial2> epipolarVec;  
+    // for both cameras
+    // epipolar1Vec[0] corresponds to base rotated about t by -pi/2
+    std::vector<Polynomial2> epipolar2Vec;
+    std::vector<Polynomial2> epipolar1Vec;
     
     int verbosity;
 };

@@ -102,8 +102,6 @@ public:
     double & sigma(int idx);
     const double & sigma(int idx) const;
     
-    
-    
     // image coordinates of depth points
     int u(int x) const;
     int v(int y) const;

@@ -159,7 +159,7 @@ struct CurveRasterizer
     T x, y;
     Surface surf; 
     
-    CurveRasterizer(T x, T y, T ex, T ey, const Surface & surf) :
+    CurveRasterizer(const T x, const T y, const T ex, const T ey, const Surface & surf) :
             x(x), y(y), surf(surf)
     {
         fx = surf.gradx(x, y);
@@ -169,7 +169,7 @@ struct CurveRasterizer
         else eps = -1;
     }
     
-    CurveRasterizer(Vector2<T> pt, Vector2<T> epipole, const Surface & surf) :
+    CurveRasterizer(const Vector2<T> pt, const Vector2<T> epipole, const Surface & surf) :
             x(pt[0]), y(pt[1]), surf(surf)
     {
         fx = surf.gradx(x, y);
@@ -177,6 +177,11 @@ struct CurveRasterizer
         delta = surf(x, y);
         if (fx*(epipole[1] - y) - fy*(epipole[0] - x) > 0) eps = 1;
         else eps = -1;
+    }
+    
+    void setStep(int step)
+    {
+        eps *= step;
     }
     
     void moveX(int dx)

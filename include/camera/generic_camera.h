@@ -20,6 +20,7 @@ Abstract camera class
 */
 #pragma once
 
+#include "std.h"
 #include "eigen.h"
 #include "geometry/geometry.h"
 
@@ -61,6 +62,19 @@ public:
         return res;
     }
     
+    bool reconstructPointCloud(const Vector2dVec & src,
+            Vector3dVec & dst, std::vector<bool> & maskVec) const
+    {
+        dst.resize(src.size());
+        maskVec.resize(src.size());
+        bool res = true;
+        for (int i = 0; i < src.size(); i++)
+        {
+            maskVec[i] = reconstructPoint(src[i], dst[i]);
+        }  
+        return accumulate(maskVec.begin(), maskVec.end(), true, std::logical_and<bool>());
+    }
+    
     bool projectPointCloud(const Vector3dVec & src, Vector2dVec & dst) const
     {
         dst.resize(src.size());
@@ -70,6 +84,19 @@ public:
             res &= projectPoint(src[i], dst[i]);
         }  
         return res;
+    }
+    
+    bool projectPointCloud(const Vector3dVec & src,
+            Vector2dVec & dst, std::vector<bool> & maskVec) const
+    {
+        dst.resize(src.size());
+        maskVec.resize(src.size());
+        bool res = true;
+        for (int i = 0; i < src.size(); i++)
+        {
+            maskVec[i] = projectPoint(src[i], dst[i]);
+        }  
+        return accumulate(maskVec.begin(), maskVec.end(), true, std::logical_and<bool>());
     }
 };
 
