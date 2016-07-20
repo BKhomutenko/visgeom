@@ -124,20 +124,17 @@ int main(int argc, char** argv)
         Mat8u img2 = imread(imageDir + imageName, 0);
         EnhancedStereo stereo(TleftRight, params.data(), params.data(), stereoParams);
 
-        Mat8u res;
+        Mat32f distMat;
         auto t2 = clock();
-        stereo.comuteStereo(img1, img2, res);
+        stereo.comuteStereo(img1, img2, distMat);
         auto t3 = clock();
 //        cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
-        Mat32f distMat;
         Mat32f planeMat;
-        stereo.computeDistance(distMat);
         Transformation<double> T0Camera = T01.compose(TbaseCamera);
         stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), planeMat,
          Vector3dVec{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
                           Vector3d(-0.1 + 3 * 0.45, 0.5, 0), Vector3d(-0.1, 0.5, 0) } );
         imshow("dist" + to_string(counter) , distMat/2);
-        imshow("disp" + to_string(counter) , res*4);
         imshow("plane" , planeMat/2);
         imwrite("/home/bogdan/projects/plane.png", planeMat);
         double err = 0;

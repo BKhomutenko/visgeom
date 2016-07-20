@@ -102,16 +102,13 @@ int main(int argc, char** argv)
         Transformation<double> T01(robotPose1.data()), T02(robotPose2.data());
         Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         
-        
         Mat8u img2 = imread(imageDir + imageName, 0);
 
         EnhancedStereo stereo(TleftRight, params.data(), params.data(), stereoParams);
 
-        Mat8u res;
         Mat32f depth;
         auto t2 = clock();
-        stereo.comuteStereo(img1, img2, res);
-        stereo.computeDistance(depth);
+        stereo.comuteStereo(img1, img2, depth);
         auto t3 = clock();
         cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
         imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);

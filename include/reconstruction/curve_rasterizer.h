@@ -34,21 +34,21 @@ struct Polynomial2
 //    Polynomial2(const std::array<double, 6> & coeffs) : coeffArr(coeffs) {}
 //    std::array<double, 6> coeffArr;
     double kuu, kuv, kvv, ku, kv, k1;
-    double operator() (int x, int y) const
+    double operator() (int u, int v) const
     {
-        return (kuu*x + kuv*y + ku)*x 
-                + (kvv*y + kv)*y 
+        return (kuu*u + kuv*v + ku)*u 
+                + (kvv*v + kv)*v 
                 + k1;
     }
     
-    double gradx(int x, int y) const
+    double gradu(int u, int v) const
     {
-        return 2*kuu*x + kuv*y + ku;
+        return 2*kuu*u + kuv*v + ku;
     }
     
-    double grady(int x, int y) const
+    double gradv(int u, int v) const
     {
-        return kuv*x + 2*kvv*y + + kv;
+        return kuv*u + 2*kvv*v + + kv;
     }
     
 };
@@ -154,28 +154,28 @@ template<typename T, class Surface>
 struct CurveRasterizer
 {
     double delta;
-    double fx, fy;
+    double fu, fv;
     int eps;
-    T x, y;
+    T u, v;
     Surface surf; 
     
-    CurveRasterizer(const T x, const T y, const T ex, const T ey, const Surface & surf) :
-            x(x), y(y), surf(surf)
+    CurveRasterizer(const T u, const T v, const T eu, const T ev, const Surface & surf) :
+            u(u), v(v), surf(surf)
     {
-        fx = surf.gradx(x, y);
-        fy = surf.grady(x, y);
-        delta = surf(x, y);
-        if (fx*(ey - y) - fy*(ex - x) > 0) eps = 1;
+        fu = surf.gradu(u, v);
+        fv = surf.gradv(u, v);
+        delta = surf(u, v);
+        if (fu*(ev - v) - fv*(eu - u) > 0) eps = 1;
         else eps = -1;
     }
     
     CurveRasterizer(const Vector2<T> pt, const Vector2<T> epipole, const Surface & surf) :
-            x(pt[0]), y(pt[1]), surf(surf)
+            u(pt[0]), v(pt[1]), surf(surf)
     {
-        fx = surf.gradx(x, y);
-        fy = surf.grady(x, y);
-        delta = surf(x, y);
-        if (fx*(epipole[1] - y) - fy*(epipole[0] - x) > 0) eps = 1;
+        fu = surf.gradu(u, v);
+        fv = surf.gradv(u, v);
+        delta = surf(u, v);
+        if (fu*(epipole[1] - v) - fv*(epipole[0] - u) > 0) eps = 1;
         else eps = -1;
     }
     
@@ -184,51 +184,51 @@ struct CurveRasterizer
         eps *= step;
     }
     
-    void moveX(int dx)
+    void moveU(int du)
     {
-        if (dx == 0) return;
-        x += dx;
-        double fx2 = surf.gradx(x, y);
-        delta += 0.5*dx*(fx + fx2);
-        fx = fx2;
-        fy = surf.grady(x, y); 
+        if (du == 0) return;
+        u += du;
+        double fu2 = surf.gradu(u, v);
+        delta += 0.5*du*(fu + fu2);
+        fu = fu2;
+        fv = surf.gradv(u, v); 
     }
     
-    void moveY(int dy)
+    void moveV(int dv)
     {
-        if (dy == 0) return;
-        y += dy;
-        double fy2 = surf.grady(x, y);
-        delta += 0.5*dy*(fy + fy2);
-        fy = fy2;
-        fx = surf.gradx(x, y); 
+        if (dv == 0) return;
+        v += dv;
+        double fv2 = surf.gradv(u, v);
+        delta += 0.5*dv*(fv + fv2);
+        fv = fv2;
+        fu = surf.gradu(u, v); 
     }
     
     void step()
     {
-        if (abs(fx) > abs(fy))  // go along y
+        if (abs(fu) > abs(fv))  // go along y
         {
-            moveY(eps*sign(fx));
-            moveX(-round(delta/fx));
+            moveV(eps*sign(fu));
+            moveU(-round(delta/fu));
         }   
         else  // go along x
         {
-            moveX(-eps*sign(fy));
-            moveY(-round(delta/fy));
+            moveU(-eps*sign(fv));
+            moveV(-round(delta/fv));
         }
     }
     
     void unstep()
     {
-        if (abs(fx) > abs(fy))  // go along y
+        if (abs(fu) > abs(fv))  // go along y
         {
-            moveY(-eps*sign(fx));
-            moveX(-round(delta/fx));
+            moveV(-eps*sign(fu));
+            moveU(-round(delta/fu));
         }   
         else  // go along x
         {
-            moveX(eps*sign(fy));
-            moveY(-round(delta/fy));
+            moveU(eps*sign(fv));
+            moveV(-round(delta/fv));
         }
     }
     

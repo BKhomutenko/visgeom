@@ -19,7 +19,6 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 /*
 Depth container
 NOTE:
-TODO change it to a more developed convention
 (u, v) is an image point 
 (x, y) is a depth map point 
 */

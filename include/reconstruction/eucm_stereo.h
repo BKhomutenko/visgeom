@@ -18,6 +18,9 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 /*
 Semi-global block matching algorithm for non-rectified images
+NOTE:
+(u, v) is an image point 
+(x, y) is a depth map point 
 */
 
 #pragma once
@@ -44,11 +47,11 @@ struct StereoParameters
     int maxBias = 10;
     
     int verbosity = 0;
-    int maxDistance = 100;
+    int maxDepth = 100;
     // precomputed parameters
     int u0, v0;
     int uMax, vMax;
-    int dispWidth, dispHeight;
+    int xMax, yMax;
     int halfBlockSize;
     
     // to be called before using
@@ -63,19 +66,19 @@ struct StereoParameters
         if (height > 0) vMax = v0 + height;
         else vMax = imageHeight - vMargin - scale;
         
-        dispWidth = uDisp(uMax) + 1;
-        dispHeight = vDisp(vMax) + 1;
+        xMax = x(uMax) + 1;
+        yMax = y(vMax) + 1;
         
         halfBlockSize =  scale / 2; 
     }
     
     // from image to small disparity coordiante transform
-    int uDisp(double u) { return round((u - u0) / scale); }
-    int vDisp(double v) { return round((v - v0) / scale); }
+    int x(double u) { return round((u - u0) / scale); }
+    int y(double v) { return round((v - v0) / scale); }
     
     // from small disparity to image coordiante transform    
-    int uImg(int u) { return u * scale + u0; }
-    int vImg(int v) { return v * scale + v0; }
+    int u(int x) { return x * scale + u0; }
+    int v(int y) { return y * scale + v0; }
     
     // from small disparity to image block corner transform 
 //    int uCorner(int u) { return u * scale + u0; }
@@ -114,8 +117,8 @@ public:
             const double * params1, const double * params2, const StereoParameters & stereoParams) :
             // initialize members
             Transform12(T12), 
-            cam1(stereoParams.imageWidth, stereoParams.imageHeight, params1),
-            cam2(stereoParams.imageWidth, stereoParams.imageHeight, params2),
+            cam1(params1),
+            cam2(params2),
             params(stereoParams),
             epipolar(T12, params1, params2, 2500)
     { 
@@ -142,11 +145,16 @@ public:
     // Only data invalidated after the transformation change are recomputed
     void initAfterTransformation()
     {
-        computeEpipolarDirections();
         computeEpipole();
         computeRotated();
         computePinf();
     }
+    
+    // An interface function
+    void comuteStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depthMap);
+    
+    // An interface function
+    void comuteStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat);
     
     //// EPIPOLAR GEOMETRY
     
@@ -155,12 +163,7 @@ public:
     
     // computes reconstRotVec -- reconstVec rotated into the second frame
     void computeRotated();
-    
-    
-    // computes epipolarDirectionVec -- computed by shifting the reconstructed points in the direction 
-    // of motion infinitesimally and projecting them back
-    void computeEpipolarDirections();
-    
+       
     // f2(t21) -- projection of the first camera's projection center
     void computeEpipole();
     
@@ -173,27 +176,11 @@ public:
     
     // TODO remove from this class
     // draws an epipolar line  on the right image that corresponds to (x, y) on the left image
-    void traceEpipolarLine(int x, int y, Mat8u & out, CameraIdx camIdx);
-    
+    void traceEpipolarLine(int u, int v, Mat8u & out, CameraIdx camIdx);
     
     //// DYNAMIC PROGRAMMING
-    
-    // fills up the output with photometric errors between the val = I1(pi) and 
-    // the values from I2 on the epipolar curve
-    void comuteStereo(const Mat8u & img1, 
-            const Mat8u & img2,
-            Mat8u & disparity);
-    
-    //TODO compute the uncertainty
-    void comuteStereo(const Mat8u & img1, 
-            const Mat8u & img2,
-            DepthMap & disparity);
-            
     void createBuffer();
-    
-    // fill up the error buffer using SxS blocks as local desctiprtors
-    void computeCost(const Mat8u & img1, const Mat8u & img2);
-    
+       
     // fill up the error buffer using 2*S-1 pixs along epipolar lines as local desctiprtors
     void computeCurveCost(const Mat8u & img1, const Mat8u & img2);
     
@@ -209,14 +196,14 @@ public:
     //// MISCELLANEOUS
     
     // index of an object in a linear array corresponding to pixel [row, col] 
-    int getLinearIndex(int x, int y) { return params.dispWidth*y + x; }
+    int getLinearIndex(int x, int y) { return params.xMax*y + x; }
       
     CurveRasterizer<int, Polynomial2> getCurveRasteriser1(int idx);
     CurveRasterizer<int, Polynomial2> getCurveRasteriser2(int idx);
     
     // reconstruction
     bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X);
-    void computeDistance(Mat32f & distanceMat);
+    void computeDepth(Mat32f & distanceMat);
     
     //TODO put generatePlane elsewhere
     void generatePlane(Transformation<double> TcameraPlane, 
@@ -226,8 +213,8 @@ public:
     void generatePlane(Transformation<double> TcameraPlane, 
             DepthMap & distance, const Vector3dVec & polygonVec);
             
-    double computeDistance(int x, int y);
-    bool computeDistance(int x, int y, double & dist, double & sigma);
+    double computeDepth(int x, int y);
+    bool computeDepth(int x, int y, double & dist, double & sigma);
     
 private:
     EnhancedEpipolar epipolar;
@@ -244,7 +231,6 @@ private:
     bool epipoleInverted1, epipoleInverted2;
     Vector2d epipole1, epipole2;  // projection of the first camera center onto the second camera
     Vector2dVec pinfVec;  // projection of reconstRotVec by cam2
-    Vector2dVec epipolarDirectionVec;  // direction of the epipolar lines on the first image
     
     // discretized version
     Vector2iVec pointPxVec1;
