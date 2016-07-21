@@ -23,34 +23,32 @@ Semi-global block matching algorithm for non-rectified images
 #include "io.h"
 #include "ocv.h"
 #include "eigen.h"
-
+#include "filter.h"
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
+#include "reconstruction/eucm_motion_stereo.h"
 #include "reconstruction/eucm_stereo.h"
 #include "reconstruction/depth_map.h"
 
 void EnhancedStereo::computeEpipole()
 {
-    if (not cam1.projectPoint(Transform12.trans(), epipole1))
+    if (not camera1->projectPoint(Transform12.trans(), epipole1))
     {
-        cam1.projectPoint(-Transform12.trans(), epipole1);
+        camera1->projectPoint(-Transform12.trans(), epipole1);
         epipoleInverted1 = true;
     }
     else epipoleInverted1 = false;
     
-    if (not cam2.projectPoint(Transform12.transInv(), epipole2))
+    if (not camera2->projectPoint(Transform12.transInv(), epipole2))
     {
-        cam2.projectPoint(-Transform12.transInv(), epipole2);
+        camera2->projectPoint(-Transform12.transInv(), epipole2);
         epipoleInverted2 = false;
     }
     else epipoleInverted2 = false;
     
-    for (int i = 0; i < 2; i++)
-    {
-        epipolePx1[i] = round(epipole1[i]);
-        epipolePx2[i] = round(epipole2[i]);
-    }
+    epipolePx1 = round(epipole1);
+    epipolePx2 = round(epipole2);
     
 }
 
@@ -83,7 +81,7 @@ void EnhancedStereo::computeReconstructed()
             pointPxVec1.emplace_back(params.u(x), params.v(y));
         }
     }
-    cam1.reconstructPointCloud(pointVec1, reconstVec, maskVec);
+    camera1->reconstructPointCloud(pointVec1, reconstVec, maskVec);
 }
 
 void EnhancedStereo::computeRotated()
@@ -93,13 +91,12 @@ void EnhancedStereo::computeRotated()
 
 void EnhancedStereo::computePinf()
 {
-    cam2.projectPointCloud(reconstRotVec, pinfVec);
+    camera2->projectPointCloud(reconstRotVec, pinfVec);
     pinfPxVec.resize(pinfVec.size());
     for (int i = 0; i < pinfVec.size(); i++)
     {
         if (not maskVec[i]) continue;
-        pinfPxVec[i][0] = round(pinfVec[i][0]);
-        pinfPxVec[i][1] = round(pinfVec[i][1]);
+        pinfPxVec[i] = round(pinfVec[i]);
     }
 }
 
@@ -177,7 +174,7 @@ void EnhancedStereo::comuteStereo(const Mat8u & img1, const Mat8u & img2, DepthM
     computeCurveCost(img1, img2);
     computeDynamicProgramming();
     reconstructDisparity();
-    depth = DepthMap(&cam1, params.yMax, params.xMax,
+    depth = DepthMap(camera1, params.yMax, params.xMax,
             params.u0, params.v0, params.scale);
     for (int y = 0; y < params.yMax; y++)
     {
@@ -267,12 +264,8 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 descriptor[i] = img1(descRaster.v, descRaster.u);
             }
             CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
-            int descAcc = 0;
-            for (int i = 0, k = 1; i < LENGTH; i++)
-            {
-                descAcc += waveVec[i] *  descriptor[i];
-            }
-            if (abs(descAcc) < WAVE_NORM) //TODO check the constant
+            int descResp = filter(waveVec.begin(), waveVec.end(), descriptor.begin(), 0);
+            if (abs(descResp) < WAVE_NORM) //TODO check the constant
             {
                 
                 raster.setStep(2);  
@@ -490,8 +483,8 @@ bool EnhancedStereo::triangulate(double x1, double y1, double x2, double y2, Vec
     if (params.verbosity > 3) cout << "EnhancedStereo::triangulate" << endl;
     //Vector3d v1n = v1 / v1.norm(), v2n = v2 / v2.norm();
     Vector3d v1, v2;
-    if (not cam1.reconstructPoint(Vector2d(x1, y1), v1) or 
-        not cam2.reconstructPoint(Vector2d(x2, y2), v2) )
+    if (not camera1->reconstructPoint(Vector2d(x1, y1), v1) or 
+        not camera2->reconstructPoint(Vector2d(x2, y2), v2) )
     {
         if (params.verbosity > 2) 
         {
@@ -642,7 +635,7 @@ void EnhancedStereo::generatePlane(Transformation<double> TcameraPlane,
         {
             distanceMat(y, x) = 0;
             Vector3d vec; // the direction vector
-            if (not cam1.reconstructPoint(Vector2d(params.u(x), params.v(y)), vec)) continue;
+            if (not camera1->reconstructPoint(Vector2d(params.u(x), params.v(y)), vec)) continue;
             double zvec = z.dot(vec);
             if (zvec < 1e-3) 
             {
@@ -672,7 +665,7 @@ void EnhancedStereo::generatePlane(Transformation<double> TcameraPlane,
         DepthMap & depth, const Vector3dVec & polygonVec)
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::generatePlane" << endl;
-    depth = DepthMap(&cam1, params.xMax, params.yMax, params.u0, params.v0, params.scale);
+    depth = DepthMap(camera1, params.xMax, params.yMax, params.u0, params.v0, params.scale);
     Vector3d t = TcameraPlane.trans();
     Vector3d z = TcameraPlane.rotMat().col(2);
     Vector3dVec polygonCamVec;
@@ -683,7 +676,7 @@ void EnhancedStereo::generatePlane(Transformation<double> TcameraPlane,
         {
             depth.at(u, v) = 0;
             Vector3d vec; // the direction vector
-            if (not cam1.reconstructPoint(Vector2d(params.u(u), params.v(v)), vec)) continue;
+            if (not camera1->reconstructPoint(Vector2d(params.u(u), params.v(v)), vec)) continue;
             double zvec = z.dot(vec);
             if (zvec < 1e-3) 
             {

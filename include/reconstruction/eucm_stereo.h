@@ -85,48 +85,34 @@ struct StereoParameters
 //    int vCorner(int v) { return v * scale + v0; }
 };
 
-//TODO bring it away
-const std::array<int32_t, 3> KERNEL_3 = {2, 3, 2};
-const std::array<int32_t, 5> KERNEL_5 = {2, 4, 5, 4, 2};
-const std::array<int32_t, 7> KERNEL_7 = {2, 3, 4, 5, 4, 3, 2};
-const std::array<int32_t, 9> KERNEL_9 = {2, 3, 4, 4, 5, 4, 4, 3, 2};
-
-
-//TODO change filters
-const std::array<int32_t, 3> WAVE_3 = {1, -2, 1};
-const std::array<int32_t, 5> WAVE_5 = {1, -4, 6, -4, 1};
-const std::array<int32_t, 7> WAVE_7 = {1, -6, 15, -20, 15, -6, 1};
-const std::array<int32_t, 9> WAVE_9 = {1, -8, 28, -56, 70, -56, 28, -8, 1};
-
-const int NORMALIZER_3 = 7;
-const int NORMALIZER_5 = 17;
-const int NORMALIZER_7 = 23;
-const int NORMALIZER_9 = 31;
-
-const int WAVE_NORM_3 = 2;
-const int WAVE_NORM_5 = 8;
-const int WAVE_NORM_7 = 30;
-const int WAVE_NORM_9 = 90;
-    
 class EnhancedStereo
 {
 public:
     enum CameraIdx {CAMERA_1, CAMERA_2};
     
-    EnhancedStereo(Transformation<double> T12,
-            const double * params1, const double * params2, const StereoParameters & stereoParams) :
+    EnhancedStereo(Transformation<double> T12, const EnhancedCamera * cam1,
+            const EnhancedCamera * cam2, const StereoParameters & stereoParams) :
             // initialize members
             Transform12(T12), 
-            cam1(params1),
-            cam2(params2),
+            camera1(cam1->clone()),
+            camera2(cam2->clone()),
             params(stereoParams),
-            epipolar(T12, params1, params2, 2500)
+            epipolar(T12, cam1, cam2, 2500)
     { 
         assert(params.dispMax % 2 == 0);
         params.init();
         init(); 
     }
-
+    
+    ~EnhancedStereo()
+    {
+        delete camera1;
+        camera1 = NULL;
+        delete camera2;
+        camera2 = NULL;
+    }
+    
+    
     void setTransformation(Transformation<double> T12) 
     { 
         Transform12 = T12;
@@ -220,7 +206,7 @@ private:
     EnhancedEpipolar epipolar;
     
     Transformation<double> Transform12;  // pose of camera 2 wrt camera 1
-    EnhancedCamera cam1, cam2;
+    EnhancedCamera *camera1, *camera2;
    
     std::vector<bool> maskVec;
     

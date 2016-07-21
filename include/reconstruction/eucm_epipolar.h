@@ -31,17 +31,25 @@ Semi-global block matching algorithm for non-rectified images
 class EnhancedEpipolar
 {
 public:
-    EnhancedEpipolar(Transformation<double> T12, const double * params1,
-        const double * params2, const int numberSteps, int verbosity = 0) :
+    EnhancedEpipolar(Transformation<double> T12, const EnhancedCamera * cam1,
+            const EnhancedCamera * cam2, const int numberSteps, int verbosity = 0) :
         // initialize the members
         Transform12(T12),
-        camera1(params1),
-        camera2(params2),
+        camera1(cam1->clone()),
+        camera2(cam2->clone()),
         step(4. / numberSteps),
         nSteps(numberSteps),
         verbosity(verbosity)
     {
         initialize();
+    }
+    
+    ~EnhancedEpipolar()
+    {
+        delete camera1;
+        camera1 = NULL;
+        delete camera2;
+        camera2 = NULL;
     }
     
     const Polynomial2 & getFirst(Vector3d X) const { return epipolar1Vec[index(X)]; }
@@ -52,7 +60,7 @@ public:
     
 private:
     
-    void prepareCamera(const EnhancedCamera & camera);
+    void prepareCamera(const EnhancedCamera * camera);
     Polynomial2 computePolynomial(Vector3d plane) const;
     int index(Vector3d X) const;
     
@@ -77,7 +85,7 @@ private:
     
     // pose of the first to the second camera
     Transformation<double> Transform12;  
-    EnhancedCamera camera1, camera2;
+    EnhancedCamera *camera1, *camera2;
    
     // total number of plains
     // must be even

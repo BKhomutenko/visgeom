@@ -27,7 +27,7 @@ Scale space for multiscale optimization
 class BinaryScalSpace
 {
 public:
-    BinaryScalSpace(int numScales = 1, bool withGradient = true) : 
+    BinaryScalSpace(int numScales = 1, bool withGradient = false) : 
             activeScale(1), 
             activeScaleIdx(0), 
             gradientOn(withGradient)
@@ -43,7 +43,7 @@ public:
     
     void setGradient(bool val)
     {
-        gradientOn = val  ; 
+        gradientOn = val; 
     }
     
     void setNumberScales(int val)

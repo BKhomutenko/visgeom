@@ -22,8 +22,7 @@ Type definitions
 #pragma once
 
 // STL
-#include <vector>
-#include <array>
+#include "std.h"
 
 // Eigen
 #include <Eigen/Eigen>
@@ -46,15 +45,20 @@ using Eigen::Matrix3d;
 using Eigen::Vector2i;
 using Eigen::Map;
 
-// STL containers
-using std::vector;
-using std::array;
-
 template<typename T>
-using Vector3Vec = vector<Vector3<T>>;
+using Vector3Vec = std::vector<Vector3<T>>;
+template<typename T>
+using Vector2Vec = std::vector<Vector2<T>>;
 
-using Vector2dVec = vector<Vector2d>;
-using Vector3dVec = vector<Vector3d>;
+using Vector2dVec = std::vector<Vector2d>;
+using Vector3dVec = std::vector<Vector3d>;
 
-using Vector2iVec = vector<Vector2i>;
+using Vector2iVec = std::vector<Vector2i>;
+
+inline Vector2i round(const Vector2d & x)
+{
+    return Vector2i(round(x[0]), round(x[1]));
+}
+
+
 

@@ -109,7 +109,8 @@ int main(int argc, char** argv)
     Mat8u img1 = imread(imageDir + imageName, 0);
     stereoParams.imageWidth = img1.cols;
     stereoParams.imageHeight = img1.rows;
-
+    
+    EnhancedCamera camera(params.data());
     int counter = 2;
     while (getline(paramFile, imageInfo))
     {
@@ -122,7 +123,7 @@ int main(int argc, char** argv)
         Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         
         Mat8u img2 = imread(imageDir + imageName, 0);
-        EnhancedStereo stereo(TleftRight, params.data(), params.data(), stereoParams);
+        EnhancedStereo stereo(TleftRight, &camera, &camera, stereoParams);
 
         Mat32f distMat;
         auto t2 = clock();

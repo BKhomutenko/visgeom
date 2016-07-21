@@ -32,7 +32,6 @@ Relative camera pose estimation based on photometric error and depth map
 #include "localization/scale_space.h"
 #include "geometry/geometry.h"
 #include "camera/generic_camera.h"
-#include "camera/eucm.h"
 
 struct Grid2D
 {
@@ -259,22 +258,23 @@ struct PhotometricError
 class ScalePhotometric
 {
 public:
-    ScalePhotometric(int nScales, EnhancedCamera cam2) :
+    ScalePhotometric(int nScales, const ICamera * cam2) :
             scaleSpace1(nScales),
             scaleSpace2(nScales),
-            camPtr2(cam2.clone()),
+            camPtr2(cam2->clone()),
             verbosity(0) {}
             
     ScalePhotometric() : camPtr2(NULL) {}
     virtual ~ScalePhotometric()
     {
         delete camPtr2;
+        camPtr2 = NULL;
     }
     
-    void setCamera(const EnhancedCamera & cam)
+    void setCamera(const ICamera * cam)
     {
         delete camPtr2;
-        camPtr2 = cam.clone();
+        camPtr2 = cam->clone();
     }
     
     void setNumberScales(int numScales)
@@ -301,7 +301,7 @@ public:
 private:
     BinaryScalSpace scaleSpace1;
     BinaryScalSpace scaleSpace2;
-    EnhancedCamera * camPtr2;
+    ICamera * camPtr2;
     DepthMap depthMap;
     
     //TODO make a parameter structure

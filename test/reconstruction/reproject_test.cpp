@@ -37,23 +37,24 @@ int main(int argc, char** argv)
     stereoParams.scale = 3;
     
     Transformation<double> T01(0.7, 0.1, 0.5, 0.1, -0.3, 0.5);
-    Transformation<double> T0plane(-1, -1, 1.5, 0, 0, 0);
+    Transformation<double> T0plane(0, 0, 1.5, 0, 0, 0);
     stereoParams.imageWidth = COLS;
     stereoParams.imageHeight = ROWS;
     
+    EnhancedCamera camera(params.data());
     EnhancedStereo stereo(Transformation<double>(),
-                params.data(), params.data(), stereoParams);
+                &camera, &camera, stereoParams);
     
     
 //     Init the localizer
     DepthMap depth0, depth1;
     stereo.generatePlane(T0plane, depth0,
-         vector<Vector3d>{Vector3d(-1, -1, 0), Vector3d(0, -1, 0),
-                          Vector3d(1, 1, 0), Vector3d(-1, 1, 0) } );
+         vector<Vector3d>{Vector3d(-0.5, -0.5, 0), Vector3d(0.5, -0.5, 0),
+                          Vector3d(0.5, 0.5, 0), Vector3d(-0.5, 0.5, 0) } );
     
     stereo.generatePlane(T01.inverseCompose(T0plane), depth1,
-         vector<Vector3d>{Vector3d(-1, -1, 0), Vector3d(1, -1, 0),
-                          Vector3d(1, 1, 0), Vector3d(-1, 1, 0) } );
+         vector<Vector3d>{Vector3d(-0.5, -0.5, 0), Vector3d(0.5, -0.5, 0),
+                          Vector3d(0.5, 0.5, 0), Vector3d(-0.5, 0.5, 0) } );
     
     DepthMap depth1wrap;
      

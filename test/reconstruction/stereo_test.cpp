@@ -131,7 +131,8 @@ int main(int argc, char** argv)
 ////    
     
     Timer timer;
-    EnhancedStereo stereo(TleftRight, params1.data(), params2.data(), stereoParams);
+    EnhancedCamera camera1(params1.data()), camera2(params2.data());
+    EnhancedStereo stereo(TleftRight, &camera1, &camera2, stereoParams);
     cout << "    initialization time : " << timer.elapsed() << endl;
     Mat8u out1, out2;
     

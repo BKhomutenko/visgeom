@@ -27,7 +27,7 @@ Abstract camera class
 class ICamera
 {
 public:
-    std::vector<double> params;
+    
     int width, height;
 
     /// takes raw image points and apply undistortion model to them
@@ -98,6 +98,11 @@ public:
         }  
         return accumulate(maskVec.begin(), maskVec.end(), true, std::logical_and<bool>());
     }
+    
+    const double * getParams() const { return params.data(); }
+    
+protected:
+    std::vector<double> params;
 };
 
 

@@ -15,7 +15,6 @@ You should have received a copy of the GNU General Public License
 along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
-
 /*
 Depth container
 NOTE:
@@ -61,29 +60,46 @@ public:
         cameraPtr = NULL;
     }
     
-    DepthMap operator = (const DepthMap & other)
+    DepthMap & operator = (const DepthMap & other)
     {
-        cameraPtr = other.cameraPtr->clone();
-        width = other.width;
-        height = other.height;
-        u0 = other.u0;
-        v0 = other.v0;
-        scale = other.scale;
-        valVec = other.valVec;
-        sigmaVec = other.sigmaVec;
+        if (this != &other)
+        {
+            delete cameraPtr;
+            cameraPtr = other.cameraPtr->clone();
+            width = other.width;
+            height = other.height;
+            u0 = other.u0;
+            v0 = other.v0;
+            scale = other.scale;
+            valVec = other.valVec;
+            sigmaVec = other.sigmaVec;
+        }
         return *this;
+    }
+    
+    void setDefault()
+    {
+        setTo(DEFAULT_DEPTH, DEFAULT_SIGMA_DEPTH);
+    }
+    
+    void setTo(double val, double sigmaVal)
+    {
+        fill(valVec.begin(), valVec.end(), val);
+        fill(sigmaVec.begin(), sigmaVec.end(), sigmaVal);
     }
     
     //check the limits
     bool isValid(int x, int y) const;
     
     // nearest neighbor interpolation
-    double nearest(int u, int v) const;
-    double nearest(Vector2d pt) const;
+    const double & nearest(int u, int v) const;
+    const double & nearest(Vector2d pt) const;
+    double & nearest(Vector2d pt);
     
     // nearest neighbor interpolation for the uncertainty
-    double nearestSigma(int u, int v) const;
-    double nearestSigma(Vector2d pt) const;
+    const double & nearestSigma(int u, int v) const;
+    const double & nearestSigma(Vector2d pt) const;
+    double & nearestSigma(Vector2d pt);
     
     // to access the elements directly
     double & at(int x, int y);
@@ -109,6 +125,11 @@ public:
     int x(int u) const;
     int y(int v) const;
     
+    void reconstructUncertainty(Vector2dVec & pointVec, 
+            Vector3dVec & minDistVec,
+            Vector3dVec & maxDistVec) const;
+    
+    //TODO change these interfaces:
     void reconstruct(Vector3dVec & result) const;
     void reconstruct(const vector<int> & indexVec, Vector3dVec & result) const;
     void reconstruct(const Vector2dVec & pointVec, Vector3dVec & result) const;
@@ -120,6 +141,7 @@ public:
 private:
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty
+    double foo; //to return in case of out-of-range 
     
     ICamera * cameraPtr;
     int width;

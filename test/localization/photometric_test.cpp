@@ -92,17 +92,20 @@ int main (int argc, char const* argv[])
     stereoParams.imageWidth = img1.cols;
     stereoParams.imageHeight = img1.rows;
     
+    // create a camera
+    EnhancedCamera camera(params.data());
+    
     // Init the distance map
     Transformation<double> T01(robotPose1.data());
     Transformation<double> T0Camera = T01.compose(TbaseCamera);
     EnhancedStereo stereo(Transformation<double>(),
-                params.data(), params.data(), stereoParams);
+                &camera, &camera, stereoParams);
     
     
 //     Init the localizer
     ScalePhotometric localizer;
     localizer.setVerbosity(0);
-    localizer.setCamera(EnhancedCamera(params.data()));
+    localizer.setCamera(&camera);
     localizer.setNumberScales(5);
     localizer.computeBaseScaleSpace(img1);
     stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), localizer.depth(),

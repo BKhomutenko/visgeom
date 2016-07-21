@@ -35,39 +35,56 @@ bool DepthMap::isValid(int x, int y) const
 }
 
 // nearest neighbor interpolation
-double DepthMap::nearest(int u, int v) const
+const double & DepthMap::nearest(int u, int v) const
 {
     int xd = x(u);
     int yd = y(v);
     if (isValid(xd, yd)) return at(xd, yd);
-    else return 0;
+    else return foo;
 }
 
 // nearest neighbor interpolation
-double DepthMap::nearest(Vector2d pt) const
+const double & DepthMap::nearest(Vector2d pt) const
 {
     int xd = x(pt[0]);
     int yd = y(pt[1]);
     if (isValid(xd, yd)) return at(xd, yd);
-    else return 0;
+    else return foo;
 }
 
+double & DepthMap::nearest(Vector2d pt)
+{
+    int xd = x(pt[0]);
+    int yd = y(pt[1]);
+    if (isValid(xd, yd)) return at(xd, yd);
+    else return foo;
+}
+
+
 // nearest neighbor interpolation
-double DepthMap::nearestSigma(int u, int v) const
+const double & DepthMap::nearestSigma(int u, int v) const
 {
     int xd = x(u);
     int yd = y(v);
     if (isValid(xd, yd)) return sigma(xd, yd);
-    else return 0;
+    else return foo;
 }
 
 // nearest neighbor interpolation
-double DepthMap::nearestSigma(Vector2d pt) const
+const double & DepthMap::nearestSigma(Vector2d pt) const
 {
     int xd = x(pt[0]);
     int yd = y(pt[1]);
     if (isValid(xd, yd)) return sigma(xd, yd);
-    else return 0;
+    else return foo;
+}
+
+double & DepthMap::nearestSigma(Vector2d pt)
+{
+    int xd = x(pt[0]);
+    int yd = y(pt[1]);
+    if (isValid(xd, yd)) return sigma(xd, yd);
+    else return foo;
 }
 
 // to access the elements directly
@@ -131,6 +148,47 @@ int DepthMap::y(int v) const
     return round(double(v - v0) / scale);
 }
 
+void DepthMap::reconstructUncertainty(Vector2dVec & pointVec, 
+            Vector3dVec & minDistVec, Vector3dVec & maxDistVec) const
+{
+    minDistVec.clear();
+    maxDistVec.clear();
+    pointVec.clear();
+    Vector2dVec pointBrutVec;
+    vector<double> minVec;
+    vector<double> maxVec;
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            double d = at(x, y);
+            if (d > 1e-4)
+            {
+                pointBrutVec.emplace_back(u(x), v(y));
+                double s = sigma(x, y);
+                // take d +- 2*sigma
+                minVec.push_back(max(0., d - 2*s));
+                maxVec.push_back(d + 2*s);
+            }
+        }
+    }
+    
+    Vector3dVec reconstBrutVec;
+    vector<bool> maskVec;
+    cameraPtr->reconstructPointCloud(pointBrutVec, reconstBrutVec, maskVec);
+    
+    for (int i = 0; i < reconstBrutVec.size(); i++)
+    {
+        if (maskVec[i])
+        {
+            Vector3d X = reconstBrutVec[i].normalized();
+            minDistVec.push_back(X*minVec[i]);
+            maxDistVec.push_back(X*maxVec[i]);
+            pointVec.push_back(pointBrutVec[i]);        
+        }
+    }
+}
+
 void DepthMap::reconstruct(Vector3dVec & result) const
 {
     Vector2dVec pointVec;
@@ -180,7 +238,7 @@ void DepthMap::project(const Vector3dVec & pointVec, Vector2dVec & result) const
     cameraPtr->projectPointCloud(pointVec, result);
 }
 
-//TODO do not reconstruct all thhe points but a selected subset
+//TODO do not reconstruct all the points but a selected subset
 // to avoid reconstruction of points with bad disparity
 void DepthReprojector::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
         const Transformation<double> T12, DepthMap& output)

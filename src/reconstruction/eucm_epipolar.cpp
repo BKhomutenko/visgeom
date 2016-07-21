@@ -57,10 +57,6 @@ void EnhancedEpipolar::initialize()
     // the last component of the basis
     yBase = zBase.cross(xBase);
     
-    
-    
-    
-    
     // prepare different directions
     Vector3dVec directionVec;
     for (int idx = 0; idx < nSteps; idx++)
@@ -81,9 +77,9 @@ void EnhancedEpipolar::initialize()
     
     // ## camera 1 ##
     // prepare reused variables
-    if (not camera1.projectPoint(zBase, epipole))
+    if (not camera1->projectPoint(zBase, epipole))
     {
-        camera1.projectPoint(-zBase, epipole);
+        camera1->projectPoint(-zBase, epipole);
     }
     prepareCamera(camera1);
     
@@ -101,9 +97,9 @@ void EnhancedEpipolar::initialize()
     Vector3d t21n = R21 * zBase;
     
     // prepare reused variables
-    if (not camera2.projectPoint(t21n, epipole))
+    if (not camera2->projectPoint(t21n, epipole))
     {
-        camera2.projectPoint(-t21n, epipole);
+        camera2->projectPoint(-t21n, epipole);
     }
     prepareCamera(camera2);
     
@@ -177,14 +173,15 @@ Polynomial2 EnhancedEpipolar::computePolynomial(Vector3d plane) const
     return surf;
 }
 
-void EnhancedEpipolar::prepareCamera(const EnhancedCamera & camera)
+void EnhancedEpipolar::prepareCamera(const EnhancedCamera * camera)
 {
-    alpha = camera.params[0];
-    beta = camera.params[1];
-    fu = camera.params[2];
-    fv = camera.params[3];
-    u0 = camera.params[4];
-    v0 = camera.params[5];
+    const double * params = camera->getParams();
+    alpha = params[0];
+    beta = params[1];
+    fu = params[2];
+    fv = params[3];
+    u0 = params[4];
+    v0 = params[5];
     
     // intermediate variables
     gamma = 1 - alpha;

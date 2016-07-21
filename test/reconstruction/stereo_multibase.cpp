@@ -92,6 +92,7 @@ int main(int argc, char** argv)
     stereoParams.imageWidth = img1.cols;
     stereoParams.imageHeight = img1.rows;
     int counter = 2;
+    EnhancedCamera camera(params.data());
     while (getline(paramFile, imageInfo))
     {
         istringstream imageStream(imageInfo);
@@ -104,7 +105,7 @@ int main(int argc, char** argv)
         
         Mat8u img2 = imread(imageDir + imageName, 0);
 
-        EnhancedStereo stereo(TleftRight, params.data(), params.data(), stereoParams);
+        EnhancedStereo stereo(TleftRight, &camera, &camera, stereoParams);
 
         Mat32f depth;
         auto t2 = clock();

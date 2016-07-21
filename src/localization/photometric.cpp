@@ -128,41 +128,41 @@ void ScalePhotometric::computePose(int scaleIdx, Transformation<double> & T12)
 }
 
 // Optimization using the auto differentiation
-void ScalePhotometric::computePoseAuto(int scaleIdx, Transformation<double> & T12)
-{
-    if (verbosity > 1) 
-    {
-        cout << "ScalePhotometric::computePoseAuto with scaleIdx = " << scaleIdx << endl;
-    }
-    PhotometricPack dataPack = initPhotometricData(scaleIdx);
-    scaleSpace2.setActiveScale(scaleIdx);
-//    const Mat32f & img1 = scaleSpace1.get();
-    const Mat32f & img2 = scaleSpace2.get();
-    array<double, 6> pose = T12.toArray();
-    typedef DynamicAutoDiffCostFunction<PhotometricError<EnhancedProjector>> photometricCF;
-    PhotometricError<EnhancedProjector> * errorFunctor;
-    errorFunctor = new PhotometricError<EnhancedProjector>(camPtr2->params, dataPack,
-                             img2, scaleSpace2.getActiveScale());
-    photometricCF * costFunctionAuto = new photometricCF(errorFunctor);
-    costFunctionAuto->AddParameterBlock(6);
-    costFunctionAuto->SetNumResiduals(dataPack.cloud.size());
-    
-    
-    
-    Problem problemAuto;
-    problemAuto.AddResidualBlock(costFunctionAuto, new SoftLOneLoss(1), pose.data());
- 
-    //run the solver
-    Solver::Options options;
-    options.linear_solver_type = ceres::DENSE_QR;
-    options.max_num_iterations = 150;
-    if (verbosity > 2) options.minimizer_progress_to_stdout = true;
-    Solver::Summary summary;
-    Solve(options, &problemAuto, &summary);
-    if (verbosity > 2) cout << summary.FullReport() << endl;
-    else if (verbosity > 1) cout << summary.BriefReport() << endl;
-    T12 = Transformation<double>(pose.data());
-}
+//void ScalePhotometric::computePoseAuto(int scaleIdx, Transformation<double> & T12)
+//{
+//    if (verbosity > 1) 
+//    {
+//        cout << "ScalePhotometric::computePoseAuto with scaleIdx = " << scaleIdx << endl;
+//    }
+//    PhotometricPack dataPack = initPhotometricData(scaleIdx);
+//    scaleSpace2.setActiveScale(scaleIdx);
+////    const Mat32f & img1 = scaleSpace1.get();
+//    const Mat32f & img2 = scaleSpace2.get();
+//    array<double, 6> pose = T12.toArray();
+//    typedef DynamicAutoDiffCostFunction<PhotometricError<EnhancedProjector>> photometricCF;
+//    PhotometricError<EnhancedProjector> * errorFunctor;
+//    errorFunctor = new PhotometricError<EnhancedProjector>(camPtr2->params, dataPack,
+//                             img2, scaleSpace2.getActiveScale());
+//    photometricCF * costFunctionAuto = new photometricCF(errorFunctor);
+//    costFunctionAuto->AddParameterBlock(6);
+//    costFunctionAuto->SetNumResiduals(dataPack.cloud.size());
+//    
+//    
+//    
+//    Problem problemAuto;
+//    problemAuto.AddResidualBlock(costFunctionAuto, new SoftLOneLoss(1), pose.data());
+// 
+//    //run the solver
+//    Solver::Options options;
+//    options.linear_solver_type = ceres::DENSE_QR;
+//    options.max_num_iterations = 150;
+//    if (verbosity > 2) options.minimizer_progress_to_stdout = true;
+//    Solver::Summary summary;
+//    Solve(options, &problemAuto, &summary);
+//    if (verbosity > 2) cout << summary.FullReport() << endl;
+//    else if (verbosity > 1) cout << summary.BriefReport() << endl;
+//    T12 = Transformation<double>(pose.data());
+//}
 
 //bool PhotometricLocalization::wrapImage(const Mat32f & img2, Mat32f & imgOut,
 //        Transformation<double> & T12)
