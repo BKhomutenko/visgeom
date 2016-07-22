@@ -34,6 +34,9 @@ bool DepthMap::isValid(int x, int y) const
     return (x >= 0 and x < width and y >= 0 and y < height);
 }
 
+//FIXME bug, if we write otside the range then read from outside the range, we'll get the written value
+// because of foo
+
 // nearest neighbor interpolation
 const double & DepthMap::nearest(int u, int v) const
 {
@@ -110,21 +113,21 @@ const double & DepthMap::at(int idx) const
 // to access the uncertainty directly
 double & DepthMap::sigma(int x, int y)
 {
-    return valVec[x + y*width];
+    return sigmaVec[x + y*width];
 }
 const double & DepthMap::sigma(int x, int y) const
 {
-    return valVec[x + y*width];
+    return sigmaVec[x + y*width];
 }
 
 // to access the uncertainty directly
 double & DepthMap::sigma(int idx)
 {
-    return valVec[idx];
+    return sigmaVec[idx];
 }
 const double & DepthMap::sigma(int idx) const
 {
-    return valVec[idx];
+    return sigmaVec[idx];
 }
 
 // image coordinates of depth points
@@ -148,30 +151,38 @@ int DepthMap::y(int v) const
     return round(double(v - v0) / scale);
 }
 
-void DepthMap::reconstructUncertainty(Vector2dVec & pointVec, 
+void DepthMap::getPointVec(const std::vector<int> idxVec, Vector2dVec & result) const
+{
+    for (auto & idx : idxVec)
+    {
+        result.emplace_back(u(idx % width), v(idx / width));
+    }
+}
+
+void DepthMap::reconstructUncertainty(vector<int> & idxVec, 
             Vector3dVec & minDistVec, Vector3dVec & maxDistVec) const
 {
     minDistVec.clear();
     maxDistVec.clear();
-    pointVec.clear();
+    idxVec.clear();
     Vector2dVec pointBrutVec;
     vector<double> minVec;
     vector<double> maxVec;
-    for (int y = 0; y < height; y++)
+    vector<int> idxBrutVec;
+    for (int i = 0; i < valVec.size(); i++)
     {
-        for (int x = 0; x < width; x++)
+        double d = valVec[i];
+        if (d >= MIN_DEPTH)
         {
-            double d = at(x, y);
-            if (d > 1e-4)
-            {
-                pointBrutVec.emplace_back(u(x), v(y));
-                double s = sigma(x, y);
-                // take d +- 2*sigma
-                minVec.push_back(max(0., d - 2*s));
-                maxVec.push_back(d + 2*s);
-            }
+            double s = sigmaVec[i];
+            // take d +- 2*sigma
+            minVec.push_back(max(MIN_DEPTH, d - 2*s));
+            maxVec.push_back(d + 2*s);
+            idxBrutVec.push_back(i);
         }
     }
+    
+    getPointVec(idxBrutVec, pointBrutVec);
     
     Vector3dVec reconstBrutVec;
     vector<bool> maskVec;
@@ -184,53 +195,69 @@ void DepthMap::reconstructUncertainty(Vector2dVec & pointVec,
             Vector3d X = reconstBrutVec[i].normalized();
             minDistVec.push_back(X*minVec[i]);
             maxDistVec.push_back(X*maxVec[i]);
-            pointVec.push_back(pointBrutVec[i]);        
+            idxVec.push_back(idxBrutVec[i]);        
         }
     }
 }
 
-void DepthMap::reconstruct(Vector3dVec & result) const
+void DepthMap::reconstruct(vector<int> & idxVec, Vector3dVec & result) const
 {
-    Vector2dVec pointVec;
-    pointVec.reserve(width * height);
-    for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            pointVec.emplace_back(u(x), v(y));
-        }
-    }
-    cameraPtr->reconstructPointCloud(pointVec, result);
+    result.clear();
+    idxVec.clear();
+    Vector2dVec pointBrutVec;
+    vector<double> depthVec;
+    vector<int> idxBrutVec;
     for (int i = 0; i < valVec.size(); i++)
     {
-        result[i] = result[i].normalized()*valVec[i];
+        double d = valVec[i];
+        if (d >= MIN_DEPTH)
+        {
+            depthVec.push_back(d);
+            idxBrutVec.push_back(i);
+        }
+    }
+    getPointVec(idxBrutVec, pointBrutVec);
+    
+    Vector3dVec reconstBrutVec;
+    vector<bool> maskVec;
+    cameraPtr->reconstructPointCloud(pointBrutVec, reconstBrutVec, maskVec);
+    
+    for (int i = 0; i < reconstBrutVec.size(); i++)
+    {
+        if (maskVec[i])
+        {
+            Vector3d X = reconstBrutVec[i].normalized();
+            result.push_back(X*depthVec[i]);
+            idxVec.push_back(idxBrutVec[i]);        
+        }
     }
 }
 
-void DepthMap::reconstruct(const vector<int> & indexVec, Vector3dVec & result) const
+void DepthMap::reconstruct(const Vector2dVec & queryPointVec,
+        vector<int> & idxVec, Vector3dVec & result) const
 {
-    Vector2dVec pointVec;
-    pointVec.reserve(indexVec.size());
-    for (int index : indexVec) // TODO make safe
+    result.clear();
+    idxVec.clear();
+    Vector3dVec reconstBrutVec;
+    vector<bool> maskVec;
+    cameraPtr->reconstructPointCloud(queryPointVec, reconstBrutVec, maskVec);
+    for (int i = 0; i < queryPointVec.size(); i++)
     {
-        int x = index % width;
-        int y = index / width;
-        pointVec.emplace_back(u(x), v(y));
-    }
-    cameraPtr->reconstructPointCloud(pointVec, result);
-    for (int i = 0; i < indexVec.size(); i++)
-    {
-        result[i] = result[i].normalized()*valVec[indexVec[i]];
+        if (maskVec[i])
+        {
+            double d = nearest(queryPointVec[i]);
+            if (d < MIN_DEPTH) continue;
+            Vector3d X = reconstBrutVec[i].normalized();
+            result.push_back(X*d);
+            idxVec.push_back(i);        
+        }
     }
 }
 
-void DepthMap::reconstruct(const Vector2dVec & pointVec, Vector3dVec & result) const
+void DepthMap::reconstruct(const Vector2dVec & queryPointVec, Vector3dVec & result) const
 {
-    cameraPtr->reconstructPointCloud(pointVec, result);
-    for (int i = 0; i < pointVec.size(); i++)
-    {
-        result[i] = result[i].normalized() * nearest(pointVec[i]);
-    }
+    vector<int> foo;
+    reconstruct(queryPointVec, foo, result);
 }
 
 void DepthMap::project(const Vector3dVec & pointVec, Vector2dVec & result) const
@@ -244,33 +271,45 @@ void DepthReprojector::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
         const Transformation<double> T12, DepthMap& output)
 {
 	//Step 1 : Get point-cloud of first camera in first frame
-	vector<Vector3d> cloud1;
-	dMap1.reconstruct(cloud1);
+	vector<int> idx0Vec;
+	Vector3dVec cloud11;
+	dMap1.reconstruct(idx0Vec, cloud11);
 
 	//Step 2 : Transform above into second frame
-	vector<Vector3d> cloud12;
-	T12.transform(cloud1, cloud12);
+	Vector3dVec cloud12;
+	T12.inverseTransform(cloud11, cloud12);
 
 	//Step 3 : Reproject points into second camera
-	vector<Vector2d> reproj;
-	dMap2.project(cloud12, reproj);
+	Vector2dVec point12Vec;
+	dMap2.project(cloud12, point12Vec);
 
 	//Step 4 : For reprojected points, reconstruct point-cloud of second camera in second frame
-	vector<Vector3d> cloud2_filtered;
-	dMap2.reconstruct(reproj, cloud2_filtered);
+	Vector3dVec cloud22;
+	vector<int> idx1Vec;
+	dMap2.reconstruct(point12Vec, idx1Vec, cloud22);
 
 	//Step 5 : Transform above into first frame
-	vector<Vector3d> cloud21;
-	T12.inverseTransform(cloud2_filtered, cloud21);
+	Vector3dVec cloud21;
+	T12.transform(cloud22, cloud21);
+
+    for (auto & x : cloud21)
+    {
+        cout << x.transpose() << endl;
+    }
+    
 
 	//Step 6 : Project above points along corresponding depth vectors
     output = dMap1;
-	for(int i=0; i<cloud21.size(); ++i)
+    output.setTo(0, 1);
+	for(int i = 0; i < idx1Vec.size(); ++i)
 	{
-		const Vector3d & point2 = cloud21[i];
-		const Vector3d & point1 = cloud1[i];
+	    int idx1 = idx1Vec[i];
+	    int idx0 = idx0Vec[idx1];
+		const Vector3d & X2 = cloud21[i];
+		const Vector3d & X1 = cloud11[idx1];
 		//Calculate dot-product to get the distance as the projection along the line
-		output.at(i) = point2.dot(point1.normalized());
-		output.sigma(i) = dMap2.nearestSigma(reproj[i]);
+		output.at(idx0) =  X2.dot(X1.normalized());
+		output.sigma(idx0) = dMap2.nearestSigma(point12Vec[idx1]);
 	}
 }
+

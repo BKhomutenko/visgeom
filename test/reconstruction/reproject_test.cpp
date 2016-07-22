@@ -34,7 +34,7 @@ int main(int argc, char** argv)
    
     array<double, 6> params = {0.5, 1, 250, 250, 320, 240};
     StereoParameters stereoParams;
-    stereoParams.scale = 3;
+    stereoParams.scale = 4;
     
     Transformation<double> T01(0.7, 0.1, 0.5, 0.1, -0.3, 0.5);
     Transformation<double> T0plane(0, 0, 1.5, 0, 0, 0);
@@ -76,6 +76,7 @@ int main(int argc, char** argv)
     
     imshow("img0", img0);
     imshow("img1", img1);
+    imshow("diff", img0 - img1wrap + 0.5);
     imshow("img1wrap", img1wrap);
     waitKey();
     

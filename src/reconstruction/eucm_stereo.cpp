@@ -290,19 +290,16 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 }
                 
                 //compute the bias;
-                int sum1 = accumulate(descriptor.begin(), descriptor.end(), 0);
+                int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
                 
                 // fill up the cost buffer
                 uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;
                 for (int d = 0; d < params.dispMax/2; d++, outPtr+=2)
                 {
-                    int acc = 0;
-                    int sum2 = accumulate(sampleVec.begin() + d, sampleVec.begin() + d + LENGTH, 0);
+                    int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
                     int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
-                    for (int i = 0; i < LENGTH; i++)
-                    {
-                        acc += abs(descriptor[i] - sampleVec[d + i] + bias) * kernelVec[i];
-                    }
+                    int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
+                                    descriptor.begin(), sampleVec.begin() + d, bias);
                     *outPtr = acc / NORMALIZER;
                     if (d)
                     {
@@ -326,19 +323,15 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 }
                 
                 //compute the bias;
-                int sum1 = accumulate(descriptor.begin(), descriptor.end(), 0);
+                int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
                 // fill up the cost buffer
                 uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;
                 for (int d = 0; d < params.dispMax; d++, outPtr++)
                 {
-                    int acc = 0;
-                    int sum2 = accumulate(sampleVec.begin() + d, sampleVec.begin() + d + LENGTH, 0);
+                    int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
                     int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
-                    for (int i = 0; i < LENGTH; i++)
-                    {
-                        acc += abs(descriptor[i] - sampleVec[d + i] + bias) * kernelVec[i];
-                    }
-                    
+                    int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
+                                    descriptor.begin(), sampleVec.begin() + d, bias);
                     *outPtr = acc / NORMALIZER;
                 }
             }

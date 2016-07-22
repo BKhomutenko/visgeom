@@ -138,9 +138,9 @@ public:
     {
         dst.resize(src.size());
         rotate(src, dst);
-        for (auto & v : dst)
+        for (unsigned int i = 0; i < dst.size(); i++)
         {
-            v += mtrans;
+            dst[i] = dst[i] + mtrans;
         }
     }
 

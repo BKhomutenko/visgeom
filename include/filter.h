@@ -55,3 +55,16 @@ Tdata filter(Titer1 kernelIter, Titer1 kernelEnd, Titer2 dataIter, Tdata val)
     }
     return val;
 }
+
+// bias = (sum(data2) - sum(data1)) / LENGTH
+template<typename Titer1, typename Titer2, typename Tdata>
+Tdata biasedAbsDiff(Titer1 kernelIter, Titer1 kernelEnd, Titer2 data1Iter, Titer2 data2Iter, Tdata bias)
+{
+    Tdata res = Tdata(0);
+    for (; kernelIter != kernelEnd; ++kernelIter, ++data1Iter, ++data2Iter)
+    {
+        res += (*kernelIter) * abs(*data1Iter - *data2Iter + bias);
+    }
+    return res;
+}
+

@@ -31,6 +31,7 @@ NOTE:
 #include "camera/generic_camera.h"
 
 const double DEFAULT_DEPTH = 1;
+const double MIN_DEPTH = 0.3;
 const double DEFAULT_SIGMA_DEPTH = 100;
 
 class DepthMap
@@ -125,14 +126,19 @@ public:
     int x(int u) const;
     int y(int v) const;
     
-    void reconstructUncertainty(Vector2dVec & pointVec, 
+    void getPointVec(const std::vector<int> idxVec, Vector2dVec & result) const;
+    
+    void reconstructUncertainty(std::vector<int> & idxVec, 
             Vector3dVec & minDistVec,
             Vector3dVec & maxDistVec) const;
+            
+    void reconstruct(std::vector<int> & idxVec, Vector3dVec & result) const;
     
-    //TODO change these interfaces:
-    void reconstruct(Vector3dVec & result) const;
-    void reconstruct(const vector<int> & indexVec, Vector3dVec & result) const;
-    void reconstruct(const Vector2dVec & pointVec, Vector3dVec & result) const;
+    // idxVec corresponds to indices of points in queryPointVec
+    void reconstruct(const Vector2dVec & queryPointVec,
+            std::vector<int> & idxVec, Vector3dVec & result) const;
+    void reconstruct(const Vector2dVec & queryPointVec, Vector3dVec & result) const;
+    
     void project(const Vector3dVec & pointVec, Vector2dVec & result) const;
     
     int getWidth() const { return width; }

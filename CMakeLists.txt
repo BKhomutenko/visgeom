@@ -53,38 +53,38 @@ TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
 ### RECONSTRUCTION ###
 
 add_executable( stereo 
-   test/reconstruction/stereo_test.cpp
-   src/reconstruction/eucm_stereo.cpp
-   src/reconstruction/eucm_epipolar.cpp
-   src/reconstruction/depth_map.cpp
+    test/reconstruction/stereo_test.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
 )
 
 target_link_libraries( stereo ${OpenCV_LIBS} )
 
 add_executable( multistereo 
-   test/reconstruction/stereo_multibase.cpp
-   src/reconstruction/eucm_stereo.cpp
-   src/reconstruction/eucm_epipolar.cpp
-   src/reconstruction/depth_map.cpp
+    test/reconstruction/stereo_multibase.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
 )
 
 target_link_libraries( multistereo ${OpenCV_LIBS} )
 
 add_executable( generate_plane 
-   test/reconstruction/generate_plane.cpp
-   src/reconstruction/eucm_stereo.cpp
-   src/reconstruction/eucm_epipolar.cpp
-   src/reconstruction/depth_map.cpp
+    test/reconstruction/generate_plane.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
 )
 
 target_link_libraries( generate_plane ${OpenCV_LIBS} )
 
 
 add_executable( reproject_plane
-   test/reconstruction/reproject_test.cpp
-   src/reconstruction/eucm_stereo.cpp
-   src/reconstruction/eucm_epipolar.cpp
-   src/reconstruction/depth_map.cpp
+    test/reconstruction/reproject_test.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
 )
 
 target_link_libraries( reproject_plane ${OpenCV_LIBS} )
@@ -92,11 +92,11 @@ target_link_libraries( reproject_plane ${OpenCV_LIBS} )
 ### LOCALIZATION ###
 
 add_executable( photometric
-   test/localization/photometric_test.cpp
-   src/localization/photometric.cpp
-   src/reconstruction/eucm_stereo.cpp
-   src/reconstruction/eucm_epipolar.cpp
-   src/reconstruction/depth_map.cpp
+    test/localization/photometric_test.cpp
+    src/localization/photometric.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
 )
 
 target_link_libraries( photometric ${OpenCV_LIBS} )

@@ -38,6 +38,7 @@ struct MotionStereoParameters
     int verbosity = 0;
     int uMargin = 25, vMargin = 25;  // RoI left upper corner
     int maxBias = 10;
+    int maxDisp = 64;
 };
 
 class MotionStereo
@@ -103,9 +104,11 @@ public:
         }
         
         // get uncertainty range reconstruction in the first frame
+        vector<int> idxVec;
         Vector2dVec pointVec; 
         Vector3dVec minDistVec, maxDistVec;
-        depthPrior.reconstructUncertainty(pointVec, minDistVec, maxDistVec);
+        depthPrior.reconstructUncertainty(idxVec, minDistVec, maxDistVec);
+        depthPrior.getPointVec(idxVec, pointVec);
         
         // discard non-salient points
         vector<bool> maskVec;
@@ -181,16 +184,13 @@ public:
             //compute the error and find the best candidate
             int dBest = 0;
             int eBest = LENGTH*255;
-            int sum1 = accumulate(descriptor.begin(), descriptor.end(), 0);
+            int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
             for (int d = 0; d < sampleVec.size() - LENGTH + 1; d++)
             {
-                int acc = 0;
-                int sum2 = accumulate(sampleVec.begin() + d, sampleVec.begin() + d + LENGTH, 0);
-                int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
-                for (int i = 0; i < LENGTH; i++)
-                {
-                    acc += abs(descriptor[i] - sampleVec[d + i] + bias) * kernelVec[i];
-                }
+                int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
+                int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / NORMALIZER));
+                int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
+                                    descriptor.begin(), sampleVec.begin() + d, bias);
                 
                 if (eBest > acc)
                 {
