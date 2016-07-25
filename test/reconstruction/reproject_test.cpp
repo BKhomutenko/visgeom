@@ -18,6 +18,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "io.h"
 #include "ocv.h"
 #include "eigen.h"
+#include "timer.h"
 
 #include "reconstruction/depth_map.h"
 #include "reconstruction/eucm_stereo.h"
@@ -25,16 +26,16 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 using namespace std;
 using namespace cv;
 
-const int COLS = 640;
-const int ROWS = 480;
+const int COLS = 1024;
+const int ROWS = 768;
 const double K = 0.3;
 
 int main(int argc, char** argv)
 {	
    
-    array<double, 6> params = {0.5, 1, 250, 250, 320, 240};
+    array<double, 6> params = {0.5, 1, 250, 250, 512, 384};
     StereoParameters stereoParams;
-    stereoParams.scale = 4;
+    stereoParams.scale = 2;
     
     Transformation<double> T01(0.7, 0.1, 0.5, 0.1, -0.3, 0.5);
     Transformation<double> T0plane(0, 0, 1.5, 0, 0, 0);
@@ -60,8 +61,9 @@ int main(int argc, char** argv)
      
     DepthReprojector reprojector;
     
+    Timer timer;
     reprojector.wrapDepth(depth0, depth1, T01, depth1wrap);
-    
+    cout << timer.elapsed() << endl;
     Mat32f img0(ROWS, COLS), img1(ROWS, COLS), img1wrap(ROWS, COLS);
     
     for (int y = 0; y < ROWS; y++)

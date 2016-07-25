@@ -71,8 +71,9 @@ public:
         for (int i = 0; i < src.size(); i++)
         {
             maskVec[i] = reconstructPoint(src[i], dst[i]);
+            res &= maskVec[i];
         }  
-        return accumulate(maskVec.begin(), maskVec.end(), true, std::logical_and<bool>());
+        return res;
     }
     
     bool projectPointCloud(const Vector3dVec & src, Vector2dVec & dst) const
@@ -95,8 +96,9 @@ public:
         for (int i = 0; i < src.size(); i++)
         {
             maskVec[i] = projectPoint(src[i], dst[i]);
+            res &= maskVec[i];
         }  
-        return accumulate(maskVec.begin(), maskVec.end(), true, std::logical_and<bool>());
+        return res;
     }
     
     const double * getParams() const { return params.data(); }

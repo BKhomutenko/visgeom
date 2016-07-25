@@ -153,6 +153,8 @@ int DepthMap::y(int v) const
 
 void DepthMap::getPointVec(const std::vector<int> idxVec, Vector2dVec & result) const
 {
+    result.clear();
+    result.reserve(idxVec.size());
     for (auto & idx : idxVec)
     {
         result.emplace_back(u(idx % width), v(idx / width));
@@ -291,12 +293,6 @@ void DepthReprojector::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
 	//Step 5 : Transform above into first frame
 	Vector3dVec cloud21;
 	T12.transform(cloud22, cloud21);
-
-    for (auto & x : cloud21)
-    {
-        cout << x.transpose() << endl;
-    }
-    
 
 	//Step 6 : Project above points along corresponding depth vectors
     output = dMap1;

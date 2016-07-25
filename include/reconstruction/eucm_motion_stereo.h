@@ -31,15 +31,16 @@ Depth-from-motion class for semidense depth estimation
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/depth_map.h"
 
+//TODO add errorMax threshold
 struct MotionStereoParameters
 {
     int scale = 3;
     int descLength = 5;
-    int gradientThresh = 2;
+    int gradientThresh = 5;
     int verbosity = 0;
     int uMargin = 25, vMargin = 25;  // RoI left upper corner
-    int maxBias = 10;
-    int maxDisp = 64;
+    int biasMax = 10;
+    int dispMax = 48;
 };
 
 class MotionStereo
@@ -69,8 +70,8 @@ public:
     }
     
     //TODO split into functions
-    void computeDepth(Transformation<double> T12, const DepthMap & depthPrior,
-            Mat8u img2, DepthMap & depthOut)
+    void computeDepth(Transformation<double> T12,
+            Mat8u img2, DepthMap & depth)
     {
         if (params.verbosity > 0) cout << "MotionStereo::computeDepth" << endl;
         epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
@@ -78,8 +79,6 @@ public:
         // init the output mat
         //TODO think about overhead
         if (params.verbosity > 1) cout << "    initializing the depth map" << endl;
-        depthOut = depthPrior;
-        depthOut.setTo(0, 1);
         
         if (params.verbosity > 1) cout << "    descriptor kernel selection" << endl;
         int LENGTH = params.descLength;
@@ -87,48 +86,29 @@ public:
         
         // compute the weights for matching cost
         // TODO make a separate header and a cpp file miscellaneous
-        vector<int> kernelVec(LENGTH);
-        int NORMALIZER;
-        switch (LENGTH)
-        {
-        case 3:
-            copy(KERNEL_3.begin(), KERNEL_3.end(), kernelVec.begin());
-            NORMALIZER = NORMALIZER_3;
-            break;
-        case 5:
-            copy(KERNEL_5.begin(), KERNEL_5.end(), kernelVec.begin());
-            NORMALIZER = NORMALIZER_5;
-            break;
-        case 7:
-            copy(KERNEL_7.begin(), KERNEL_7.end(), kernelVec.begin());
-            NORMALIZER = NORMALIZER_7;
-            break;
-        default:
-            LENGTH = 9;
-            HALF_LENGTH = 4;
-        case 9:
-            copy(KERNEL_9.begin(), KERNEL_9.end(), kernelVec.begin());
-            NORMALIZER = NORMALIZER_9;
-            break;
-        }
+        vector<int> kernelVec, waveVec;
+        const int NORMALIZER = initKernel(kernelVec, LENGTH);
+        const int WAVE_NORM = initWave(waveVec, LENGTH);
         
         
         if (params.verbosity > 1) cout << "    computing the scan limits" << endl;
         // get uncertainty range reconstruction in the first frame
+        
+        cout << 222 << endl;
+        // discard non-salient points
+        for (int y = 0; y < depth.getHeight(); y++)
+        {
+            for (int x = 0; x < depth.getWidth(); x++)
+            {
+                if ( not maskMat(depth.v(y), depth.u(x)) ) depth.at(x, y) = 0;
+            }
+        }
+        
         vector<int> idxVec;
         Vector2dVec pointVec; 
         Vector3dVec minDistVec, maxDistVec;
-        depthPrior.reconstructUncertainty(idxVec, minDistVec, maxDistVec);
-        depthPrior.getPointVec(idxVec, pointVec);
-        cout << 222 << endl;
-        // discard non-salient points
-        vector<bool> maskVec;
-        for (auto & pt : pointVec)
-        {
-            if ( maskMat(round(pt[1]), round(pt[0])) ) maskVec.push_back(true);
-            else maskVec.push_back(false);
-        }
-        
+        depth.reconstructUncertainty(idxVec, minDistVec, maxDistVec);
+        depth.getPointVec(idxVec, pointVec);
         // reproject them onto the second image
         Vector3dVec minDist2Vec, maxDist2Vec;
         T12.inverseTransform(minDistVec, minDist2Vec);
@@ -140,9 +120,10 @@ public:
         camera2->projectPointCloud(minDist2Vec, pointMinVec, maskMinVec);
         camera2->projectPointCloud(maxDist2Vec, pointMaxVec, maskMaxVec);
         
-        for (int i = 0; i < maskVec.size(); i++)
+        vector<bool> maskVec;
+        for (int i = 0; i < maskMinVec.size(); i++)
         {
-            if (not maskMinVec[i] or not maskMaxVec[i]) maskVec[i] = false;
+            maskVec.push_back(maskMinVec[i] and maskMaxVec[i]);
         }
         
         
@@ -151,7 +132,7 @@ public:
         {
             if (not maskVec[ptIdx])
             {
-                depthOut.nearest(pointVec[ptIdx]) = 0;
+                depth.nearest(pointVec[ptIdx]) = 0;
                 continue;
             }   
             
@@ -170,26 +151,34 @@ public:
                 descriptor[i] = img1(descRaster.v, descRaster.u);
             }
             
+            int descResp = filter(waveVec.begin(), waveVec.end(), descriptor.begin(), 0);
+            if (descResp < WAVE_NORM)
+            {
+                depth.nearest(pointVec[ptIdx]) = 0;
+                continue;
+            }
             // ### find the best correspondence on img2 ###
             if (params.verbosity > 2) cout << "        sampling the second image" << endl;
             //sample the second image
             //TODO traverse the epipolar line in the opposit direction and respect the disparity limit
-            CurveRasterizer<int, Polynomial2> raster(round(pointMinVec[ptIdx]), round(pointMaxVec[ptIdx]),
+            Vector2i goal = round(pointMinVec[ptIdx]);
+            CurveRasterizer<int, Polynomial2> raster(round(pointMaxVec[ptIdx]), goal,
                                                 epipolarPtr->getSecond(minDistVec[ptIdx]));
             raster.steps(-HALF_LENGTH);
             vector<uint8_t> sampleVec;
-            Vector2i goal = round(pointMaxVec[ptIdx]);
             vector<int> uVec, vVec;
+            uVec.reserve(params.dispMax);
+            vVec.reserve(params.dispMax);
+            sampleVec.reserve(params.dispMax);
             int loopCount = HALF_LENGTH;
             bool loopFlag = false;
-            while (loopCount)
+            for (int d = 0; d < params.dispMax and loopCount > 0; d++, raster.step())
             {
                 if (raster.v < 0 or raster.v >= img2.rows 
                     or raster.u < 0 or raster.u >= img2.cols) sampleVec.push_back(0);
                 else sampleVec.push_back(img2(raster.v, raster.u));
                 uVec.push_back(raster.u);
                 vVec.push_back(raster.v);
-                raster.step();
                 if (not loopFlag) loopFlag = (abs(goal[0] - raster.u) + abs(goal[1] - raster.v) <= 1);
                 else loopCount--;
             }
@@ -202,7 +191,7 @@ public:
             for (int d = 0; d < sampleVec.size() - LENGTH + 1; d++)
             {
                 int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-                int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / NORMALIZER));
+                int bias = min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
                 int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
                                     descriptor.begin(), sampleVec.begin() + d, bias);
                 
@@ -219,8 +208,8 @@ public:
                     uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], X1);
             triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
                     uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], X2);
-            depthOut.nearest(pointVec[ptIdx]) = X1.norm();
-            depthOut.nearestSigma(pointVec[ptIdx]) = (X2.norm() - X1.norm()) / 2;
+            depth.nearest(pointVec[ptIdx]) = X1.norm();
+            depth.nearestSigma(pointVec[ptIdx]) = (X2.norm() - X1.norm()) / 2;
         }
         
         delete epipolarPtr;
@@ -307,9 +296,11 @@ private:
         Sobel(img1, gradx, CV_16S, 1, 0, 3, 1/8.);
         Sobel(img1, grady, CV_16S, 0, 1, 3, 1/8.);
         Mat16s gradAbs = abs(gradx) + abs(grady);
+        GaussianBlur(gradAbs, gradAbs, Size(3, 3), 0, 0);
         Mat8u gradAbs8u;
         gradAbs.convertTo(gradAbs8u, CV_8U);
-        threshold(gradAbs8u, maskMat, params.gradientThresh, 1, CV_THRESH_BINARY);
+        threshold(gradAbs8u, maskMat, params.gradientThresh, 128, CV_THRESH_BINARY);
+        
     }
     
     bool epipoleInverted1, epipoleInverted2;

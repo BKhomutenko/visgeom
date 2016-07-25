@@ -202,40 +202,9 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     int LENGTH = HALF_LENGTH * 2 + 1;
     
     // compute the weights for matching cost
-    vector<int> kernelVec(LENGTH);
-    vector<int> waveVec(LENGTH);
-    int WAVE_NORM, NORMALIZER;
-    switch (LENGTH)
-    {
-    case 3:
-        copy(KERNEL_3.begin(), KERNEL_3.end(), kernelVec.begin());
-        copy(WAVE_3.begin(), WAVE_3.end(), waveVec.begin());
-        NORMALIZER = NORMALIZER_3;
-        WAVE_NORM = WAVE_NORM_3;
-        break;
-    case 5:
-        copy(KERNEL_5.begin(), KERNEL_5.end(), kernelVec.begin());
-        copy(WAVE_5.begin(), WAVE_5.end(), waveVec.begin());
-        NORMALIZER = NORMALIZER_5;
-        WAVE_NORM = WAVE_NORM_5;
-        break;
-    case 7:
-        copy(KERNEL_7.begin(), KERNEL_7.end(), kernelVec.begin());
-        copy(WAVE_7.begin(), WAVE_7.end(), waveVec.begin());
-        NORMALIZER = NORMALIZER_7;
-        WAVE_NORM = WAVE_NORM_7;
-        break;
-    default:
-        LENGTH = 9;
-        HALF_LENGTH = 4;
-    case 9:
-        copy(KERNEL_9.begin(), KERNEL_9.end(), kernelVec.begin());
-        copy(WAVE_9.begin(), WAVE_9.end(), waveVec.begin());
-        NORMALIZER = NORMALIZER_9;
-        WAVE_NORM = WAVE_NORM_9;
-        break;
-    }
-    WAVE_NORM *= 2;
+    vector<int> kernelVec, waveVec;
+    const int NORMALIZER = initKernel(kernelVec, LENGTH);
+    const int WAVE_NORM = initWave(waveVec, LENGTH) * 2;
     for (int y = 0; y < params.yMax; y++)
     {
         for (int x = 0; x < params.xMax; x++)
