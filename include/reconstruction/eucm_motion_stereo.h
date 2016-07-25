@@ -21,6 +21,7 @@ Depth-from-motion class for semidense depth estimation
 
 #pragma once
 
+
 #include "std.h"
 #include "ocv.h"
 #include "eigen.h"
@@ -30,6 +31,7 @@ Depth-from-motion class for semidense depth estimation
 #include "reconstruction/eucm_epipolar.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/depth_map.h"
+#include "epipolar_descriptor.h"
 
 //TODO add errorMax threshold
 struct MotionStereoParameters
@@ -152,7 +154,7 @@ public:
             }
             
             int descResp = filter(waveVec.begin(), waveVec.end(), descriptor.begin(), 0);
-            if (descResp < WAVE_NORM)
+            if (descResp < WAVE_NORM/2)
             {
                 depth.nearest(pointVec[ptIdx]) = 0;
                 continue;
@@ -293,10 +295,10 @@ private:
     void computeMask()
     {
         Mat16s gradx, grady;
-        Sobel(img1, gradx, CV_16S, 1, 0, 3, 1/8.);
-        Sobel(img1, grady, CV_16S, 0, 1, 3, 1/8.);
+        Sobel(img1, gradx, CV_16S, 1, 0, 1);
+        Sobel(img1, grady, CV_16S, 0, 1, 1);
         Mat16s gradAbs = abs(gradx) + abs(grady);
-        GaussianBlur(gradAbs, gradAbs, Size(3, 3), 0, 0);
+        GaussianBlur(gradAbs, gradAbs, Size(5, 5), 0, 0);
         Mat8u gradAbs8u;
         gradAbs.convertTo(gradAbs8u, CV_8U);
         threshold(gradAbs8u, maskMat, params.gradientThresh, 128, CV_THRESH_BINARY);

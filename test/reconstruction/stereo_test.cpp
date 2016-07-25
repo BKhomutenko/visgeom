@@ -150,7 +150,7 @@ int main(int argc, char** argv)
 //    }
     
 
-    Mat8u res;
+    Mat32f res;
     timer.reset();
     stereo.computeCurveCost(img1, img2);
     cout << timer.elapsed() << endl;
@@ -161,12 +161,12 @@ int main(int argc, char** argv)
     stereo.reconstructDisparity();
     cout << timer.elapsed() << endl;
     timer.reset();
-    stereo.upsampleDisparity(img1, res);
+    stereo.computeDepth(res);
     cout << timer.elapsed() << endl;
     
     imshow("out1", out1);
     imshow("out2", out2);
-    imshow("res", res*3);
+    imshow("res", res/10);
     waitKey(); 
     return 0;
 }

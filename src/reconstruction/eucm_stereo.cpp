@@ -204,7 +204,9 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     // compute the weights for matching cost
     vector<int> kernelVec, waveVec;
     const int NORMALIZER = initKernel(kernelVec, LENGTH);
-    const int WAVE_NORM = initWave(waveVec, LENGTH) * 2;
+    const int WAVE_NORM = initWave(waveVec, LENGTH);
+    EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1, 2, 3, 5, 8, 13, 21});
+    vector<int> discHist(50, 0);
     for (int y = 0; y < params.yMax; y++)
     {
         for (int x = 0; x < params.xMax; x++)
@@ -223,91 +225,114 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 continue;
             }
             // compute the local image descriptor -- a piece of the epipolar curve on the first image
+            vector<uint8_t> descriptor;
             CurveRasterizer<int, Polynomial2> descRaster = getCurveRasteriser1(idx);
-            descRaster.setStep(-1);
-            descRaster.steps(-HALF_LENGTH);
-            vector<uint8_t> descriptor(LENGTH);
-            for (int i = 0; i < LENGTH; i++, descRaster.step())
-            {
-                descriptor[i] = img1(descRaster.v, descRaster.u);
-            }
+            const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
+            discHist[step]++;
+            int nSteps = (params.dispMax  + step - 1 ) / step; 
             CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
-            int descResp = filter(waveVec.begin(), waveVec.end(), descriptor.begin(), 0);
-            if (abs(descResp) < WAVE_NORM) //TODO check the constant
+               
+            //sample the curve 
+            raster.setStep(step); 
+            raster.steps(-HALF_LENGTH);           
+            vector<uint8_t> sampleVec(nSteps + LENGTH - 1, 0);
+            for (int i = 0; i  < nSteps + LENGTH - 1; i++, raster.step())
             {
-                
-                raster.setStep(2);  
-                
-//                recompute the descriptor
-                descRaster = getCurveRasteriser1(idx);
-                descRaster.setStep(-2);
-                descRaster.steps(-HALF_LENGTH);
-                for (int i = 0; i < LENGTH; i++, descRaster.step())
-                {
-                    descriptor[i] = img1(descRaster.v, descRaster.u);
-                }
+                if (raster.v < 0 or raster.v >= img2.rows 
+                    or raster.u < 0 or raster.u >= img2.cols) sampleVec[i] = 0;
+                else sampleVec[i] = img2(raster.v, raster.u);
+            }
             
-                raster.steps(-HALF_LENGTH);
-                
-                vector<uint8_t> sampleVec(params.dispMax/2 + LENGTH - 1, 0);
-                for (int i = 0; i  < params.dispMax/2 + LENGTH - 1; i++, raster.step())
-                {
-                    if (raster.v < 0 or raster.v >= img2.rows 
-                        or raster.u < 0 or raster.u >= img2.cols) sampleVec[i] = 0;
-                    else sampleVec[i] = img2(raster.v, raster.u);
-                }
-                
-                //compute the bias;
-                int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
-                
-                // fill up the cost buffer
-                uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;
-                for (int d = 0; d < params.dispMax/2; d++, outPtr+=2)
-                {
-                    int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-                    int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
-                    int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
-                                    descriptor.begin(), sampleVec.begin() + d, bias);
-                    *outPtr = acc / NORMALIZER;
-                    if (d)
-                    {
-                        *(outPtr - 1) = (*(outPtr - 2) >> 1) + (*outPtr >> 1);
-                    }
-                }
-                *(outPtr - 1) = *(outPtr - 2);
-                
-            }
-            else
+            //compute the bias;
+            int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
+            
+            // fill up the cost buffer
+            uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;
+            for (int d = 0; d < nSteps; d++, outPtr += step)
             {
-                //sample img2 along the epipolar curve
-                
-                raster.steps(-HALF_LENGTH);
-                vector<uint8_t> sampleVec(params.dispMax + LENGTH - 1, 0);
-                for (int i = 0; i  < params.dispMax + LENGTH - 1; i++, raster.step())
-                {
-                    if (raster.v < 0 or raster.v >= img2.rows 
-                        or raster.u < 0 or raster.u >= img2.cols) sampleVec[i] = 0;
-                    else sampleVec[i] = img2(raster.v, raster.u);
-                }
-                
-                //compute the bias;
-                int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
-                // fill up the cost buffer
-                uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;
-                for (int d = 0; d < params.dispMax; d++, outPtr++)
-                {
-                    int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-                    int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
-                    int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
-                                    descriptor.begin(), sampleVec.begin() + d, bias);
-                    *outPtr = acc / NORMALIZER;
-                }
+                int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
+                int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
+                int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
+                                descriptor.begin(), sampleVec.begin() + d, bias);
+                *outPtr = acc / NORMALIZER;
             }
+            if (step > 1) fillGaps(errorBuffer.row(y).data + x*params.dispMax, step);
+//            }
+//            else
+//            {
+//                //sample img2 along the epipolar curve
+//                
+//                raster.steps(-HALF_LENGTH);
+//                vector<uint8_t> sampleVec(params.dispMax + LENGTH - 1, 0);
+//                for (int i = 0; i  < params.dispMax + LENGTH - 1; i++, raster.step())
+//                {
+//                    if (raster.v < 0 or raster.v >= img2.rows 
+//                        or raster.u < 0 or raster.u >= img2.cols) sampleVec[i] = 0;
+//                    else sampleVec[i] = img2(raster.v, raster.u);
+//                }
+//                
+//                //compute the bias;
+//                int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
+//                // fill up the cost buffer
+//                uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;
+//                for (int d = 0; d < params.dispMax; d++, outPtr++)
+//                {
+//                    int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
+//                    int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
+//                    int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
+//                                    descriptor.begin(), sampleVec.begin() + d, bias);
+//                    *outPtr = acc / NORMALIZER;
+//                }
+//            }
             
         }
+        
     }
 }
-          
+
+void EnhancedStereo::fillGaps(uint8_t * const data, const int step)
+{
+    assert(step > 0);
+    //linear interpolation for all intermediate points
+    int base;
+    switch (step)
+    {
+    case 2:
+        for (base = 2; base < params.dispMax; base += 2)
+        {
+            data[base - 1] = (data[base - 2] + data[base]) >> 1;
+        }
+        break;
+    case 3:
+        for (base = 3; base < params.dispMax; base += 3)
+        {
+            const uint8_t & val1 = data[base - 3];
+            const uint8_t & val2 = data[base];
+            data[base - 2] = (val1 << 1  + val2) / 3;
+            data[base - 1] = (val1 + val2 << 1) / 3;
+        }
+        break;
+    default:
+        for (base = step; base < params.dispMax; base += step)
+        {
+            const uint8_t & val1 = data[base - step];
+            const uint8_t & val2 = data[base];
+            for (int i = step - 1; i > 0; i--)
+            {
+                data[base - i] = (val1 * i + val2 * (step - i)) / step;
+            }
+        }
+        break;
+    }
+    //for the rest just constant extrapolation
+    base -= step;
+    const uint8_t & val = data[base];
+    for (int i = base + 1 ; i < params.dispMax; i++)
+    {
+        data[i] = val;
+    }
+}
+
 void EnhancedStereo::computeDynamicStep(const int32_t* inCost, const uint8_t * error, int32_t * outCost)
 {
     int bestCost = inCost[0];

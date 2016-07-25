@@ -33,6 +33,7 @@ NOTE:
 #include "curve_rasterizer.h"
 #include "depth_map.h"
 #include "eucm_epipolar.h"
+#include "epipolar_descriptor.h"
 
 struct StereoParameters
 {
@@ -201,6 +202,8 @@ public:
             
     double computeDepth(int x, int y);
     bool computeDepth(int x, int y, double & dist, double & sigma);
+    
+    void fillGaps(uint8_t * const data, const int step);
     
 private:
     EnhancedEpipolar epipolar;

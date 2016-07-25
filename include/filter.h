@@ -31,7 +31,7 @@ const std::array<int32_t, 9> KERNEL_9 = {2, 3, 4, 4, 5, 4, 4, 3, 2};
 
 
 //TODO change filters
-const std::array<int32_t, 3> WAVE_3 = {1, -2, 1};
+const std::array<int32_t, 3> WAVE_3 = {2, -4, 2};
 const std::array<int32_t, 5> WAVE_5 = {1, -3, 4, -3, 1};
 const std::array<int32_t, 7> WAVE_7 = {1, -4, 8, -10, 8, -4, 1};
 const std::array<int32_t, 9> WAVE_9 = {3, -15, 40, -70, 84, -70, 40, -15, 3};
@@ -41,7 +41,7 @@ const int NORMALIZER_5 = 17;
 const int NORMALIZER_7 = 23;
 const int NORMALIZER_9 = 31;
 
-const int WAVE_NORM_3 = 2;
+const int WAVE_NORM_3 = 5;
 const int WAVE_NORM_5 = 6;
 const int WAVE_NORM_7 = 16;
 const int WAVE_NORM_9 = 143;

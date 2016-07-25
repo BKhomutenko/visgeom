@@ -74,7 +74,7 @@ int main(int argc, char** argv)
     
     
     StereoParameters stereoParams;
-//    stereoParams.verbosity = 3;
+    stereoParams.verbosity = 3;
     paramFile >> stereoParams.uMargin;
     paramFile >> stereoParams.vMargin;
     paramFile >> stereoParams.dispMax;

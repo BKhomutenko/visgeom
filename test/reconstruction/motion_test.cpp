@@ -144,7 +144,7 @@ int main(int argc, char** argv)
     
     imshow("out1", out1);
     imshow("out2", out2);
-    imshow("res", res*3);
+    imshow("res", res*100);
     waitKey(); 
     return 0;
 }

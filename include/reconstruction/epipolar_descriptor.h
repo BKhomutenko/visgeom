@@ -1,0 +1,72 @@
+/*
+This file is part of visgeom.
+
+visgeom is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+visgeom is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
+*/ 
+
+
+/*
+Semi-global block matching algorithm for non-rectified images
+NOTE:
+(u, v) is an image point 
+(x, y) is a depth map point 
+*/
+
+#pragma once
+
+#include "std.h"
+#include "ocv.h"
+#include "eigen.h"
+#include "filter.h"
+
+#include "curve_rasterizer.h"
+
+class EpipolarDescriptor
+{
+public:
+    EpipolarDescriptor(int length, int waveThresh, const int * wave, vector<int> stepVec) :
+            LENGTH(length),
+            HALF_LENGTH(length / 2),
+            WAVE_THRESH(waveThresh),
+            wavePtr(wave),
+            samplingStepVec(stepVec) {}
+            
+    // return: the sampling step
+    int compute(const Mat8u & img1, const CurveRasterizer<int, Polynomial2> & descRasterRef,
+                vector<uint8_t> & descVec)
+    {
+        descVec.resize(LENGTH);
+        for (int step : samplingStepVec)
+        {
+            CurveRasterizer<int, Polynomial2> descRaster(descRasterRef);
+            descRaster.setStep(-step);
+            descRaster.steps(-HALF_LENGTH);
+            for (int i = 0; i < LENGTH; i++, descRaster.step())
+            {
+                descVec[i] = img1(descRaster.v, descRaster.u);
+            }
+            int descResp = filter(wavePtr, wavePtr + LENGTH, descVec.begin(), 0);
+            if (abs(descResp) > WAVE_THRESH) return step;
+        }
+        return samplingStepVec.back();
+    }
+       
+private:
+    const int LENGTH;
+    const int HALF_LENGTH;
+    const int WAVE_THRESH;
+    const int * const wavePtr;
+    vector<int> samplingStepVec;
+};
+
