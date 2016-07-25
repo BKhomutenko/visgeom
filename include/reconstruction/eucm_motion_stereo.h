@@ -33,8 +33,9 @@ Depth-from-motion class for semidense depth estimation
 
 struct MotionStereoParameters
 {
+    int scale = 3;
     int descLength = 5;
-    int gradientThersh = 5;
+    int gradientThresh = 2;
     int verbosity = 0;
     int uMargin = 25, vMargin = 25;  // RoI left upper corner
     int maxBias = 10;
@@ -61,18 +62,26 @@ public:
         camera2 = NULL;
     }    
     
-    void setBaseImage(const Mat8u & image);
+    void setBaseImage(const Mat8u & image)
+    {
+        image.copyTo(img1);
+        computeMask();
+    }
     
+    //TODO split into functions
     void computeDepth(Transformation<double> T12, const DepthMap & depthPrior,
             Mat8u img2, DepthMap & depthOut)
     {
-        epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, verbosity);
+        if (params.verbosity > 0) cout << "MotionStereo::computeDepth" << endl;
+        epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
         Transform12 = T12;
         // init the output mat
         //TODO think about overhead
+        if (params.verbosity > 1) cout << "    initializing the depth map" << endl;
         depthOut = depthPrior;
         depthOut.setTo(0, 1);
         
+        if (params.verbosity > 1) cout << "    descriptor kernel selection" << endl;
         int LENGTH = params.descLength;
         int HALF_LENGTH = LENGTH / 2;
         
@@ -103,13 +112,15 @@ public:
             break;
         }
         
+        
+        if (params.verbosity > 1) cout << "    computing the scan limits" << endl;
         // get uncertainty range reconstruction in the first frame
         vector<int> idxVec;
         Vector2dVec pointVec; 
         Vector3dVec minDistVec, maxDistVec;
         depthPrior.reconstructUncertainty(idxVec, minDistVec, maxDistVec);
         depthPrior.getPointVec(idxVec, pointVec);
-        
+        cout << 222 << endl;
         // discard non-salient points
         vector<bool> maskVec;
         for (auto & pt : pointVec)
@@ -122,7 +133,7 @@ public:
         Vector3dVec minDist2Vec, maxDist2Vec;
         T12.inverseTransform(minDistVec, minDist2Vec);
         T12.inverseTransform(maxDistVec, maxDist2Vec);
-        
+        cout << 111 << endl;
         Vector2dVec pointMinVec;
         Vector2dVec pointMaxVec;
         vector<bool> maskMinVec, maskMaxVec;
@@ -135,6 +146,7 @@ public:
         }
         
         
+        if (params.verbosity > 1) cout << "    core loop" << endl;
         for (int ptIdx = 0; ptIdx < minDistVec.size(); ptIdx++)
         {
             if (not maskVec[ptIdx])
@@ -144,7 +156,7 @@ public:
             }   
             
             // ### compute descriptor ###
-            
+            if (params.verbosity > 2) cout << "        compute descriptor" << endl;
             // get the corresponding rasterizer
             CurveRasterizer<int, Polynomial2> descRaster(round(pointVec[ptIdx]), epipolePx1,
                                                 epipolarPtr->getFirst(minDistVec[ptIdx]));
@@ -159,8 +171,9 @@ public:
             }
             
             // ### find the best correspondence on img2 ###
-            
+            if (params.verbosity > 2) cout << "        sampling the second image" << endl;
             //sample the second image
+            //TODO traverse the epipolar line in the opposit direction and respect the disparity limit
             CurveRasterizer<int, Polynomial2> raster(round(pointMinVec[ptIdx]), round(pointMaxVec[ptIdx]),
                                                 epipolarPtr->getSecond(minDistVec[ptIdx]));
             raster.steps(-HALF_LENGTH);
@@ -181,6 +194,7 @@ public:
                 else loopCount--;
             }
             
+            if (params.verbosity > 2) cout << "        find the best candidate" << endl;
             //compute the error and find the best candidate
             int dBest = 0;
             int eBest = LENGTH*255;
@@ -282,10 +296,21 @@ public:
         epipolePx2 = round(epipole2);
     }
     
+    
+    
 private:
     EnhancedEpipolar * epipolarPtr;
     // based on the image gradient
-    void computeMask();
+    void computeMask()
+    {
+        Mat16s gradx, grady;
+        Sobel(img1, gradx, CV_16S, 1, 0, 3, 1/8.);
+        Sobel(img1, grady, CV_16S, 0, 1, 3, 1/8.);
+        Mat16s gradAbs = abs(gradx) + abs(grady);
+        Mat8u gradAbs8u;
+        gradAbs.convertTo(gradAbs8u, CV_8U);
+        threshold(gradAbs8u, maskMat, params.gradientThresh, 1, CV_THRESH_BINARY);
+    }
     
     bool epipoleInverted1, epipoleInverted2;
     Vector2d epipole1, epipole2;  // projection of the first camera center onto the second camera
@@ -298,6 +323,5 @@ private:
     Mat8u img1;    
     Mat8u maskMat; //TODO compute mask
     MotionStereoParameters params;
-    int verbosity;
 };
 

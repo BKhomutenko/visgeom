@@ -31,7 +31,7 @@ NOTE:
 #include "camera/generic_camera.h"
 
 const double DEFAULT_DEPTH = 1;
-const double MIN_DEPTH = 0.3;
+const double MIN_DEPTH = 0.1;
 const double DEFAULT_SIGMA_DEPTH = 100;
 
 class DepthMap

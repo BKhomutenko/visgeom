@@ -89,6 +89,15 @@ add_executable( reproject_plane
 
 target_link_libraries( reproject_plane ${OpenCV_LIBS} )
 
+add_executable( motion_test
+    test/reconstruction/motion_test.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+)
+
+target_link_libraries( motion_test ${OpenCV_LIBS} )
+
 ### LOCALIZATION ###
 
 add_executable( photometric
