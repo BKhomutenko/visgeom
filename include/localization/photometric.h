@@ -57,8 +57,6 @@ struct PhotometricPack
 {
     vector<float> colorVec;
     vector<Vector3d> cloud;
-    vector<Vector3d> gradientVec;
-    vector<double> gradValVec;
     vector<int> idxVec;
     int scaleIdx;
 };
@@ -150,12 +148,8 @@ struct PhotometricCostFunction : ceres::CostFunction
                     Matrix3d R21 = T12.rotMatInv();
                     Matrix3d M21 = R21 * interOmegaRot(T12.rot());
                     
-                    // computing the eqilibrium gradient
-                    Vector3d gradEq3 = R21 * _dataPack.gradientVec[i];
-                    Vector2d gradEq2 = (projJac * gradEq3).normalized() * _dataPack.gradValVec[i]; 
-                    
                     // intermediate matrix
-                    Matrix<double, 1, 3> dfdX = (grad + 0. * gradEq2.transpose()) * projJac;
+                    Matrix<double, 1, 3> dfdX = (grad) * projJac;
                     
                     // fill up the corresponding jacobian row
                     Map<Matrix<double, 1, 3>> jacV(jacobian[0] + i*6);
@@ -259,12 +253,15 @@ class ScalePhotometric
 {
 public:
     ScalePhotometric(int nScales, const ICamera * cam2) :
-            scaleSpace1(nScales),
-            scaleSpace2(nScales),
+            scaleSpace1(nScales, true),
+            scaleSpace2(nScales, false),
             camPtr2(cam2->clone()),
             verbosity(0) {}
             
-    ScalePhotometric() : camPtr2(NULL) {}
+    ScalePhotometric() : 
+            scaleSpace1(1, true),
+            scaleSpace2(1, false), 
+            camPtr2(NULL) {}
     virtual ~ScalePhotometric()
     {
         delete camPtr2;
@@ -288,17 +285,17 @@ public:
     
     void computeBaseScaleSpace(const Mat32f & img1);
     
-    PhotometricPack initPhotometricData(int scaleIdx);
-    
     void computePose(const Mat32f & img2, Transformation<double> & T12);
-    
-    // scaleSpace2 must be initialized
-    void computePose(int scaleIdx, Transformation<double> & T12);
-    void computePoseAuto(int scaleIdx, Transformation<double> & T12);
     
     void setVerbosity(int newVerbosity) { verbosity = newVerbosity; }
     
 private:
+    // scaleSpace2 must be initialized
+    void computePose(int scaleIdx, Transformation<double> & T12);
+    void computePoseAuto(int scaleIdx, Transformation<double> & T12);
+    
+    PhotometricPack initPhotometricData(int scaleIdx);
+
     BinaryScalSpace scaleSpace1;
     BinaryScalSpace scaleSpace2;
     ICamera * camPtr2;

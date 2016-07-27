@@ -105,7 +105,7 @@ int main(int argc, char** argv)
     paramFile >> stereoParams.dispMax;
     paramFile >> stereoParams.scale;
     paramFile.ignore();
-//    stereoParams.lambdaStep = 5;
+//    stereoParams.lambdaStep = 3;
 //    stereoParams.lambdaJump = 15;
     string fileName1, fileName2;
     getline(paramFile, fileName1);

@@ -205,8 +205,7 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     vector<int> kernelVec, waveVec;
     const int NORMALIZER = initKernel(kernelVec, LENGTH);
     const int WAVE_NORM = initWave(waveVec, LENGTH);
-    EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1, 2, 3, 5, 8, 13, 21});
-    vector<int> discHist(50, 0);
+    EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM/2, waveVec.data(), {1, 2, 3, 5});
     for (int y = 0; y < params.yMax; y++)
     {
         for (int x = 0; x < params.xMax; x++)
@@ -228,8 +227,15 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
             vector<uint8_t> descriptor;
             CurveRasterizer<int, Polynomial2> descRaster = getCurveRasteriser1(idx);
             const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
-            discHist[step]++;
-            int nSteps = (params.dispMax  + step - 1 ) / step; 
+            if (step < 1) 
+            {
+                //TODO make a function
+                uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;            
+                *outPtr = 0;
+                fill(outPtr + 1, outPtr + params.dispMax, 255);
+                continue;
+            }
+            const int nSteps = (params.dispMax  + step - 1 ) / step; 
             CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
                
             //sample the curve 

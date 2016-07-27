@@ -2,7 +2,6 @@
 #include "ocv.h"
 #include "eigen.h"
 #include "timer.h"
-#include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_motion_stereo.h"
 
 int main(int argc, char** argv)
@@ -80,7 +79,6 @@ int main(int argc, char** argv)
     
     Mat8u img1 = imread(fileName1, 0);
     Mat8u img2 = imread(fileName2, 0);
-    Mat16s img1lap, img2lap;
 
 //    
 //    Laplacian(img1, img1lap, CV_16S, 3);
@@ -126,7 +124,7 @@ int main(int argc, char** argv)
     
     DepthMap depth(&camera1, w, h, u0, v0, stereoParams.scale);
     depth.setDefault();
-    Mat8u res;
+    Mat32f res;
     timer.reset();
     stereo.computeDepth(TleftRight, img2, depth);
     cout << timer.elapsed() << endl;
@@ -144,7 +142,7 @@ int main(int argc, char** argv)
     
     imshow("out1", out1);
     imshow("out2", out2);
-    imshow("res", res*100);
+    imshow("res", res/10);
     waitKey(); 
     return 0;
 }

@@ -47,6 +47,7 @@ public:
                 vector<uint8_t> & descVec)
     {
         descVec.resize(LENGTH);
+        bool imageBorder = false;
         for (int step : samplingStepVec)
         {
             CurveRasterizer<int, Polynomial2> descRaster(descRasterRef);
@@ -54,15 +55,27 @@ public:
             descRaster.steps(-HALF_LENGTH);
             for (int i = 0; i < LENGTH; i++, descRaster.step())
             {
+                if (descRaster.v < 0 or descRaster.v >= img1.rows 
+                    or descRaster.u < 0 or descRaster.u >= img1.cols)
+                {
+                    imageBorder = true;
+                    break;
+                }
                 descVec[i] = img1(descRaster.v, descRaster.u);
             }
-            int descResp = filter(wavePtr, wavePtr + LENGTH, descVec.begin(), 0);
-            if (abs(descResp) > WAVE_THRESH) return step;
+            if (imageBorder) return -1;
+            descResp = filter(wavePtr, wavePtr + LENGTH, descVec.begin(), 0);
+            if (goodResp()) return step;
         }
         return samplingStepVec.back();
     }
-       
+    
+    int getResp() { return descResp; }
+    
+    bool goodResp() { return abs(descResp) > WAVE_THRESH; }
+    
 private:
+    int descResp;
     const int LENGTH;
     const int HALF_LENGTH;
     const int WAVE_THRESH;

@@ -52,7 +52,6 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
     double scale = scaleSpace1.getActiveScale();
     vector<double> distVec;
     vector<Vector2d> imagePointVec;
-    vector<Vector2d> imageGradPointVec;
     if (verbosity > 3) cout << "    scaled image size : " << img1.size() << endl;
     for (int vs = 0; vs < img1.rows; vs++)
     {
@@ -67,21 +66,12 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
             if (dist < 0.01) continue;
             if (verbosity > 3) cout << "    " << vs << " " << us << endl;
             dataPack.colorVec.push_back(img1(vs, us));
-            dataPack.gradValVec.push_back(sqrt(gu*gu + gv*gv) / scale);
             imagePointVec.emplace_back(ub, vb);
-            imageGradPointVec.emplace_back(ub + gu/GRAD_MAX, vb + gv/GRAD_MAX);
             dataPack.idxVec.push_back(vs*img1.cols + us);
         }
     }
     // TODO check the reconstruction and discard bad points
-    vector<Vector3d> cloudGradPointVec;
-    depthMap.reconstruct(imageGradPointVec, cloudGradPointVec);
     depthMap.reconstruct(imagePointVec, dataPack.cloud);
-    for (int i = 0; i < dataPack.cloud.size(); i++)
-    {
-        dataPack.gradientVec.push_back( (cloudGradPointVec[i] - dataPack.cloud[i]).normalized() );
-        
-    }
     return dataPack;
 }
 
@@ -92,10 +82,10 @@ void ScalePhotometric::computePose(const Mat32f & img2, Transformation<double> &
         cout << "ScalePhotometric::computePose" << endl;
     }
     scaleSpace2.generate(img2);
+    //TODO set the optimization depth with the parameters   v
     for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 2; scaleIdx--)
     {
         computePose(scaleIdx, T12);
-//        break;
     }
 }
 

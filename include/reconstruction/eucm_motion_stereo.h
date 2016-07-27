@@ -38,7 +38,7 @@ struct MotionStereoParameters
 {
     int scale = 3;
     int descLength = 5;
-    int gradientThresh = 5;
+    int gradientThresh = 10;
     int verbosity = 0;
     int uMargin = 25, vMargin = 25;  // RoI left upper corner
     int biasMax = 10;
@@ -91,7 +91,7 @@ public:
         vector<int> kernelVec, waveVec;
         const int NORMALIZER = initKernel(kernelVec, LENGTH);
         const int WAVE_NORM = initWave(waveVec, LENGTH);
-        
+        EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1, 2, 3});
         
         if (params.verbosity > 1) cout << "    computing the scan limits" << endl;
         // get uncertainty range reconstruction in the first frame
@@ -146,15 +146,9 @@ public:
             if (epipoleInverted1) descRaster.setStep(-1);
             
             // compute the actual descriptor
-            descRaster.steps(-HALF_LENGTH);
-            vector<uint8_t> descriptor(LENGTH);
-            for (int i = 0; i < LENGTH; i++, descRaster.step())
-            {
-                descriptor[i] = img1(descRaster.v, descRaster.u);
-            }
-            
-            int descResp = filter(waveVec.begin(), waveVec.end(), descriptor.begin(), 0);
-            if (descResp < WAVE_NORM/2)
+            vector<uint8_t> descriptor;
+            const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
+            if (not epipolarDescriptor.goodResp() or step < 1)
             {
                 depth.nearest(pointVec[ptIdx]) = 0;
                 continue;
@@ -166,23 +160,22 @@ public:
             Vector2i goal = round(pointMinVec[ptIdx]);
             CurveRasterizer<int, Polynomial2> raster(round(pointMaxVec[ptIdx]), goal,
                                                 epipolarPtr->getSecond(minDistVec[ptIdx]));
-            raster.steps(-HALF_LENGTH);
+            Vector2i diff = round(pointMaxVec[ptIdx]) - goal;
+            const int distance = min(int(diff.norm()), params.dispMax);
+            raster.steps(-HALF_LENGTH*step);
             vector<uint8_t> sampleVec;
             vector<int> uVec, vVec;
-            uVec.reserve(params.dispMax);
-            vVec.reserve(params.dispMax);
-            sampleVec.reserve(params.dispMax);
-            int loopCount = HALF_LENGTH;
-            bool loopFlag = false;
-            for (int d = 0; d < params.dispMax and loopCount > 0; d++, raster.step())
+            const int margin = LENGTH*step - 1;
+            uVec.reserve(distance + margin);
+            vVec.reserve(distance + margin);
+            sampleVec.reserve(distance + margin);
+            for (int d = 0; d < distance + margin; d++, raster.step())
             {
                 if (raster.v < 0 or raster.v >= img2.rows 
                     or raster.u < 0 or raster.u >= img2.cols) sampleVec.push_back(0);
                 else sampleVec.push_back(img2(raster.v, raster.u));
                 uVec.push_back(raster.u);
                 vVec.push_back(raster.v);
-                if (not loopFlag) loopFlag = (abs(goal[0] - raster.u) + abs(goal[1] - raster.v) <= 1);
-                else loopCount--;
             }
             
             if (params.verbosity > 2) cout << "        find the best candidate" << endl;
@@ -190,13 +183,14 @@ public:
             int dBest = 0;
             int eBest = LENGTH*255;
             int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
-            for (int d = 0; d < sampleVec.size() - LENGTH + 1; d++)
+//            cout << "ERROR CURVE " << step << endl;
+            for (int d = 0; d < distance; d++)
             {
                 int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-                int bias = min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
+                int bias = 0; // min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
                 int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
-                                    descriptor.begin(), sampleVec.begin() + d, bias);
-                
+                                    descriptor.begin(), sampleVec.begin() + d, bias, step);
+//                cout << acc << endl;
                 if (eBest > acc)
                 {
                     eBest = acc;
@@ -211,7 +205,7 @@ public:
             triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
                     uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], X2);
             depth.nearest(pointVec[ptIdx]) = X1.norm();
-            depth.nearestSigma(pointVec[ptIdx]) = (X2.norm() - X1.norm()) / 2;
+            depth.nearestSigma(pointVec[ptIdx]) = (X2- X1).norm() / 2;
         }
         
         delete epipolarPtr;

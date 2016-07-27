@@ -23,6 +23,7 @@ Scale space for multiscale optimization
 
 #include "std.h"
 #include "ocv.h"
+#include "io.h"
 
 class BinaryScalSpace
 {
@@ -34,30 +35,21 @@ public:
     {
         assert(numScales > 0);
         imgVec.resize(numScales);
-        if (gradientOn)
-        {
-            gradUVec.resize(numScales);
-            gradVVec.resize(numScales);
-        }
+        if (gradientOn) resizeGradient();
     }
     
     void setGradient(bool val)
     {
         gradientOn = val; 
+        if (gradientOn) resizeGradient();
     }
     
     void setNumberScales(int val)
     {
         assert(val > 0);
         imgVec.resize(val);
-        if (gradientOn)
-        {
-            gradUVec.resize(val);
-            gradVVec.resize(val);
-        }
+        if (gradientOn) resizeGradient();
     }
-    
-//    virtual ~ScalSpace();
     
     void generate(const Mat8u & img)
     {
@@ -71,21 +63,6 @@ public:
         propagate();
     }
 
-    void propagate()
-    {
-        for (int i = 1; i < imgVec.size(); i++)
-        {
-            Mat32f blured;
-            GaussianBlur(imgVec[i - 1], blured, Size(3, 3), 0, 0);
-            resize(blured, imgVec[i], Size(blured.cols/2, blured.rows/2));
-            if (gradientOn)
-            {
-                Sobel(imgVec[i], gradUVec[i], CV_32F, 1, 0, 3, 1./8);
-                Sobel(imgVec[i], gradVVec[i], CV_32F, 0, 1, 3, 1./8);
-            }
-        }
-    }
-    
     const Mat32f & get() const { return imgVec[activeScaleIdx]; }
     const Mat32f & getGradU() const { return gradUVec[activeScaleIdx]; }
     const Mat32f & getGradV() const { return gradVVec[activeScaleIdx]; }
@@ -117,6 +94,28 @@ public:
     double vScaled(double v) const { return v / activeScale; }
     
 private:
+
+    void resizeGradient()
+    {
+        gradUVec.resize(size());
+        gradVVec.resize(size());
+    }
+    
+    void propagate()
+    {
+        for (int i = 1; i < imgVec.size(); i++)
+        {
+            Mat32f blured;
+            GaussianBlur(imgVec[i - 1], blured, Size(3, 3), 0, 0);
+            resize(blured, imgVec[i], Size(blured.cols/2, blured.rows/2));
+            if (gradientOn)
+            {
+                Sobel(imgVec[i], gradUVec[i], CV_32F, 1, 0, 3, 1./8);
+                Sobel(imgVec[i], gradVVec[i], CV_32F, 0, 1, 3, 1./8);
+            }
+        }
+    }
+    
     std::vector<Mat32f> imgVec;
     std::vector<Mat32f> gradUVec;
     std::vector<Mat32f> gradVVec;
