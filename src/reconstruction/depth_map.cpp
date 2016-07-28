@@ -256,12 +256,6 @@ void DepthMap::reconstruct(const Vector2dVec & queryPointVec,
     }
 }
 
-void DepthMap::reconstruct(const Vector2dVec & queryPointVec, Vector3dVec & result) const
-{
-    vector<int> foo;
-    reconstruct(queryPointVec, foo, result);
-}
-
 void DepthMap::project(const Vector3dVec & pointVec, Vector2dVec & result) const
 {
     cameraPtr->projectPointCloud(pointVec, result);

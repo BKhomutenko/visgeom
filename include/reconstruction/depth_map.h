@@ -137,8 +137,8 @@ public:
     // idxVec corresponds to indices of points in queryPointVec
     void reconstruct(const Vector2dVec & queryPointVec,
             std::vector<int> & idxVec, Vector3dVec & result) const;
-    void reconstruct(const Vector2dVec & queryPointVec, Vector3dVec & result) const;
     
+    //TODO make it bool and make it return a mask
     void project(const Vector3dVec & pointVec, Vector2dVec & result) const;
     
     int getWidth() const { return width; }
