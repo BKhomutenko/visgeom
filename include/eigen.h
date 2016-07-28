@@ -38,6 +38,8 @@ using Vector3 = Eigen::Matrix<T, 3, 1>;
 template<typename T>
 using Matrix3 = Eigen::Matrix<T, 3, 3>;
 
+using Covector2d = Eigen::Matrix<double, 1, 2>;
+using Covector3d = Eigen::Matrix<double, 1, 3>;
 using Eigen::Matrix;
 using Eigen::Vector2d;
 using Eigen::Vector3d;

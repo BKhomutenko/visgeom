@@ -31,6 +31,7 @@ using std::string;
 
 using std::istringstream;
 using std::ifstream;
+using std::ofstream;
 using std::cin;
 using std::cout;
 using std::endl;

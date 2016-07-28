@@ -19,10 +19,6 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "generic_calibration.h"
 
-#include <string> 
-
-using ceres::SoftLOneLoss;
-
 template<template<typename> class Projector>
 struct StereoGridProjection 
 {

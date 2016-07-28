@@ -88,6 +88,7 @@ void EnhancedStereo::computeRotated()
     Transform12.inverseRotate(reconstVec, reconstRotVec);
 }
 
+//FIXME maskVec must be recomputed to discard not projected pInf
 void EnhancedStereo::computePinf()
 {
     camera2->projectPointCloud(reconstRotVec, pinfVec);

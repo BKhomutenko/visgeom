@@ -17,23 +17,15 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-#include <cmath>
-#include <algorithm>
-
-#include <ceres/ceres.h>
-#include <glog/logging.h>
-
+#include "std.h"
 #include "io.h"
 #include "ocv.h"
 #include "eigen.h"
-#include "cost_functors.h"
+#include "ceres.h"
 
-using ceres::DynamicAutoDiffCostFunction;
-using ceres::CostFunction;
-using ceres::Problem;
-using ceres::Solver;
-using ceres::Solve;
-using ceres::SoftLOneLoss;
+#include <glog/logging.h>
+
+#include "cost_functors.h"
 
 int nObjects = 0;
 

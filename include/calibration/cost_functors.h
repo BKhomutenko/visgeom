@@ -19,7 +19,6 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "eigen.h"
 
-
 template<template<typename> class Projector>
 struct GridProjection 
 {

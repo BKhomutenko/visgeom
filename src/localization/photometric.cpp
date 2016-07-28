@@ -21,18 +21,9 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "std.h"
 #include "eigen.h"
 #include "ocv.h"
-
-#include <ceres/ceres.h>
-#include <ceres/cubic_interpolation.h>
+#include "ceres.h"
 
 #include "camera/eucm.h"
-
-using ceres::DynamicAutoDiffCostFunction;
-using ceres::CostFunction;
-using ceres::Problem;
-using ceres::Solver;
-using ceres::Solve;
-using ceres::SoftLOneLoss;
 
 void ScalePhotometric::computeBaseScaleSpace(const Mat32f & img1)
 {
@@ -50,7 +41,8 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
     const Mat32f & gradU1 = scaleSpace1.getGradU();
     const Mat32f & gradV1 = scaleSpace1.getGradV();
     double scale = scaleSpace1.getActiveScale();
-    vector<double> distVec;
+    vector<double> colorVec;
+    vector<int> packIdxVec;
     vector<Vector2d> imagePointVec;
     if (verbosity > 3) cout << "    scaled image size : " << img1.size() << endl;
     for (int vs = 0; vs < img1.rows; vs++)
@@ -59,19 +51,25 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
         {
             double gu = gradU1(vs, us);
             double gv = gradV1(vs, us);
-            if (gu*gu + gv*gv < GRAD_THRESH) continue;
+            if (gu*gu + gv*gv < GRAD_THRESH) continue; 
+            //TODO change the threshold depending on the image size or use adaptive random sampling
+            // to speed up the computation
             int ub = scaleSpace1.uBase(us);
             int vb = scaleSpace1.vBase(vs);
-            double dist = depthMap.nearest(ub, vb);
-            if (dist < 0.01) continue;
             if (verbosity > 3) cout << "    " << vs << " " << us << endl;
-            dataPack.colorVec.push_back(img1(vs, us));
+            colorVec.push_back(img1(vs, us));
             imagePointVec.emplace_back(ub, vb);
-            dataPack.idxVec.push_back(vs*img1.cols + us);
+            packIdxVec.push_back(vs*img1.cols + us);
         }
     }
-    // TODO check the reconstruction and discard bad points
-    depthMap.reconstruct(imagePointVec, dataPack.cloud);
+    vector<int> reconstIdxVec;
+    depthMap.reconstruct(imagePointVec, reconstIdxVec, dataPack.cloud);
+    for (auto & idx : reconstIdxVec)
+    {
+        dataPack.idxVec.push_back(packIdxVec[idx]);
+        dataPack.colorVec.push_back(colorVec[idx]);
+    }
+    cout << "DATAPACK SIZE : " << reconstIdxVec.size() << endl;
     return dataPack;
 }
 
@@ -116,6 +114,101 @@ void ScalePhotometric::computePose(int scaleIdx, Transformation<double> & T12)
     else if (verbosity > 1) cout << summary.BriefReport() << endl;
     T12 = Transformation<double>(pose.data());
 }
+
+void ScalePhotometric::computePoseMI(const Mat32f & img2, Transformation<double> & T12)
+{
+    if (verbosity > 0) 
+    {
+        cout << "ScalePhotometric::computePoseMI" << endl;
+    }
+    scaleSpace2.generate(img2);
+    //TODO set the optimization depth with the parameters   v
+    for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 2; scaleIdx--)
+    {
+        computePoseMI(scaleIdx, T12);
+    }
+}
+
+//TODO put to a separate file   
+void saveSurface(string fileName, FirstOrderFunction * func, 
+        int idx1, int idx2, double step, int Nsteps, double* params)
+{
+    vector<double> paramVec(params, params + func->NumParameters());
+    ofstream surfaceFile;
+    surfaceFile.open(fileName);
+    for (int i = -Nsteps; i <= Nsteps; i++)
+    {
+        for (int j = -Nsteps; j <= Nsteps; j++)
+        {
+            double f;
+            paramVec[idx1] = params[idx1] + i*step;
+            paramVec[idx2] = params[idx2] + j*step;
+            func->Evaluate(paramVec.data(), &f, NULL);
+            surfaceFile << setw(15) << f;
+        }
+        surfaceFile << endl;
+    }
+    surfaceFile.close();
+}
+
+
+void ScalePhotometric::computePoseMI(int scaleIdx, Transformation<double> & T12)
+{
+    if (verbosity > 1) 
+    {
+        cout << "ScalePhotometric::computePoseMI with scaleIdx = " << scaleIdx << endl;
+    }
+    PhotometricPack dataPack = initPhotometricData(scaleIdx);
+    scaleSpace2.setActiveScale(scaleIdx);
+    const Mat32f & img2 = scaleSpace2.get();
+    array<double, 6> pose = T12.toArray();
+    MutualInformation * costFunction = new MutualInformation(camPtr2, dataPack,
+                                                        img2, scaleSpace2.getActiveScale(), 8, 255);
+    
+    //TODO put to a separate file                                                    
+//    array<double, 6> grad;
+//    double val;
+//    array<double, 6> val1;
+//    array<double, 6> val2;
+//    double eps = 1e-5;
+//    costFunction->Evaluate(pose.data(), &val, grad.data());
+//    for (int i = 0; i < 6; i++)
+//    {
+//        pose[i] += eps;
+//        costFunction->Evaluate(pose.data(), &val2[i], NULL);
+//        pose[i] -= 2*eps;
+//        costFunction->Evaluate(pose.data(), &val1[i], NULL);
+//        pose[i] += eps;
+//    }
+//    
+//    for (int i = 0; i < 6; i++)
+//    {
+//        cout << grad[i] << "    " << (val2[i] - val1[i]) / 2 / eps << endl;
+//    }
+    
+//    return;
+    GradientProblem problem(costFunction);
+    
+    if (verbosity > 2) cout << "    Problem created" << endl;
+    //run the solver
+    GradientProblemSolver::Options options;
+    options.line_search_direction_type = ceres::BFGS;
+//    options.use_approximate_eigenvalue_bfgs_scaling = true;
+//    options.line_search_interpolation_type = ceres::CUBIC;
+    options.function_tolerance = 1e-2;
+    options.gradient_tolerance = 1e-3;
+//    options.linear_solver_type = ceres::DENSE_QR;
+//    options.max_num_iterations = 15;
+    if (verbosity > 2) options.minimizer_progress_to_stdout = true;
+    GradientProblemSolver::Summary summary;
+    Solve(options, problem, pose.data(), &summary);
+    if (verbosity > 2) cout << summary.FullReport() << endl;
+    else if (verbosity > 1) cout << summary.BriefReport() << endl;
+    T12 = Transformation<double>(pose.data());
+    cout << T12 << endl;
+//    saveSurface("surf01.txt", costFunction, 2, 3, 0.0005, 50, pose.data());
+}
+
 
 // Optimization using the auto differentiation
 //void ScalePhotometric::computePoseAuto(int scaleIdx, Transformation<double> & T12)

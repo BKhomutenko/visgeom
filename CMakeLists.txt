@@ -111,6 +111,16 @@ add_executable( photometric
 target_link_libraries( photometric ${OpenCV_LIBS} )
 TARGET_LINK_LIBRARIES( photometric ${CERES_LIBRARIES})
 
+add_executable( mi_test
+    test/localization/mi_test.cpp
+    src/localization/photometric.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+)
+
+target_link_libraries( mi_test ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( mi_test ${CERES_LIBRARIES})
 
 if(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS "-O2")        ## Optimize
