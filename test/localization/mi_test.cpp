@@ -125,9 +125,9 @@ int main (int argc, char const* argv[])
         Transformation<double> T02(robotPose2.data());
         Transformation<double> T12 = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         cout << "REAL POSE : " << T12 << endl;
-        T12 = T12.compose(Transformation<double>(-0.01, -0.01, -0.3, -0.003, -0.003, -0.005));
-//        T12 = T12.compose(Transformation<double>(-0.001, 0.005, -0.01, 0.001, 0.001, 0.001));
-        Mat32f img2 = 255 - imread(imageDir + imageName, 0);
+//        T12 = T12.compose(Transformation<double>(-0.01, -0.01, -0.2, -0.003, -0.003, -0.005));
+        T12 = T12.compose(Transformation<double>(-0.001, 0.005, -0.01, 0.001, 0.001, 0.001));
+        Mat32f img2 = imread(imageDir + imageName, 0);
         double min, max;
         cv::minMaxLoc(img2, &min, &max);
         cout << "MIN and MAX : "  << min << " " << max << endl;
