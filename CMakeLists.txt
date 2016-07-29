@@ -103,6 +103,7 @@ target_link_libraries( motion_test ${OpenCV_LIBS} )
 add_executable( photometric
     test/localization/photometric_test.cpp
     src/localization/photometric.cpp
+    src/localization/cost_functions.cpp
     src/reconstruction/eucm_stereo.cpp
     src/reconstruction/eucm_epipolar.cpp
     src/reconstruction/depth_map.cpp
@@ -114,6 +115,7 @@ TARGET_LINK_LIBRARIES( photometric ${CERES_LIBRARIES})
 add_executable( mi_test
     test/localization/mi_test.cpp
     src/localization/photometric.cpp
+    src/localization/cost_functions.cpp
     src/reconstruction/eucm_stereo.cpp
     src/reconstruction/eucm_epipolar.cpp
     src/reconstruction/depth_map.cpp

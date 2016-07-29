@@ -68,7 +68,7 @@ public:
     }
 
     //TODO implement the projection and distortion Jacobian
-    virtual bool projectionJacobian(const Vector3d & src, Eigen::Matrix<double, 2, 3> & Jac) const
+    virtual bool projectionJacobian(const Vector3d & src, Matrix23d & Jac) const
     {
         const double & u0 = params[0];
         const double & v0 = params[1];

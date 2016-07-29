@@ -38,7 +38,7 @@ public:
 
     //TODO implement the projection and distortion Jacobian
     virtual bool projectionJacobian(const Vector3d & src,
-            Eigen::Matrix<double, 2, 3> & Jac) const {return 0;}
+            Matrix23d & Jac) const {return false;}
 
     virtual void setParameters(const double * const newParams)
     {

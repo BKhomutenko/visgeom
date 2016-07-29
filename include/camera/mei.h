@@ -97,12 +97,6 @@ public:
         return projector(params.data(), src.data(), dst.data());
     }
     
-    virtual bool projectionJacobian(const Vector3d & src, Eigen::Matrix<double, 2, 3> & Jac) const
-    {
-        return false;
-
-    }
-    
     
     virtual MeiCamera * clone() const { return new MeiCamera(width, height, params.data()); }
     

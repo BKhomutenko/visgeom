@@ -41,7 +41,7 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
     const Mat32f & gradU1 = scaleSpace1.getGradU();
     const Mat32f & gradV1 = scaleSpace1.getGradV();
     double scale = scaleSpace1.getActiveScale();
-    vector<double> colorVec;
+    vector<double> valVec;
     vector<int> packIdxVec;
     vector<Vector2d> imagePointVec;
     if (verbosity > 3) cout << "    scaled image size : " << img1.size() << endl;
@@ -56,8 +56,8 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
             // to speed up the computation
             int ub = scaleSpace1.u(us);
             int vb = scaleSpace1.v(vs);
-            if (verbosity > 3) cout << "    " << vs << " " << us << endl;
-            colorVec.push_back(img1(vs, us));
+            if (verbosity > 4) cout << "    " << vs << " " << us << endl;
+            valVec.push_back(img1(vs, us));
             imagePointVec.emplace_back(ub, vb);
             packIdxVec.push_back(vs*img1.cols + us);
         }
@@ -67,9 +67,9 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
     for (auto & idx : reconstIdxVec)
     {
         dataPack.idxVec.push_back(packIdxVec[idx]);
-        dataPack.colorVec.push_back(colorVec[idx]);
+        dataPack.valVec.push_back(valVec[idx]);
     }
-    cout << "DATAPACK SIZE : " << reconstIdxVec.size() << endl;
+    if (verbosity > 3) cout << "    datapack size : " << reconstIdxVec.size() << endl;
     return dataPack;
 }
 
@@ -209,95 +209,4 @@ void ScalePhotometric::computePoseMI(int scaleIdx, Transformation<double> & T12)
 //    saveSurface("surf01.txt", costFunction, 2, 3, 0.0005, 50, pose.data());
 }
 
-
-// Optimization using the auto differentiation
-//void ScalePhotometric::computePoseAuto(int scaleIdx, Transformation<double> & T12)
-//{
-//    if (verbosity > 1) 
-//    {
-//        cout << "ScalePhotometric::computePoseAuto with scaleIdx = " << scaleIdx << endl;
-//    }
-//    PhotometricPack dataPack = initPhotometricData(scaleIdx);
-//    scaleSpace2.setActiveScale(scaleIdx);
-////    const Mat32f & img1 = scaleSpace1.get();
-//    const Mat32f & img2 = scaleSpace2.get();
-//    array<double, 6> pose = T12.toArray();
-//    typedef DynamicAutoDiffCostFunction<PhotometricError<EnhancedProjector>> photometricCF;
-//    PhotometricError<EnhancedProjector> * errorFunctor;
-//    errorFunctor = new PhotometricError<EnhancedProjector>(camPtr2->params, dataPack,
-//                             img2, scaleSpace2.getActiveScale());
-//    photometricCF * costFunctionAuto = new photometricCF(errorFunctor);
-//    costFunctionAuto->AddParameterBlock(6);
-//    costFunctionAuto->SetNumResiduals(dataPack.cloud.size());
-//    
-//    
-//    
-//    Problem problemAuto;
-//    problemAuto.AddResidualBlock(costFunctionAuto, new SoftLOneLoss(1), pose.data());
-// 
-//    //run the solver
-//    Solver::Options options;
-//    options.linear_solver_type = ceres::DENSE_QR;
-//    options.max_num_iterations = 150;
-//    if (verbosity > 2) options.minimizer_progress_to_stdout = true;
-//    Solver::Summary summary;
-//    Solve(options, &problemAuto, &summary);
-//    if (verbosity > 2) cout << summary.FullReport() << endl;
-//    else if (verbosity > 1) cout << summary.BriefReport() << endl;
-//    T12 = Transformation<double>(pose.data());
-//}
-
-//bool PhotometricLocalization::wrapImage(const Mat32f & img2, Mat32f & imgOut,
-//        Transformation<double> & T12)
-//{
-//    imgOut.create(cam1.height, cam1.width);
-//    imgOut.setTo(0);
-//    
-//    vector<Vector3d> cloud2;
-//    T12.inverseTransform(dataPack.cloud, cloud2);
-//    
-//    vector<Vector2d> pointVec2;
-//    cam2.projectPointCloud(cloud2, pointVec2);
-//    
-//    for (int i = 0; i < pointVec2.size(); i++)
-//    {
-//        int u = round(pointVec2[i][0]), v = round(pointVec2[i][1]);
-//        if (u < 0 or u >= img2.cols or v < 0 or v > img2.rows) continue;
-//        imgOut(dataPack.idxVec[i]) = img2(v, u);
-//    }
-//    return true;
-//}
-
-//const int step = 27;
-
-//bool PhotometricLocalization::initCloud(const Mat32f & img1, const Mat32f & dist)
-//{
-//    vector<Vector2d> imagePointVec;
-//    vector<double> distVec;
-//    for (int v = 0; v < img1.rows; v += step)
-//    {
-//        for (int u = 0; u < img1.cols; u += step)
-//        {
-//            //TODO change it
-//            int ud = params.uSmall(u);
-//            int vd = params.vSmall(v);
-//            if (ud < 0 or ud >= dist.cols or vd < 0 or vd >= dist.rows) continue;
-//            if (dist(vd, ud) < 0.01) continue;
-////            cout << u << " " << v <<" " << ud << " " << vd << " " << dist(vd, ud) << endl;
-//            dataPack.colorVec.push_back(img1(v, u));
-//            imagePointVec.emplace_back(u, v);
-//            distVec.push_back(dist(vd, ud));
-//            dataPack.idxVec.push_back(v*img1.cols + u);
-//        }
-//    }
-////    cout << indexVec.size() << endl;
-//    // TODO check the reconstruction and discard bad points
-//    cam1.reconstructPointCloud(imagePointVec, dataPack.cloud);
-//    for (int i = 0; i < dataPack.cloud.size(); i++)
-//    {
-//        dataPack.cloud[i] = dataPack.cloud[i] * (distVec[i] / dataPack.cloud[i].norm());
-////        cout << cloud[i].transpose() << endl;
-//    }
-//    return true;
-//}
 

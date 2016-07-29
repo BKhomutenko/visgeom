@@ -103,7 +103,7 @@ public:
         return projector(params.data(), src.data(), dst.data()); 
     }
     
-    virtual bool projectionJacobian(const Vector3d & src, Eigen::Matrix<double, 2, 3> & Jac) const
+    virtual bool projectionJacobian(const Vector3d & src, Matrix23d & Jac) const
     {
         const double & alpha = params[0];
         const double & beta = params[1];

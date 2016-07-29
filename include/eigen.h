@@ -40,6 +40,8 @@ using Matrix3 = Eigen::Matrix<T, 3, 3>;
 
 using Covector2d = Eigen::Matrix<double, 1, 2>;
 using Covector3d = Eigen::Matrix<double, 1, 3>;
+using Covector6d = Eigen::Matrix<double, 1, 6>;
+using Matrix23d = Eigen::Matrix<double, 2, 3, Eigen::RowMajor>;
 using Eigen::Matrix;
 using Eigen::Vector2d;
 using Eigen::Vector3d;
