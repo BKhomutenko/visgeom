@@ -28,8 +28,8 @@ NOTE:
 struct ScaleParameters
 {
     // basic parameters
-    int scale = 3;
-    int u0, v0;
+    int scale = 1;
+    int u0 = 0, v0 = 0;
     int uMax, vMax;
     int xMax, yMax;
     

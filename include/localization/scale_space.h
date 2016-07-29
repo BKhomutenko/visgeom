@@ -25,18 +25,23 @@ Scale space for multiscale optimization
 #include "ocv.h"
 #include "io.h"
 
-class BinaryScalSpace
+#include "utils/scale_parameters.h"
+
+class BinaryScalSpace : private ScaleParameters
 {
 public:
     BinaryScalSpace(int numScales = 1, bool withGradient = false) : 
-            activeScale(1), 
             activeScaleIdx(0), 
             gradientOn(withGradient)
     {
+        scale = 1;
         assert(numScales > 0);
         imgVec.resize(numScales);
         if (gradientOn) resizeGradient();
     }
+    
+    using ScaleParameters::u;
+    using ScaleParameters::v;
     
     void setGradient(bool val)
     {
@@ -69,29 +74,23 @@ public:
     
     int size() const { return imgVec.size(); }
     
-    int scale(int idx) const { return (1 << idx); }
+    int scaleByIdx(int idx) const { return (1 << idx); }
     
     void setActiveScale(int idx) 
     { 
-        activeScale = scale(idx);
+        scale = scaleByIdx(idx);
         activeScaleIdx = idx;
     }
     
     int getActiveScale() 
     { 
-        return activeScale;
+        return scale;
     }
     
     int getActiveIdx()
     {
         return activeScaleIdx;
     }
-    
-    double uBase(double u) const { return u * activeScale; }
-    double vBase(double v) const { return v * activeScale; }
-    
-    double uScaled(double u) const { return u / activeScale; }
-    double vScaled(double v) const { return v / activeScale; }
     
 private:
 
@@ -119,7 +118,6 @@ private:
     std::vector<Mat32f> imgVec;
     std::vector<Mat32f> gradUVec;
     std::vector<Mat32f> gradVVec;
-    int activeScale;
     int activeScaleIdx;
     bool gradientOn;
 };
