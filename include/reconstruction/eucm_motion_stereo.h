@@ -96,21 +96,13 @@ public:
         if (params.verbosity > 1) cout << "    computing the scan limits" << endl;
         // get uncertainty range reconstruction in the first frame
         
-        cout << 222 << endl;
         // discard non-salient points
-        for (int y = 0; y < depth.getHeight(); y++)
-        {
-            for (int x = 0; x < depth.getWidth(); x++)
-            {
-                if ( not maskMat(depth.v(y), depth.u(x)) ) depth.at(x, y) = 0;
-            }
-        }
+        depth.applyMask(maskMat);
         
         vector<int> idxVec;
-        Vector2dVec pointVec; 
         Vector3dVec minDistVec, maxDistVec;
         depth.reconstructUncertainty(idxVec, minDistVec, maxDistVec);
-        depth.getPointVec(idxVec, pointVec);
+        Vector2dVec pointVec = depth.getPointVec(idxVec);
         // reproject them onto the second image
         Vector3dVec minDist2Vec, maxDist2Vec;
         T12.inverseTransform(minDistVec, minDist2Vec);

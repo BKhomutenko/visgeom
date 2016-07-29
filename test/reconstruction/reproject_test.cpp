@@ -39,8 +39,8 @@ int main(int argc, char** argv)
     
     Transformation<double> T01(0.7, 0.1, 0.5, 0.1, -0.3, 0.5);
     Transformation<double> T0plane(0, 0, 1.5, 0, 0, 0);
-    stereoParams.imageWidth = COLS;
-    stereoParams.imageHeight = ROWS;
+    stereoParams.uMax = COLS;
+    stereoParams.vMax = ROWS;
     
     EnhancedCamera camera(params.data());
     EnhancedStereo stereo(Transformation<double>(),

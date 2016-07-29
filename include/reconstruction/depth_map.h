@@ -27,33 +27,33 @@ NOTE:
 #include "io.h"
 #include "std.h"
 #include "eigen.h"
+#include "ocv.h"
 
 #include "camera/generic_camera.h"
+#include "utils/scale_parameters.h"
 
 const double DEFAULT_DEPTH = 1;
 const double MIN_DEPTH = 0.1;
 const double DEFAULT_SIGMA_DEPTH = 100;
 
-class DepthMap
+class DepthMap : private ScaleParameters
 {
 public:
     DepthMap() : cameraPtr(NULL) {}
     
     //copy constructor
     DepthMap(const DepthMap & depth) :
+            ScaleParameters(depth),
             cameraPtr(depth.cameraPtr->clone()),
-            width(depth.width),
-            height(depth.height),
-            u0(depth.u0),
-            v0(depth.v0),
-            scale(depth.scale),
             valVec(depth.valVec),
             sigmaVec(depth.sigmaVec) {}
     
     //basic constructor        
-    DepthMap(const ICamera * camera, int w, int h, double u0, double v0, int scale) :
-            cameraPtr(camera->clone()), width(w), height(h), u0(u0), v0(v0), scale(scale),
-            valVec(w*h, DEFAULT_DEPTH),  sigmaVec(w*h, DEFAULT_SIGMA_DEPTH)  {}
+    DepthMap(const ICamera * camera, const ScaleParameters & params) :
+            ScaleParameters(params),
+            cameraPtr(camera->clone()),
+            valVec(xMax*yMax, DEFAULT_DEPTH),
+            sigmaVec(xMax*yMax, DEFAULT_SIGMA_DEPTH)  {}
 
     virtual ~DepthMap() 
     {
@@ -67,11 +67,7 @@ public:
         {
             delete cameraPtr;
             cameraPtr = other.cameraPtr->clone();
-            width = other.width;
-            height = other.height;
-            u0 = other.u0;
-            v0 = other.v0;
-            scale = other.scale;
+            ScaleParameters::operator = (other);
             valVec = other.valVec;
             sigmaVec = other.sigmaVec;
         }
@@ -88,6 +84,8 @@ public:
         fill(valVec.begin(), valVec.end(), val);
         fill(sigmaVec.begin(), sigmaVec.end(), sigmaVal);
     }
+    
+    void applyMask(const Mat8u & mask);
     
     //check the limits
     bool isValid(int x, int y) const;
@@ -118,15 +116,8 @@ public:
     double & sigma(int idx);
     const double & sigma(int idx) const;
     
-    // image coordinates of depth points
-    int u(int x) const;
-    int v(int y) const;
-
-    // depth coordinates of image points
-    int x(int u) const;
-    int y(int v) const;
-    
-    void getPointVec(const std::vector<int> idxVec, Vector2dVec & result) const;
+    Vector2dVec getPointVec(const std::vector<int> idxVec) const;
+    Vector2dVec getPointVec() const;
     
     void reconstructUncertainty(std::vector<int> & idxVec, 
             Vector3dVec & minDistVec,
@@ -141,8 +132,10 @@ public:
     //TODO make it bool and make it return a mask
     void project(const Vector3dVec & pointVec, Vector2dVec & result) const;
     
-    int getWidth() const { return width; }
-    int getHeight() const { return height; }
+    void toMat(Mat32f & out) const;
+    
+    int getWidth() const { return xMax; }
+    int getHeight() const { return yMax; }
     
 private:
     std::vector<double> valVec;
@@ -150,11 +143,6 @@ private:
     double foo; //to return in case of out-of-range 
     
     ICamera * cameraPtr;
-    int width;
-    int height;
-    
-    int u0, v0; // image coordinates of the [0, 0] point
-    int scale; // normally > 1, x = (u - u0) / ration 
 };
 
 

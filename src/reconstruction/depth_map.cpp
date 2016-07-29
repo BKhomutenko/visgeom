@@ -28,10 +28,21 @@ NOTE:
 #include "std.h"
 #include "eigen.h"
 
+void DepthMap::applyMask(const Mat8u & mask)
+{
+    for (int y = 0; y < yMax; y++)
+    {
+        for (int x = 0; x < xMax; x++)
+        {
+            if ( not mask(v(y), u(x)) ) at(x, y) = 0;
+        }
+    }
+}
+
 //check the limits
 bool DepthMap::isValid(int x, int y) const
 {
-    return (x >= 0 and x < width and y >= 0 and y < height);
+    return (x >= 0 and x < xMax and y >= 0 and y < yMax);
 }
 
 //FIXME bug, if we write otside the range then read from outside the range, we'll get the written value
@@ -93,11 +104,11 @@ double & DepthMap::nearestSigma(Vector2d pt)
 // to access the elements directly
 double & DepthMap::at(int x, int y)
 {
-    return valVec[x + y*width];
+    return valVec[x + y*xMax];
 }
 const double & DepthMap::at(int x, int y) const
 {
-    return valVec[x + y*width];
+    return valVec[x + y*xMax];
 }
 
 // to access the elements directly
@@ -113,11 +124,11 @@ const double & DepthMap::at(int idx) const
 // to access the uncertainty directly
 double & DepthMap::sigma(int x, int y)
 {
-    return sigmaVec[x + y*width];
+    return sigmaVec[x + y*xMax];
 }
 const double & DepthMap::sigma(int x, int y) const
 {
-    return sigmaVec[x + y*width];
+    return sigmaVec[x + y*xMax];
 }
 
 // to access the uncertainty directly
@@ -130,35 +141,29 @@ const double & DepthMap::sigma(int idx) const
     return sigmaVec[idx];
 }
 
-// image coordinates of depth points
-int DepthMap::u(int x) const
+Vector2dVec DepthMap::getPointVec(const std::vector<int> idxVec) const
 {
-    return x * scale + u0;
-}
-int DepthMap::v(int y) const
-{
-    return y * scale + v0;
-}
-
-// depth coordinates of image points
-int DepthMap::x(int u) const
-{
-    return round(double(u - u0) / scale);
-}
-
-int DepthMap::y(int v) const
-{
-    return round(double(v - v0) / scale);
-}
-
-void DepthMap::getPointVec(const std::vector<int> idxVec, Vector2dVec & result) const
-{
-    result.clear();
+    Vector2dVec result;
     result.reserve(idxVec.size());
     for (auto & idx : idxVec)
     {
-        result.emplace_back(u(idx % width), v(idx / width));
+        result.emplace_back(u(idx % xMax), v(idx / xMax));
     }
+    return result;
+}
+
+Vector2dVec DepthMap::getPointVec() const
+{
+    Vector2dVec result;
+    result.reserve(xMax * yMax);
+    for (int y = 0; y < yMax; y++)
+    {
+        for (int x = 0; x < xMax; x++)
+        {
+            result.emplace_back(u(x), v(y)); 
+        }
+    }
+    return result;
 }
 
 void DepthMap::reconstructUncertainty(vector<int> & idxVec, 
@@ -167,7 +172,6 @@ void DepthMap::reconstructUncertainty(vector<int> & idxVec,
     minDistVec.clear();
     maxDistVec.clear();
     idxVec.clear();
-    Vector2dVec pointBrutVec;
     vector<double> minVec;
     vector<double> maxVec;
     vector<int> idxBrutVec;
@@ -184,7 +188,7 @@ void DepthMap::reconstructUncertainty(vector<int> & idxVec,
         }
     }
     
-    getPointVec(idxBrutVec, pointBrutVec);
+    Vector2dVec pointBrutVec = getPointVec(idxBrutVec);
     
     Vector3dVec reconstBrutVec;
     vector<bool> maskVec;
@@ -206,7 +210,6 @@ void DepthMap::reconstruct(vector<int> & idxVec, Vector3dVec & result) const
 {
     result.clear();
     idxVec.clear();
-    Vector2dVec pointBrutVec;
     vector<double> depthVec;
     vector<int> idxBrutVec;
     for (int i = 0; i < valVec.size(); i++)
@@ -218,7 +221,7 @@ void DepthMap::reconstruct(vector<int> & idxVec, Vector3dVec & result) const
             idxBrutVec.push_back(i);
         }
     }
-    getPointVec(idxBrutVec, pointBrutVec);
+    Vector2dVec pointBrutVec = getPointVec(idxBrutVec);
     
     Vector3dVec reconstBrutVec;
     vector<bool> maskVec;
@@ -259,6 +262,12 @@ void DepthMap::reconstruct(const Vector2dVec & queryPointVec,
 void DepthMap::project(const Vector3dVec & pointVec, Vector2dVec & result) const
 {
     cameraPtr->projectPointCloud(pointVec, result);
+}
+
+void DepthMap::toMat(Mat32f & out) const
+{
+    out.create(yMax, xMax);
+    copy(valVec.begin(), valVec.end(), (float*)out.data);
 }
 
 //TODO do not reconstruct all the points but a selected subset

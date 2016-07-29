@@ -34,26 +34,20 @@ NOTE:
 #include "depth_map.h"
 #include "eucm_epipolar.h"
 #include "epipolar_descriptor.h"
+#include "utils/scale_parameters.h"
 
-struct StereoParameters
+struct StereoParameters : public ScaleParameters
 {
     // basic parameters
     int dispMax = 48; // maximum disparity
-    int scale = 3;
     int uMargin = 0, vMargin = 0;  // RoI left upper corner
     int width = -1, height = -1;  // RoI size
     int lambdaStep = 5;
     int lambdaJump = 32;
-    int imageWidth = 0, imageHeight = 0;
     int maxBias = 10;
     
     int verbosity = 0;
     int maxDepth = 100;
-    // precomputed parameters
-    int u0, v0;
-    int uMax, vMax;
-    int xMax, yMax;
-    int halfBlockSize;
     
     // to be called before using
     void init()
@@ -61,29 +55,17 @@ struct StereoParameters
         u0 = uMargin + scale; 
         v0 = vMargin + scale;
         
+        int uBR, vBR; //bottom right
+            
         if (width > 0) uMax = u0 + width;
-        else uMax = imageWidth - uMargin - scale;
+        else uBR = uMax - uMargin - scale;
         
         if (height > 0) vMax = v0 + height;
-        else vMax = imageHeight - vMargin - scale;
+        else vBR = vMax - vMargin - scale;
         
-        xMax = x(uMax) + 1;
-        yMax = y(vMax) + 1;
-        
-        halfBlockSize =  scale / 2; 
+        xMax = x(uBR) + 1;
+        yMax = y(vBR) + 1;
     }
-    
-    // from image to small disparity coordiante transform
-    int x(double u) { return round((u - u0) / scale); }
-    int y(double v) { return round((v - v0) / scale); }
-    
-    // from small disparity to image coordiante transform    
-    int u(int x) { return x * scale + u0; }
-    int v(int y) { return y * scale + v0; }
-    
-    // from small disparity to image block corner transform 
-//    int uCorner(int u) { return u * scale + u0; }
-//    int vCorner(int v) { return v * scale + v0; }
 };
 
 class EnhancedStereo

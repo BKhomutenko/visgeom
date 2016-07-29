@@ -89,8 +89,8 @@ int main (int argc, char const* argv[])
     
     Mat32f img1 = imread(imageDir + imageName, 0);
     
-    stereoParams.imageWidth = img1.cols;
-    stereoParams.imageHeight = img1.rows;
+    stereoParams.uMax = img1.cols;
+    stereoParams.vMax = img1.rows;
     
     // create a camera
     EnhancedCamera camera(params.data());

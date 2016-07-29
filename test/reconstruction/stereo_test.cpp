@@ -115,8 +115,8 @@ int main(int argc, char** argv)
     Mat8u img2 = imread(fileName2, 0);
     Mat16s img1lap, img2lap;
 
-    stereoParams.imageWidth = img1.cols;
-    stereoParams.imageHeight = img1.rows;
+    stereoParams.uMax = img1.cols;
+    stereoParams.vMax = img1.rows;
 //    
 //    Laplacian(img1, img1lap, CV_16S, 3);
 //    Laplacian(img2, img2lap, CV_16S, 3);

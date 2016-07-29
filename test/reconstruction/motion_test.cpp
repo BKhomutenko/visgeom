@@ -3,6 +3,7 @@
 #include "eigen.h"
 #include "timer.h"
 #include "reconstruction/eucm_motion_stereo.h"
+#include "utils/scale_parameters.h"
 
 int main(int argc, char** argv)
 {	
@@ -114,15 +115,17 @@ int main(int argc, char** argv)
 //        stereo.traceEpipolarLine(x, out2);
 //    }
     
-    DepthMap depthOut;
-    
-    int u0 = 25;
-    int v0 = 25;
-    int w = (img1.cols - 2*u0) / stereoParams.scale;
-    int h = (img1.rows - 2*u0) / stereoParams.scale;
     
     
-    DepthMap depth(&camera1, w, h, u0, v0, stereoParams.scale);
+    ScaleParameters scaleParams;
+    scaleParams.scale = stereoParams.scale;
+    scaleParams.u0 = 25;
+    scaleParams.v0 = 25;
+    scaleParams.uMax = img1.cols;
+    scaleParams.vMax = img1.rows;
+    scaleParams.setEqualMargin();
+    
+    DepthMap depth(&camera1, scaleParams);
     depth.setDefault();
     Mat32f res;
     timer.reset();
@@ -130,15 +133,7 @@ int main(int argc, char** argv)
     cout << timer.elapsed() << endl;
     timer.reset();
 
-    res.create(h, w);
-    for (int x = 0; x < w; x++)
-    {
-        for (int y = 0; y < h; y++)
-        {
-            res(y, x) = depth.at(x, y);
-        }
-    }
-    
+    depth.toMat(res);    
     
     imshow("out1", out1);
     imshow("out2", out2);

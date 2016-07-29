@@ -174,8 +174,7 @@ void EnhancedStereo::comuteStereo(const Mat8u & img1, const Mat8u & img2, DepthM
     computeCurveCost(img1, img2);
     computeDynamicProgramming();
     reconstructDisparity();
-    depth = DepthMap(camera1, params.yMax, params.xMax,
-            params.u0, params.v0, params.scale);
+    depth = DepthMap(camera1, params);
     for (int y = 0; y < params.yMax; y++)
     {
         for (int x = 0; x < params.xMax; x++)
@@ -658,7 +657,7 @@ void EnhancedStereo::generatePlane(Transformation<double> TcameraPlane,
         DepthMap & depth, const Vector3dVec & polygonVec)
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::generatePlane" << endl;
-    depth = DepthMap(camera1, params.xMax, params.yMax, params.u0, params.v0, params.scale);
+    depth = DepthMap(camera1, params);
     Vector3d t = TcameraPlane.trans();
     Vector3d z = TcameraPlane.rotMat().col(2);
     Vector3dVec polygonCamVec;
