@@ -25,7 +25,7 @@ Depth-from-motion class for semidense depth estimation
 #include "std.h"
 #include "ocv.h"
 #include "eigen.h"
-#include "filter.h"
+#include "utils/filter.h"
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 

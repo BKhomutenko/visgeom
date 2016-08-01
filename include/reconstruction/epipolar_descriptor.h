@@ -28,7 +28,7 @@ NOTE:
 #include "std.h"
 #include "ocv.h"
 #include "eigen.h"
-#include "filter.h"
+#include "utils/filter.h"
 
 #include "curve_rasterizer.h"
 
