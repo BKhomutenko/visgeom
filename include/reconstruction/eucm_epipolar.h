@@ -17,7 +17,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 
 /*
-Semi-global block matching algorithm for non-rectified images
+A class that computes the epipolar curve equations for a calibrated stereo system
 */
 
 #pragma once

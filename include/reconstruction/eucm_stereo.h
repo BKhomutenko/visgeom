@@ -28,13 +28,16 @@ NOTE:
 #include "std.h"
 #include "ocv.h"
 #include "eigen.h"
+
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
+
 #include "curve_rasterizer.h"
 #include "depth_map.h"
 #include "eucm_epipolar.h"
 #include "epipolar_descriptor.h"
 #include "utils/scale_parameters.h"
+#include "epipoles.h"
 
 struct StereoParameters : public ScaleParameters
 {
@@ -48,6 +51,8 @@ struct StereoParameters : public ScaleParameters
     
     int verbosity = 0;
     int maxDepth = 100;
+    
+    bool useUVCache = true;
     
     // to be called before using
     void init()
@@ -80,11 +85,16 @@ public:
             camera1(cam1->clone()),
             camera2(cam2->clone()),
             params(stereoParams),
-            epipolar(T12, cam1, cam2, 2500)
+            epipolar(T12, cam1, cam2, 2500),
+            epipoles(cam1, cam2, T12)
     { 
         assert(params.dispMax % 2 == 0);
         params.init();
-        init(); 
+        createBuffer();
+        computeReconstructed();
+        computeRotated();
+        computePinf();
+        if (params.useUVCache) computeUVCache();
     }
     
     ~EnhancedStereo()
@@ -95,29 +105,8 @@ public:
         camera2 = NULL;
     }
     
-    
-    void setTransformation(Transformation<double> T12) 
-    { 
-        Transform12 = T12;
-        initAfterTransformation();
-    } 
-    
-    void init()
-    {
-        createBuffer();
-        computeReconstructed();
-        
-        initAfterTransformation();
-        
-    }
-    
-    // Only data invalidated after the transformation change are recomputed
-    void initAfterTransformation()
-    {
-        computeEpipole();
-        computeRotated();
-        computePinf();
-    }
+    // precompute coordinates for different disparities to speedup the computation
+    void computeUVCache();
     
     // An interface function
     void comuteStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depthMap);
@@ -133,9 +122,6 @@ public:
     // computes reconstRotVec -- reconstVec rotated into the second frame
     void computeRotated();
        
-    // f2(t21) -- projection of the first camera's projection center
-    void computeEpipole();
-    
     // computes pinfVec -- projections of all the reconstructed points from the first image
     // onto the second image as if they were at infinity
     void computePinf();
@@ -187,8 +173,11 @@ public:
     
     void fillGaps(uint8_t * const data, const int step);
     
+    int getHalfLength() { return min(4, max(params.scale - 1, 1)); }
+    
 private:
     EnhancedEpipolar epipolar;
+    StereoEpipoles epipoles;
     
     Transformation<double> Transform12;  // pose of camera 2 wrt camera 1
     EnhancedCamera *camera1, *camera2;
@@ -198,16 +187,15 @@ private:
     Vector2dVec pointVec1;  // the depth points on the image 1
     Vector3dVec reconstVec;  // reconstruction of every pixel by cam1
     Vector3dVec reconstRotVec;  // reconstVec rotated into the second frame
-    
-    bool epipoleInverted1, epipoleInverted2;
-    Vector2d epipole1, epipole2;  // projection of the first camera center onto the second camera
     Vector2dVec pinfVec;  // projection of reconstRotVec by cam2
     
     // discretized version
     Vector2iVec pointPxVec1;
-    Vector2i epipolePx1, epipolePx2;  
     Vector2iVec pinfPxVec;
     
+    
+    const int DISPARITY_MARGIN = 20;
+    Mat32s uCache, vCache;
     Mat8u errorBuffer;
     Mat32s tableauLeft, tableauRight; //FIXME check the type through the code
     Mat32s tableauTop, tableauBottom;

@@ -30,40 +30,19 @@ Semi-global block matching algorithm for non-rectified images
 #include "reconstruction/eucm_stereo.h"
 #include "reconstruction/depth_map.h"
 
-void EnhancedStereo::computeEpipole()
-{
-    if (not camera1->projectPoint(Transform12.trans(), epipole1))
-    {
-        camera1->projectPoint(-Transform12.trans(), epipole1);
-        epipoleInverted1 = true;
-    }
-    else epipoleInverted1 = false;
-    
-    if (not camera2->projectPoint(Transform12.transInv(), epipole2))
-    {
-        camera2->projectPoint(-Transform12.transInv(), epipole2);
-        epipoleInverted2 = false;
-    }
-    else epipoleInverted2 = false;
-    
-    epipolePx1 = round(epipole1);
-    epipolePx2 = round(epipole2);
-    
-}
-
 CurveRasterizer<int, Polynomial2> EnhancedStereo::getCurveRasteriser1(int idx)
 {
     Vector2i pt = pointPxVec1[idx];
-    CurveRasterizer<int, Polynomial2> raster(pt, epipolePx1, epipolar.getFirst(reconstVec[idx]));
-    if (epipoleInverted1) raster.setStep(-1);
+    CurveRasterizer<int, Polynomial2> raster(pt, epipoles.getFirstPx(), epipolar.getFirst(reconstVec[idx]));
+    if (epipoles.firstIsInverted()) raster.setStep(-1);
     return raster;
 }
 
 CurveRasterizer<int, Polynomial2> EnhancedStereo::getCurveRasteriser2(int idx)
 {
     Vector2i pinfPx = pinfPxVec[idx];
-    CurveRasterizer<int, Polynomial2> raster(pinfPx, epipolePx2, epipolar.getSecond(reconstVec[idx]));
-    if (epipoleInverted2) raster.setStep(-1);
+    CurveRasterizer<int, Polynomial2> raster(pinfPx, epipoles.getSecondPx(), epipolar.getSecond(reconstVec[idx]));
+    if (epipoles.secondIsInverted()) raster.setStep(-1);
     return raster;
 }
 
@@ -111,12 +90,12 @@ void EnhancedStereo::traceEpipolarLine(int x, int y, Mat8u & out, CameraIdx camI
     int count;
     if (camIdx == CAMERA_1)
     { 
-        count = (pinfPxVec[idx] - epipolePx1).norm();
+        count = (pinfPxVec[idx] - epipoles.getFirstPx()).norm();
         raster = new CurveRasterizer<int, Polynomial2>(getCurveRasteriser1(idx));
     }
     else if (camIdx == CAMERA_2)
     {
-        count = (pinfPxVec[idx] - epipolePx2).norm();
+        count = (pinfPxVec[idx] - epipoles.getSecondPx()).norm();
         raster = new CurveRasterizer<int, Polynomial2>(getCurveRasteriser2(idx));
     }
     else 
@@ -134,35 +113,50 @@ void EnhancedStereo::traceEpipolarLine(int x, int y, Mat8u & out, CameraIdx camI
     delete raster;
 }
 
+void EnhancedStereo::computeUVCache()
+{
+    for (int y = 0; y < params.yMax; y++)
+    {
+        for (int x = 0; x < params.xMax; x++)
+        {
+            int idx = getLinearIndex(x, y);
+            CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
+            raster.steps(-DISPARITY_MARGIN);
+            const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
+            int32_t * uPtr = (int32_t *)uCache.row(y).data + x*uvCacheStep;
+            int32_t * vPtr = (int32_t *)vCache.row(y).data + x*uvCacheStep;
+            for (int i = 0; i  < uvCacheStep; i++, raster.step(), uPtr++, vPtr++)
+            {
+                if (raster.v < 0 or raster.v >= params.vMax 
+                    or raster.u < 0 or raster.u >= params.uMax)
+                {
+                    // coordinate is out of the image
+                    *uPtr = -1;
+                    *vPtr = -1;
+                }
+                else
+                {
+                    // coordinate is within the image
+                    *uPtr = raster.u;
+                    *vPtr = raster.v;
+                }
+            }
+        }
+    }
+}
+
 void EnhancedStereo::createBuffer()
 {
     if (params.verbosity > 1) cout << "EnhancedStereo::createBuffer" << endl;
     int bufferWidth = params.xMax*params.dispMax;
-    if (errorBuffer.cols != bufferWidth or errorBuffer.rows != params.yMax)
-    {
-        errorBuffer = Mat8u(Size(bufferWidth, params.yMax));
-    }
-    if (tableauLeft.cols != bufferWidth or tableauLeft.rows != params.yMax)
-    {
-        tableauLeft = Mat32s(Size(bufferWidth, params.yMax));
-    }
-    if (tableauRight.cols != bufferWidth or tableauRight.rows != params.yMax)
-    {
-        tableauRight = Mat32s(Size(bufferWidth, params.yMax));
-    }
-    if (tableauTop.cols != bufferWidth or tableauTop.rows != params.yMax)
-    {
-        tableauTop = Mat32s(Size(bufferWidth, params.yMax));
-    }
-    if (tableauBottom.cols != bufferWidth or tableauBottom.rows != params.yMax)
-    {
-        tableauBottom = Mat32s(Size(bufferWidth, params.yMax));
-    }
-    if (smallDisparity.cols != params.xMax or smallDisparity.rows != params.yMax)
-    {
-        smallDisparity = Mat8u(Size(params.xMax, params.yMax));
-
-    }
+    errorBuffer.create(params.yMax, bufferWidth);
+    tableauLeft.create(params.yMax, bufferWidth);
+    tableauRight.create(params.yMax, bufferWidth);
+    tableauTop.create(params.yMax, bufferWidth);
+    tableauBottom.create(params.yMax, bufferWidth);
+    smallDisparity.create(params.yMax, params.xMax);
+    uCache.create(params.yMax, params.xMax * (params.dispMax + 2*DISPARITY_MARGIN));
+    vCache.create(params.yMax, params.xMax * (params.dispMax + 2*DISPARITY_MARGIN));
     if (params.verbosity > 2) 
     {
         cout << "    small disparity size: " << smallDisparity.size() << endl;
@@ -198,8 +192,8 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::computeCurveCost" << endl;
     
-    int HALF_LENGTH = max(params.scale - 1, 1);
-    int LENGTH = HALF_LENGTH * 2 + 1;
+    const int HALF_LENGTH = getHalfLength();
+    const int LENGTH = HALF_LENGTH * 2 + 1;
     
     // compute the weights for matching cost
     vector<int> kernelVec, waveVec;
@@ -236,19 +230,36 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 continue;
             }
             const int nSteps = (params.dispMax  + step - 1 ) / step; 
-            CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
                
             //sample the curve 
-            raster.setStep(step); 
-            raster.steps(-HALF_LENGTH);           
             vector<uint8_t> sampleVec(nSteps + LENGTH - 1, 0);
-            for (int i = 0; i  < nSteps + LENGTH - 1; i++, raster.step())
-            {
-                if (raster.v < 0 or raster.v >= img2.rows 
-                    or raster.u < 0 or raster.u >= img2.cols) sampleVec[i] = 0;
-                else sampleVec[i] = img2(raster.v, raster.u);
-            }
             
+            if (params.useUVCache)
+            {
+                const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
+                int32_t * uPtr = (int32_t *)uCache.row(y).data + x*uvCacheStep;
+                int32_t * vPtr = (int32_t *)vCache.row(y).data + x*uvCacheStep;
+                uPtr += DISPARITY_MARGIN - HALF_LENGTH * step;
+                vPtr += DISPARITY_MARGIN - HALF_LENGTH * step;
+                for (int i = 0; i  < nSteps + LENGTH - 1; i++, uPtr += step, vPtr += step)
+                {
+                    if (*uPtr < 0 or *vPtr < 0) sampleVec[i] = 0;
+                    else sampleVec[i] = img2(*vPtr, *uPtr);
+                }
+            }
+            else
+            {
+                CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
+                raster.setStep(step); 
+                raster.steps(-HALF_LENGTH);           
+                
+                for (int i = 0; i  < nSteps + LENGTH - 1; i++, raster.step())
+                {
+                    if (raster.v < 0 or raster.v >= img2.rows 
+                        or raster.u < 0 or raster.u >= img2.cols) sampleVec[i] = 0;
+                    else sampleVec[i] = img2(raster.v, raster.u);
+                }
+            }
             //compute the bias;
             int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
             
@@ -263,36 +274,7 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 *outPtr = acc / NORMALIZER;
             }
             if (step > 1) fillGaps(errorBuffer.row(y).data + x*params.dispMax, step);
-//            }
-//            else
-//            {
-//                //sample img2 along the epipolar curve
-//                
-//                raster.steps(-HALF_LENGTH);
-//                vector<uint8_t> sampleVec(params.dispMax + LENGTH - 1, 0);
-//                for (int i = 0; i  < params.dispMax + LENGTH - 1; i++, raster.step())
-//                {
-//                    if (raster.v < 0 or raster.v >= img2.rows 
-//                        or raster.u < 0 or raster.u >= img2.cols) sampleVec[i] = 0;
-//                    else sampleVec[i] = img2(raster.v, raster.u);
-//                }
-//                
-//                //compute the bias;
-//                int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
-//                // fill up the cost buffer
-//                uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;
-//                for (int d = 0; d < params.dispMax; d++, outPtr++)
-//                {
-//                    int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-//                    int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
-//                    int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
-//                                    descriptor.begin(), sampleVec.begin() + d, bias);
-//                    *outPtr = acc / NORMALIZER;
-//                }
-//            }
-            
         }
-        
     }
 }
 
@@ -553,16 +535,33 @@ bool EnhancedStereo::computeDepth(int x, int y, double & dist, double & sigma)
     const auto & pt1 = pointVec1[idx];
     
     // to compute point on the second image
-    CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
-    raster.steps(disparity - 1);
+    // TODO make virtual rasterizer using the cache
+    int u21, v21, u22, v22;
+    if (params.useUVCache)
+    {
+        const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
+        u21 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
+        u22 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity + 1);
+        v21 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
+        v22 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity + 1);
+    }
+    else
+    {            
+        CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
+        raster.steps(disparity);
+        u21 = raster.u;
+        v21 = raster.v;
+        raster.step();
+        u22 = raster.u;
+        v22 = raster.v;
+    }
     
     
     Vector3d X;
-    if (triangulate(pt1[0], pt1[1], raster.u, raster.v, X))
+    if (triangulate(pt1[0], pt1[1], u22, v22, X))
     {
         sigma = X.norm();
-        raster.step();
-        if (triangulate(pt1[0], pt1[1], raster.u, raster.v, X))
+        if (triangulate(pt1[0], pt1[1], u21, v21, X))
         {
             dist = X.norm();
             sigma = abs(sigma - dist) / 2;
@@ -581,27 +580,38 @@ bool EnhancedStereo::computeDepth(int x, int y, double & dist, double & sigma)
     }
 }
 
-double EnhancedStereo::computeDepth(int u, int v)
+double EnhancedStereo::computeDepth(int x, int y)
 {
     if (params.verbosity > 3) cout << "EnhancedStereo::computeDepth(int *)" << endl;
     
-    int idx = getLinearIndex(u, v);
+    int idx = getLinearIndex(x, y);
     if (not maskVec[idx]) return 0;
-    int disparity = smallDisparity(v, u);
+    int disparity = smallDisparity(y, x);
     if (disparity <= 0) 
     {
         return params.maxDepth;
     }
     
     // to compute point on the second image
-    CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
-    raster.steps(disparity);
-    
+    int u2, v2;
+    if (params.useUVCache)
+    {
+        const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
+        u2 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
+        v2 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
+    }
+    else
+    {            
+        CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
+        raster.steps(disparity);
+        u2 = raster.u;
+        v2 = raster.v;
+    }
     // point on the first image
     const auto & pt1 = pointVec1[idx];
     
     Vector3d X;
-    if (triangulate(pt1[0], pt1[1], raster.u, raster.v, X))
+    if (triangulate(pt1[0], pt1[1], u2, v2, X))
     {
         return X.norm();
     }

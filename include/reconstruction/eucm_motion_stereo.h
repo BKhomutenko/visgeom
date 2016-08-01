@@ -28,10 +28,12 @@ Depth-from-motion class for semidense depth estimation
 #include "filter.h"
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
-#include "reconstruction/eucm_epipolar.h"
-#include "reconstruction/curve_rasterizer.h"
-#include "reconstruction/depth_map.h"
+
+#include "eucm_epipolar.h"
+#include "curve_rasterizer.h"
+#include "depth_map.h"
 #include "epipolar_descriptor.h"
+#include "epipoles.h"
 
 //TODO add errorMax threshold
 struct MotionStereoParameters
@@ -77,6 +79,7 @@ public:
     {
         if (params.verbosity > 0) cout << "MotionStereo::computeDepth" << endl;
         epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
+        StereoEpipoles epipoles(camera1, camera2, T12);
         Transform12 = T12;
         // init the output mat
         //TODO think about overhead
@@ -133,9 +136,9 @@ public:
             // ### compute descriptor ###
             if (params.verbosity > 2) cout << "        compute descriptor" << endl;
             // get the corresponding rasterizer
-            CurveRasterizer<int, Polynomial2> descRaster(round(pointVec[ptIdx]), epipolePx1,
+            CurveRasterizer<int, Polynomial2> descRaster(round(pointVec[ptIdx]), epipoles.getFirstPx(),
                                                 epipolarPtr->getFirst(minDistVec[ptIdx]));
-            if (epipoleInverted1) descRaster.setStep(-1);
+            if (epipoles.firstIsInverted()) descRaster.setStep(-1);
             
             // compute the actual descriptor
             vector<uint8_t> descriptor;
@@ -251,28 +254,7 @@ public:
         X = (v1*l1 + t + v2*l2)*0.5;
         return true;
     }
-    
-    void computeEpipole(Transformation<double> Transform12)
-    {
-        if (not camera1->projectPoint(Transform12.trans(), epipole1))
-        {
-            camera1->projectPoint(-Transform12.trans(), epipole1);
-            epipoleInverted1 = true;
-        }
-        else epipoleInverted1 = false;
-        
-        //FIXME not nedeed?
-        if (not camera2->projectPoint(Transform12.transInv(), epipole2))
-        {
-            camera2->projectPoint(-Transform12.transInv(), epipole2);
-            epipoleInverted2 = false;
-        }
-        else epipoleInverted2 = false;
-        
-        epipolePx1 = round(epipole1);
-        epipolePx2 = round(epipole2);
-    }
-    
+ 
     
     
 private:
@@ -290,10 +272,6 @@ private:
         threshold(gradAbs8u, maskMat, params.gradientThresh, 128, CV_THRESH_BINARY);
         
     }
-    
-    bool epipoleInverted1, epipoleInverted2;
-    Vector2d epipole1, epipole2;  // projection of the first camera center onto the second camera
-    Vector2i epipolePx1, epipolePx2;
     
     // pose of the first to the second camera
     Transformation<double> Transform12;
