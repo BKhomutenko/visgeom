@@ -129,7 +129,7 @@ public:
         {
             if (not maskVec[ptIdx])
             {
-                depth.nearest(pointVec[ptIdx]) = 0;
+                depth.at(idxVec[ptIdx]) = 0;
                 continue;
             }   
             
@@ -145,7 +145,7 @@ public:
             const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
             if (not epipolarDescriptor.goodResp() or step < 1)
             {
-                depth.nearest(pointVec[ptIdx]) = 0;
+                depth.at(idxVec[ptIdx]) = 0;
                 continue;
             }
             // ### find the best correspondence on img2 ###
@@ -199,8 +199,8 @@ public:
                     uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], X1);
             triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
                     uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], X2);
-            depth.nearest(pointVec[ptIdx]) = X1.norm();
-            depth.nearestSigma(pointVec[ptIdx]) = (X2- X1).norm() / 2;
+            depth.at(idxVec[ptIdx]) = X1.norm();
+            depth.sigma(idxVec[ptIdx]) = (X2 - X1).norm() / 2;
         }
         
         delete epipolarPtr;
