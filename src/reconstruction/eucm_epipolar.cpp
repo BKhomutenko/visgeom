@@ -77,11 +77,7 @@ void EnhancedEpipolar::initialize()
     
     // ## camera 1 ##
     // prepare reused variables
-    if (not camera1->projectPoint(zBase, epipole))
-    {
-        camera1->projectPoint(-zBase, epipole);
-    }
-    prepareCamera(camera1);
+    prepareCamera(CAMERA_1);
     
     for (const auto & dir : directionVec)
     {
@@ -97,11 +93,7 @@ void EnhancedEpipolar::initialize()
     Vector3d t21n = R21 * zBase;
     
     // prepare reused variables
-    if (not camera2->projectPoint(t21n, epipole))
-    {
-        camera2->projectPoint(-t21n, epipole);
-    }
-    prepareCamera(camera2);
+    prepareCamera(CAMERA_2);
     
     for (const auto & dir : directionVec)
     {
@@ -173,9 +165,20 @@ Polynomial2 EnhancedEpipolar::computePolynomial(Vector3d plane) const
     return surf;
 }
 
-void EnhancedEpipolar::prepareCamera(const EnhancedCamera * camera)
+void EnhancedEpipolar::prepareCamera(CameraIdx camIdx)
 {
-    const double * params = camera->getParams();
+    const double * params = NULL;
+    if (camIdx == CAMERA_1)
+    {
+        params = camera1->getParams();
+        epipole = epipoles.getFirst();
+    } 
+    else if (camIdx == CAMERA_2) 
+    {
+        params = camera2->getParams();
+        epipole = epipoles.getSecond();
+    }
+    activeCamera = camIdx;
     alpha = params[0];
     beta = params[1];
     fu = params[2];
@@ -190,5 +193,34 @@ void EnhancedEpipolar::prepareCamera(const EnhancedCamera * camera)
     fufv = fu * fv;
     fufu = fu * fu;
     fvfv = fv * fv;
+}
+
+void EnhancedEpipolar::traceEpipolarLine(int u, int v, Mat & out, CameraIdx camIdx, int count) const
+{
+    if (verbosity > 0) cout << "EnhancedStereo::traceEpipolarLine" << endl;
+    
+    CurveRasterizer<int, Polynomial2> * raster1 = NULL;
+    Vector2i pt(u, v);
+    Vector3d X;
+    if (camIdx == CAMERA_1)
+    { 
+        if (not camera1->reconstructPoint(Vector2d(u, v), X)) return;
+        raster1 = new CurveRasterizer<int, Polynomial2>(pt, epipoles.getFirstPx(), getFirst(X));
+    }
+    else if (camIdx == CAMERA_2)
+    {
+        if (not camera2->reconstructPoint(Vector2d(u, v), X)) return;
+        raster1 = new CurveRasterizer<int, Polynomial2>(pt, epipoles.getSecondPx(), getSecond(X));
+    }
+    CurveRasterizer<int, Polynomial2> * raster2 = new CurveRasterizer<int, Polynomial2>(*raster1);
+    for (int i = 0; i < count; i++)
+    {
+        cv::circle(out, Point(raster1->u, raster1->v), 2, Scalar(0), -1);
+        cv::circle(out, Point(raster2->u, raster2->v), 2, Scalar(0), -1);
+        raster1->step();
+        raster2->unstep();
+    }
+    delete raster1;
+    delete raster2;
 }
    

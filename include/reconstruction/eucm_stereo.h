@@ -56,7 +56,6 @@ struct StereoParameters : public ScaleParameters
 class EnhancedStereo
 {
 public:
-    enum CameraIdx {CAMERA_1, CAMERA_2};
     
     EnhancedStereo(Transformation<double> T12, const EnhancedCamera * cam1,
             const EnhancedCamera * cam2, const StereoParameters & stereoParams) :
@@ -107,10 +106,6 @@ public:
     
     // calculate the coefficients of the polynomials for all the 
     void computeEpipolarIndices();
-    
-    // TODO remove from this class
-    // draws an epipolar line  on the right image that corresponds to (x, y) on the left image
-    void traceEpipolarLine(int u, int v, Mat8u & out, CameraIdx camIdx);
     
     //// DYNAMIC PROGRAMMING
     void createBuffer();

@@ -25,6 +25,7 @@ OpenCV include and using
 
 // Data types
 using cv::Point;
+using cv::Scalar;
 using cv::Point2d;
 using cv::Size;
 using cv::Rect;

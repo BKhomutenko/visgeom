@@ -79,40 +79,6 @@ void EnhancedStereo::computePinf()
     }
 }
 
-//TODO move elsewhere
-void EnhancedStereo::traceEpipolarLine(int x, int y, Mat8u & out, CameraIdx camIdx)
-{
-    if (params.verbosity > 0) cout << "EnhancedStereo::traceEpipolarLine" << endl;
-    int idx = getLinearIndex(x, y);
-    if (not maskVec[idx]) return;
-    
-    CurveRasterizer<int, Polynomial2> * raster = NULL;
-    int count;
-    if (camIdx == CAMERA_1)
-    { 
-        count = (pinfPxVec[idx] - epipoles.getFirstPx()).norm();
-        raster = new CurveRasterizer<int, Polynomial2>(getCurveRasteriser1(idx));
-    }
-    else if (camIdx == CAMERA_2)
-    {
-        count = (pinfPxVec[idx] - epipoles.getSecondPx()).norm();
-        raster = new CurveRasterizer<int, Polynomial2>(getCurveRasteriser2(idx));
-    }
-    else 
-    {
-        return;
-    }
-    for (int i = 0; i < count; i++)
-    {
-        out(raster->v, raster->u) = 0;
-        out(raster->v+1, raster->u) = 0;
-        out(raster->v, raster->u+1) = 0;
-        out(raster->v+1, raster->u+1) = 0;
-        raster->step();
-    }
-    delete raster;
-}
-
 void EnhancedStereo::computeUVCache()
 {
     for (int y = 0; y < params.yMax; y++)
