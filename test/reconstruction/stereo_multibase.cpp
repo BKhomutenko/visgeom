@@ -75,8 +75,8 @@ int main(int argc, char** argv)
     
     StereoParameters stereoParams;
     stereoParams.verbosity = 3;
-    paramFile >> stereoParams.uMargin;
-    paramFile >> stereoParams.vMargin;
+    paramFile >> stereoParams.u0;
+    paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
     paramFile >> stereoParams.scale;
     paramFile.ignore();
@@ -91,6 +91,8 @@ int main(int argc, char** argv)
     Mat8u img1 = imread(imageDir + imageName, 0);
     stereoParams.uMax = img1.cols;
     stereoParams.vMax = img1.rows;
+    stereoParams.setEqualMargin();
+    
     int counter = 2;
     EnhancedCamera camera(params.data());
     while (getline(paramFile, imageInfo))

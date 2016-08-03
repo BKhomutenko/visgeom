@@ -43,8 +43,6 @@ struct StereoParameters : public ScaleParameters
 {
     // basic parameters
     int dispMax = 48; // maximum disparity
-    int uMargin = 0, vMargin = 0;  // RoI left upper corner
-    int width = -1, height = -1;  // RoI size
     int lambdaStep = 5;
     int lambdaJump = 32;
     int maxBias = 10;
@@ -53,24 +51,6 @@ struct StereoParameters : public ScaleParameters
     int maxDepth = 100;
     
     bool useUVCache = true;
-    
-    // to be called before using
-    void init()
-    {
-        u0 = uMargin + scale; 
-        v0 = vMargin + scale;
-        
-        int uBR, vBR; //bottom right
-            
-        if (width > 0) uMax = u0 + width;
-        else uBR = uMax - uMargin - scale;
-        
-        if (height > 0) vMax = v0 + height;
-        else vBR = vMax - vMargin - scale;
-        
-        xMax = x(uBR) + 1;
-        yMax = y(vBR) + 1;
-    }
 };
 
 class EnhancedStereo
@@ -89,7 +69,6 @@ public:
             epipoles(cam1, cam2, T12)
     { 
         assert(params.dispMax % 2 == 0);
-        params.init();
         createBuffer();
         computeReconstructed();
         computeRotated();
@@ -159,14 +138,6 @@ public:
     // reconstruction
     bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X);
     void computeDepth(Mat32f & distanceMat);
-    
-    //TODO put generatePlane elsewhere
-    void generatePlane(Transformation<double> TcameraPlane, 
-            Mat32f & distance, const Vector3dVec & polygonVec);
-            
-    //TODO put generatePlane elsewhere        
-    void generatePlane(Transformation<double> TcameraPlane, 
-            DepthMap & distance, const Vector3dVec & polygonVec);
             
     double computeDepth(int x, int y);
     bool computeDepth(int x, int y, double & dist, double & sigma);

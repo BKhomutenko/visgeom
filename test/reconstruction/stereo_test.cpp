@@ -100,8 +100,8 @@ int main(int argc, char** argv)
     
     StereoParameters stereoParams;
     stereoParams.verbosity = 1;
-    paramFile >> stereoParams.uMargin;
-    paramFile >> stereoParams.vMargin;
+    paramFile >> stereoParams.u0;
+    paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
     paramFile >> stereoParams.scale;
     paramFile.ignore();
@@ -117,6 +117,7 @@ int main(int argc, char** argv)
 
     stereoParams.uMax = img1.cols;
     stereoParams.vMax = img1.rows;
+    stereoParams.setEqualMargin();
 //    
 //    Laplacian(img1, img1lap, CV_16S, 3);
 //    Laplacian(img2, img2lap, CV_16S, 3);

@@ -2,8 +2,10 @@
 #include "ocv.h"
 #include "eigen.h"
 
+#include "camera/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_stereo.h"
+#include "reconstruction/depth_map.h"
 
 using namespace std;
 using namespace cv;
@@ -89,8 +91,8 @@ int main(int argc, char** argv)
     
     StereoParameters stereoParams;
     stereoParams.verbosity = 2;
-    paramFile >> stereoParams.uMargin;
-    paramFile >> stereoParams.vMargin;
+    paramFile >> stereoParams.u0;
+    paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
     paramFile >> stereoParams.scale;
     
@@ -109,6 +111,7 @@ int main(int argc, char** argv)
     Mat8u img1 = imread(imageDir + imageName, 0);
     stereoParams.uMax = img1.cols;
     stereoParams.vMax = img1.rows;
+    stereoParams.setEqualMargin();
     
     EnhancedCamera camera(params.data());
     int counter = 2;
@@ -130,11 +133,14 @@ int main(int argc, char** argv)
         stereo.comuteStereo(img1, img2, distMat);
         auto t3 = clock();
 //        cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
-        Mat32f planeMat;
+        
         Transformation<double> T0Camera = T01.compose(TbaseCamera);
-        stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), planeMat,
-         Vector3dVec{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
+        DepthMap depth = DepthMap::generatePlane(&camera, stereoParams,
+                T0Camera.inverseCompose(TbasePlane),
+                Vector3dVec{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
                           Vector3d(-0.1 + 3 * 0.45, 0.5, 0), Vector3d(-0.1, 0.5, 0) } );
+        Mat32f planeMat;
+        depth.toMat(planeMat);
         imshow("dist" + to_string(counter) , distMat/2);
         imshow("plane" , planeMat/2);
         imwrite("/home/bogdan/projects/plane.png", planeMat);

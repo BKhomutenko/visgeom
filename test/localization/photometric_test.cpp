@@ -69,11 +69,12 @@ int main (int argc, char const* argv[])
     paramFile.ignore();
     Transformation<double> TbasePlane(cameraPose.data());
     
-    StereoParameters stereoParams;
-    paramFile >> stereoParams.uMargin;
-    paramFile >> stereoParams.vMargin;
-    paramFile >> stereoParams.dispMax;
-    paramFile >> stereoParams.scale;
+    double foo;
+    ScaleParameters scaleParams;
+    paramFile >> scaleParams.u0;
+    paramFile >> scaleParams.v0;
+    paramFile >> foo;
+    paramFile >> scaleParams.scale;
     paramFile.ignore();
     
     string imageDir;
@@ -89,8 +90,9 @@ int main (int argc, char const* argv[])
     
     Mat32f img1 = imread(imageDir + imageName, 0);
     
-    stereoParams.uMax = img1.cols;
-    stereoParams.vMax = img1.rows;
+    scaleParams.uMax = img1.cols;
+    scaleParams.vMax = img1.rows;
+    scaleParams.setEqualMargin();
     
     // create a camera
     EnhancedCamera camera(params.data());
@@ -98,16 +100,14 @@ int main (int argc, char const* argv[])
     // Init the distance map
     Transformation<double> T01(robotPose1.data());
     Transformation<double> T0Camera = T01.compose(TbaseCamera);
-    EnhancedStereo stereo(Transformation<double>(),
-                &camera, &camera, stereoParams);
-    
     
 //     Init the localizer
     ScalePhotometric localizer(5, &camera);
     localizer.setVerbosity(1);
     localizer.computeBaseScaleSpace(img1);
-    stereo.generatePlane(T0Camera.inverseCompose(TbasePlane), localizer.depth(),
-         vector<Vector3d>{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
+    localizer.depth() = DepthMap::generatePlane(&camera, scaleParams,
+             T0Camera.inverseCompose(TbasePlane),
+            vector<Vector3d>{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
                           Vector3d(-0.1 + 3 * 0.45, 0.5, 0), Vector3d(-0.1, 0.5, 0) } );
     
      

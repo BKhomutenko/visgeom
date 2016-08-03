@@ -35,8 +35,12 @@ struct ScaleParameters
     
     void setEqualMargin()
     {
-        xMax = (uMax - 2*u0) / scale;
-        yMax = (vMax - 2*v0) / scale;
+        xMax = (uMax - 2*u0) / scale + 1;
+        yMax = (vMax - 2*v0) / scale + 1;
+        if (xMax < 1 or yMax < 1)
+        {
+            throw std::runtime_error("The scaled image is empty: xMax < 1 or yMax < 1");
+        }
     }
     
     // from image to small disparity coordiante transform

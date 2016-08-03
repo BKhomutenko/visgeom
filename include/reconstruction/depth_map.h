@@ -132,10 +132,14 @@ public:
     //TODO make it bool and make it return a mask
     void project(const Vector3dVec & pointVec, Vector2dVec & result) const;
     
+    //TODO make a wrap method
     void toMat(Mat32f & out) const;
     
     int getWidth() const { return xMax; }
     int getHeight() const { return yMax; }
+    
+    static DepthMap generatePlane(const ICamera * camera, const ScaleParameters & params, 
+            Transformation<double> TcameraPlane, const Vector3dVec & polygonVec);
     
 private:
     std::vector<double> valVec;

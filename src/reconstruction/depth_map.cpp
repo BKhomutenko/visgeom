@@ -312,3 +312,44 @@ void DepthReprojector::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
 	}
 }
 
+DepthMap DepthMap::generatePlane(const ICamera * camera, const ScaleParameters & params, 
+        Transformation<double> TcameraPlane, const Vector3dVec & polygonVec)
+{
+    DepthMap depth(camera, params);
+    Vector3d t = TcameraPlane.trans();
+    Vector3d z = TcameraPlane.rotMat().col(2);
+    Vector3dVec polygonCamVec;
+    TcameraPlane.transform(polygonVec, polygonCamVec);
+    for (int v = 0; v < params.yMax; v++)
+    {
+        for (int u = 0; u < params.xMax; u++)
+        {
+            depth.at(u, v) = 0;
+            Vector3d vec; // the direction vector
+            if (not camera->reconstructPoint(Vector2d(params.u(u), params.v(v)), vec)) continue;
+            double zvec = z.dot(vec);
+            if (zvec < 1e-3) 
+            {
+                continue;
+            }
+            bool inside = true;
+            for (int i = 0; i < polygonCamVec.size(); i++)
+            {
+                int j = (i + 1) % polygonCamVec.size();
+                Vector3d normal = polygonCamVec[i].cross(polygonCamVec[j]);
+                if (vec.dot(normal) < 0)
+                {
+                    inside = false;
+                    break;
+                }
+            }
+            if (not inside) continue;
+            double tz = t.dot(z);
+            double alpha = tz / zvec;
+            vec *= alpha;
+            depth.at(u, v) = vec.norm();
+        }
+    }
+    return depth;
+}
+

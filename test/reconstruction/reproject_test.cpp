@@ -20,8 +20,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "eigen.h"
 #include "timer.h"
 
+#include "camera/eucm.h"
 #include "reconstruction/depth_map.h"
-#include "reconstruction/eucm_stereo.h"
 
 using namespace std;
 using namespace cv;
@@ -34,26 +34,22 @@ int main(int argc, char** argv)
 {	
    
     array<double, 6> params = {0.5, 1, 250, 250, 512, 384};
-    StereoParameters stereoParams;
-    stereoParams.scale = 2;
+    ScaleParameters scaleParams;
+    scaleParams.scale = 2;
     
     Transformation<double> T01(0.7, 0.1, 0.5, 0.1, -0.3, 0.5);
     Transformation<double> T0plane(0, 0, 1.5, 0, 0, 0);
-    stereoParams.uMax = COLS;
-    stereoParams.vMax = ROWS;
+    scaleParams.uMax = COLS;
+    scaleParams.vMax = ROWS;
     
     EnhancedCamera camera(params.data());
-    EnhancedStereo stereo(Transformation<double>(),
-                &camera, &camera, stereoParams);
-    
     
 //     Init the localizer
-    DepthMap depth0, depth1;
-    stereo.generatePlane(T0plane, depth0,
+    DepthMap depth0 = DepthMap::generatePlane(&camera, scaleParams, T0plane,
          vector<Vector3d>{Vector3d(-0.5, -0.5, 0), Vector3d(0.5, -0.5, 0),
                           Vector3d(0.5, 0.5, 0), Vector3d(-0.5, 0.5, 0) } );
     
-    stereo.generatePlane(T01.inverseCompose(T0plane), depth1,
+    DepthMap depth1 = DepthMap::generatePlane(&camera, scaleParams, T01.inverseCompose(T0plane),
          vector<Vector3d>{Vector3d(-0.5, -0.5, 0), Vector3d(0.5, -0.5, 0),
                           Vector3d(0.5, 0.5, 0), Vector3d(-0.5, 0.5, 0) } );
     
