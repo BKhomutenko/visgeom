@@ -114,13 +114,15 @@ void EnhancedStereo::computeUVCache()
 void EnhancedStereo::createBuffer()
 {
     if (params.verbosity > 1) cout << "EnhancedStereo::createBuffer" << endl;
+    assert(params.hypMax > 0);
     int bufferWidth = params.xMax*params.dispMax;
     errorBuffer.create(params.yMax, bufferWidth);
     tableauLeft.create(params.yMax, bufferWidth);
     tableauRight.create(params.yMax, bufferWidth);
     tableauTop.create(params.yMax, bufferWidth);
     tableauBottom.create(params.yMax, bufferWidth);
-    smallDisparity.create(params.yMax, params.xMax);
+    smallDisparity.create(params.yMax, params.xMax * params.hypMax);
+    finalErrorMat.create(params.yMax, params.xMax * params.hypMax);
     uCache.create(params.yMax, params.xMax * (params.dispMax + 2*DISPARITY_MARGIN));
     vCache.create(params.yMax, params.xMax * (params.dispMax + 2*DISPARITY_MARGIN));
     if (params.verbosity > 2) 
@@ -384,34 +386,40 @@ void EnhancedStereo::computeDynamicProgramming()
 
 void EnhancedStereo::reconstructDisparity()
 {
-    if (params.verbosity > 0) cout << "EnhancedStereo::reconstructDisparity" << endl;
-    Mat16s errFinalMat(smallDisparity.size());
+    if (params.verbosity > 0) cout << "EnhancedStereo::reconstructDisparityMono" << endl;
     for (int y = 0; y < params.yMax; y++)
     {
         int32_t* dynRow1 = (int32_t*)(tableauLeft.row(y).data);
         int32_t* dynRow2 = (int32_t*)(tableauRight.row(y).data);
         int32_t* dynRow3 = (int32_t*)(tableauTop.row(y).data);
         int32_t* dynRow4 = (int32_t*)(tableauBottom.row(y).data);
-        uint8_t* errRow = (errorBuffer.row(y).data);
+        uint8_t* errRow = errorBuffer.row(y).data;
         for (int x = 0; x < params.xMax; x++)
         {
-            int bestCost = 1000000;
-            uint8_t & bestDisp = smallDisparity(y, x);
-            int16_t & bestErr = errFinalMat(y, x);
-            bestDisp = 0;
-            for (int d = 0; d < params.dispMax; d++)
+            int minCost = 0;
+            for (int hypIdx = 0; hypIdx < params.hypMax; hypIdx++)
             {
-                int base = x * params.dispMax;
-                int acc = dynRow1[base + d] + dynRow2[base + d] 
-                        + dynRow3[base + d] + dynRow4[base + d] - 2*errRow[base + d];
-                if (bestCost > acc)
+                int32_t & bestDisp = smallDisparity(y, x + hypIdx * params.xMax);
+                int32_t & bestErr = finalErrorMat(y, x + hypIdx * params.xMax);
+                bestErr = INT32_MAX;
+                bestDisp = -1;
+                for (int d = 0; d < params.dispMax; d++)
                 {
-                    bestCost = acc;
-                    bestDisp = d;
-                    bestErr = acc;
+                    int base = x * params.dispMax;
+                    if (errRow[base + d] > params.maxError) continue;
+                    int acc = dynRow1[base + d] + dynRow2[base + d] 
+                            + dynRow3[base + d] + dynRow4[base + d] - 2*errRow[base + d];
+                            
+                    if (bestErr > acc and acc > minCost)
+                    {
+                        if (hypIdx > 0 and acc > minCost + params.maxHypDiff) continue;
+                        bestDisp = d;
+                        bestErr = acc;
+                    }
                 }
+                if (hypIdx == 0) minCost = bestErr;
             }
-            if (params.verbosity > 3) cout << "    best error: " << int(bestErr) << endl;
+            if (params.verbosity > 3) cout << "    best error: " << finalErrorMat(y, x) << endl;
         }
         
     }
@@ -490,10 +498,10 @@ bool EnhancedStereo::computeDepth(int x, int y, double & dist, double & sigma)
     
     }
     int disparity = smallDisparity(y, x);
-    if (disparity <= 0) 
+    if (disparity < 0) 
     {
-        dist = params.maxDepth;
-        sigma = params.maxDepth;
+        dist = OUT_OF_RANGE;
+        sigma = 0;
         return true;
     }
     
@@ -534,13 +542,14 @@ bool EnhancedStereo::computeDepth(int x, int y, double & dist, double & sigma)
         }
         else
         {
+            dist = OUT_OF_RANGE;
             sigma = 0;
             return false;
         }
     }
     else 
     {
-        dist = 0;
+        dist = OUT_OF_RANGE;
         sigma = 0;
         return false;
     }
@@ -553,9 +562,9 @@ double EnhancedStereo::computeDepth(int x, int y)
     int idx = getLinearIndex(x, y);
     if (not maskVec[idx]) return 0;
     int disparity = smallDisparity(y, x);
-    if (disparity <= 0) 
+    if (disparity < 0) 
     {
-        return params.maxDepth;
+        return OUT_OF_RANGE;
     }
     
     // to compute point on the second image
@@ -587,10 +596,4 @@ double EnhancedStereo::computeDepth(int x, int y)
     }
 }
 
-void EnhancedStereo::upsampleDisparity(const Mat8u & img1, Mat8u & disparityMat)
-{
-    cout << smallDisparity.size() << endl;
-    smallDisparity.copyTo(disparityMat);
-//    resize(smallDisparity, disparity, Size(0, 0), params.scale, params.scale, 0);
-}
 

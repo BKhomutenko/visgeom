@@ -41,16 +41,22 @@ NOTE:
 
 struct StereoParameters : public ScaleParameters
 {
-    // basic parameters
-    int dispMax = 48; // maximum disparity
+    int dispMax = 48;
+    
+    // cost parameters
     int lambdaStep = 5;
     int lambdaJump = 32;
+    int maxError = 150;
     int maxBias = 10;
     
     int verbosity = 0;
     int maxDepth = 100;
     
     bool useUVCache = true;
+    
+    //multi-hypoteses
+    int hypMax = 1;
+    int maxHypDiff = 25;
 };
 
 class EnhancedStereo
@@ -119,9 +125,6 @@ public:
     
     void reconstructDisparity();  // using the result of the dynamic programming
     
-    // TODO implement
-    void upsampleDisparity(const Mat8u & img1, Mat8u & disparityMat);
-    
     //// MISCELLANEOUS
     
     // index of an object in a linear array corresponding to pixel [row, col] 
@@ -131,6 +134,7 @@ public:
     CurveRasterizer<int, Polynomial2> getCurveRasteriser2(int idx);
     
     // reconstruction
+    //TODO move elsewhere (e.g. create a class stereo system with two cameras and a transformation)
     bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X);
     void computeDepth(Mat32f & distanceMat);
             
@@ -165,8 +169,9 @@ private:
     Mat8u errorBuffer;
     Mat32s tableauLeft, tableauRight; //FIXME check the type through the code
     Mat32s tableauTop, tableauBottom;
-    Mat8u smallDisparity;
+    Mat32s smallDisparity;
+    Mat32s finalErrorMat;
     
-    StereoParameters params;
+    const StereoParameters params;
 };
 
