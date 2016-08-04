@@ -35,25 +35,35 @@ NOTE:
 const double DEFAULT_DEPTH = 1;
 const double MIN_DEPTH = 0.1;
 const double DEFAULT_SIGMA_DEPTH = 100;
+const double DEFAULT_COST_DEPTH = 100;
+const double OUT_OF_RANGE = 0.0;
 
 class DepthMap : private ScaleParameters
 {
 public:
-    DepthMap() : cameraPtr(NULL) {}
+    DepthMap() : 
+            cameraPtr(NULL),
+            hMax(1) {}
     
     //copy constructor
     DepthMap(const DepthMap & depth) :
             ScaleParameters(depth),
             cameraPtr(depth.cameraPtr->clone()),
             valVec(depth.valVec),
-            sigmaVec(depth.sigmaVec) {}
-    
-    //basic constructor        
-    DepthMap(const ICamera * camera, const ScaleParameters & params) :
+            sigmaVec(depth.sigmaVec),
+            costVec(depth.costVec),
+            hMax(depth.hMax),
+            hStep(depth.hStep) {}
+
+    //basic constructor for multi-hypothesis
+    DepthMap(const ICamera * camera, const ScaleParameters & params, const int hMax = 1):
             ScaleParameters(params),
             cameraPtr(camera->clone()),
-            valVec(xMax*yMax, DEFAULT_DEPTH),
-            sigmaVec(xMax*yMax, DEFAULT_SIGMA_DEPTH)  {}
+            valVec(xMax*yMax*hMax, DEFAULT_DEPTH),
+            sigmaVec(xMax*yMax*hMax, DEFAULT_SIGMA_DEPTH),
+            costVec(xMax*yMax*hMax, DEFAULT_COST_DEPTH),
+            hMax(hMax),
+            hStep(xMax*yMax) {}
 
     virtual ~DepthMap() 
     {
@@ -70,51 +80,60 @@ public:
             ScaleParameters::operator = (other);
             valVec = other.valVec;
             sigmaVec = other.sigmaVec;
+            costVec = other.costVec;
+            hMax = other.hMax;
         }
         return *this;
     }
     
     void setDefault()
     {
-        setTo(DEFAULT_DEPTH, DEFAULT_SIGMA_DEPTH);
+        setTo(DEFAULT_DEPTH, DEFAULT_SIGMA_DEPTH, DEFAULT_COST_DEPTH);
     }
     
-    void setTo(double val, double sigmaVal)
+    void setTo(const double val, const double sigmaVal, const double costVal = DEFAULT_COST_DEPTH)
     {
         fill(valVec.begin(), valVec.end(), val);
         fill(sigmaVec.begin(), sigmaVec.end(), sigmaVal);
+        fill(costVec.begin(), costVec.end(), costVal);
     }
     
     void applyMask(const Mat8u & mask);
     
     //check the limits
-    bool isValid(int x, int y) const;
+    bool isValid(const int x, const int y, const int h = 0) const;
     
     // nearest neighbor interpolation
-    const double & nearest(int u, int v) const;
-    const double & nearest(Vector2d pt) const;
-    double & nearest(Vector2d pt);
+    double nearest(const int u, const int v, const int h = 0) const;
+    double nearest(const Vector2d pt, const int h = 0) const;
     
     // nearest neighbor interpolation for the uncertainty
-    const double & nearestSigma(int u, int v) const;
-    const double & nearestSigma(Vector2d pt) const;
-    double & nearestSigma(Vector2d pt);
+    double nearestSigma(const int u, const int v, const int h = 0) const;
+    double nearestSigma(const Vector2d pt, const int h = 0) const;
     
     // to access the elements directly
-    double & at(int x, int y);
-    const double & at(int x, int y) const;
+    double & at(const int x, const int y, const int h = 0);
+    const double & at(const int x, const int y, const int h = 0) const;
     
     // to access the elements directly
-    double & at(int idx);
-    const double & at(int idx) const;
+    double & at(const int idx);
+    const double & at(const int idx) const;
     
     // to access the uncertainty directly
-    double & sigma(int x, int y);
-    const double & sigma(int x, int y) const;
+    double & sigma(const int x, const int y, const int h = 0);
+    const double & sigma(const int x, const int y, const int h = 0) const;
     
     // to access the uncertainty directly
-    double & sigma(int idx);
-    const double & sigma(int idx) const;
+    double & sigma(const int idx);
+    const double & sigma(const int idx) const;
+
+    // to access the hypothesis cost directly
+    double & cost(const int x, const int y, const int h = 0);
+    const double & cost(const int x, const int y, const int h = 0) const;
+    
+    // to access the hypothesis cost directly
+    double & cost(const int idx);
+    const double & cost(const int idx) const;
     
     Vector2dVec getPointVec(const std::vector<int> idxVec) const;
     Vector2dVec getPointVec() const;
@@ -144,7 +163,9 @@ public:
 private:
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty
-    double foo; //to return in case of out-of-range 
+    std::vector<double> costVec; // hypothesis cost
+    int hMax; // Number of hypotheses
+    int hStep; // Step to get to the next hypothesis
     
     ICamera * cameraPtr;
 };

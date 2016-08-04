@@ -34,111 +34,120 @@ void DepthMap::applyMask(const Mat8u & mask)
     {
         for (int x = 0; x < xMax; x++)
         {
-            if ( not mask(v(y), u(x)) ) at(x, y) = 0;
+            if ( not mask(v(y), u(x)) ) 
+            {
+                for (int h = 0; h < hMax; h++)
+                {
+                    at(x, y, h) = 0;
+                }
+            }
         }
     }
 }
 
 //check the limits
-bool DepthMap::isValid(int x, int y) const
+bool DepthMap::isValid(const int x, const int y, const int h) const
 {
-    return (x >= 0 and x < xMax and y >= 0 and y < yMax);
+    return ( (x >= 0) and (x < xMax) and (y >= 0) and (y < yMax) and (h >= 0) and (h < hMax) );
 }
 
-//FIXME bug, if we write otside the range then read from outside the range, we'll get the written value
-// because of foo
 
 // nearest neighbor interpolation
-const double & DepthMap::nearest(int u, int v) const
+double DepthMap::nearest(const int u, const int v, const int h) const
 {
     int xd = x(u);
     int yd = y(v);
-    if (isValid(xd, yd)) return at(xd, yd);
-    else return foo;
+    if (isValid(xd, yd, h)) return at(xd, yd, h);
+    else return OUT_OF_RANGE;
 }
 
 // nearest neighbor interpolation
-const double & DepthMap::nearest(Vector2d pt) const
+double DepthMap::nearest(const Vector2d pt, const int h) const
 {
     int xd = x(pt[0]);
     int yd = y(pt[1]);
-    if (isValid(xd, yd)) return at(xd, yd);
-    else return foo;
-}
-
-double & DepthMap::nearest(Vector2d pt)
-{
-    int xd = x(pt[0]);
-    int yd = y(pt[1]);
-    if (isValid(xd, yd)) return at(xd, yd);
-    else return foo;
+    if (isValid(xd, yd, h)) return at(xd, yd, h);
+    else return OUT_OF_RANGE;
 }
 
 
 // nearest neighbor interpolation
-const double & DepthMap::nearestSigma(int u, int v) const
+double DepthMap::nearestSigma(const int u, const int v, const int h) const
 {
     int xd = x(u);
     int yd = y(v);
-    if (isValid(xd, yd)) return sigma(xd, yd);
-    else return foo;
+    if (isValid(xd, yd, h)) return sigma(xd, yd, h);
+    else return OUT_OF_RANGE;
 }
 
 // nearest neighbor interpolation
-const double & DepthMap::nearestSigma(Vector2d pt) const
+double DepthMap::nearestSigma(const Vector2d pt, const int h) const
 {
     int xd = x(pt[0]);
     int yd = y(pt[1]);
-    if (isValid(xd, yd)) return sigma(xd, yd);
-    else return foo;
+    if (isValid(xd, yd, h)) return sigma(xd, yd, h);
+    else return OUT_OF_RANGE;
 }
 
-double & DepthMap::nearestSigma(Vector2d pt)
+
+// to access the elements directly
+double & DepthMap::at(const int x, const int y, const int h)
 {
-    int xd = x(pt[0]);
-    int yd = y(pt[1]);
-    if (isValid(xd, yd)) return sigma(xd, yd);
-    else return foo;
+    return valVec[x + y*xMax + h*hStep];
+}
+const double & DepthMap::at(const int x, const int y, const int h) const
+{
+    return valVec[x + y*xMax + h*hStep];
 }
 
 // to access the elements directly
-double & DepthMap::at(int x, int y)
-{
-    return valVec[x + y*xMax];
-}
-const double & DepthMap::at(int x, int y) const
-{
-    return valVec[x + y*xMax];
-}
-
-// to access the elements directly
-double & DepthMap::at(int idx)
+double & DepthMap::at(const int idx)
 {
     return valVec[idx];
 }
-const double & DepthMap::at(int idx) const
+const double & DepthMap::at(const int idx) const
 {
     return valVec[idx];
 }
 
 // to access the uncertainty directly
-double & DepthMap::sigma(int x, int y)
+double & DepthMap::sigma(const int x, const int y, const int h)
 {
-    return sigmaVec[x + y*xMax];
+    return sigmaVec[x + y*xMax + h*hStep];
 }
-const double & DepthMap::sigma(int x, int y) const
+const double & DepthMap::sigma(const int x, const int y, const int h) const
 {
-    return sigmaVec[x + y*xMax];
+    return sigmaVec[x + y*xMax + h*hStep];
 }
 
 // to access the uncertainty directly
-double & DepthMap::sigma(int idx)
+double & DepthMap::sigma(const int idx)
 {
     return sigmaVec[idx];
 }
-const double & DepthMap::sigma(int idx) const
+const double & DepthMap::sigma(const int idx) const
 {
     return sigmaVec[idx];
+}
+
+// to access the hypothesis cost directly
+double & DepthMap::cost(const int x, const int y, const int h)
+{
+    return costVec[x + y*xMax + h*hStep];
+}
+const double & DepthMap::cost(const int x, const int y, const int h) const
+{
+    return costVec[x + y*xMax + h*hStep];
+}
+
+// to access the hypothesis cost directly
+double & DepthMap::cost(const int idx)
+{
+    return costVec[idx];
+}
+const double & DepthMap::cost(const int idx) const
+{
+    return costVec[idx];
 }
 
 Vector2dVec DepthMap::getPointVec(const std::vector<int> idxVec) const
@@ -147,7 +156,8 @@ Vector2dVec DepthMap::getPointVec(const std::vector<int> idxVec) const
     result.reserve(idxVec.size());
     for (auto & idx : idxVec)
     {
-        result.emplace_back(u(idx % xMax), v(idx / xMax));
+        const int idxh = idx % hStep;
+        result.emplace_back(u(idxh % xMax), v(idxh / xMax));
     }
     return result;
 }
@@ -156,15 +166,18 @@ Vector2dVec DepthMap::getPointVec() const
 {
     Vector2dVec result;
     result.reserve(xMax * yMax);
-    for (int y = 0; y < yMax; y++)
+    for (int h = 0; h < hMax; h++)
     {
-        for (int x = 0; x < xMax; x++)
+        for (int y = 0; y < yMax; y++)
         {
-            result.emplace_back(u(x), v(y)); 
+            for (int x = 0; x < xMax; x++)
+            {
+                result.emplace_back(u(x), v(y)); 
+            }
         }
     }
     return result;
-}
+} //TODO Anoop continue from here
 
 void DepthMap::reconstructUncertainty(vector<int> & idxVec, 
             Vector3dVec & minDistVec, Vector3dVec & maxDistVec) const
@@ -267,7 +280,7 @@ void DepthMap::project(const Vector3dVec & pointVec, Vector2dVec & result) const
 void DepthMap::toMat(Mat32f & out) const
 {
     out.create(yMax, xMax);
-    copy(valVec.begin(), valVec.end(), (float*)out.data);
+    copy(valVec.begin(), valVec.begin()+hStep, (float*)out.data);
 }
 
 //TODO do not reconstruct all the points but a selected subset
