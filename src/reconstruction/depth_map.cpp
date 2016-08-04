@@ -89,6 +89,24 @@ double DepthMap::nearestSigma(const Vector2d pt, const int h) const
     else return OUT_OF_RANGE;
 }
 
+// nearest neighbor interpolation
+double DepthMap::nearestCost(const int u, const int v, const int h) const
+{
+    int xd = x(u);
+    int yd = y(v);
+    if (isValid(xd, yd, h)) return cost(xd, yd, h);
+    else return OUT_OF_RANGE;
+}
+
+// nearest neighbor interpolation
+double DepthMap::nearestCost(const Vector2d pt, const int h) const
+{
+    int xd = x(pt[0]);
+    int yd = y(pt[1]);
+    if (isValid(xd, yd, h)) return cost(xd, yd, h);
+    else return OUT_OF_RANGE;
+}
+
 
 // to access the elements directly
 double & DepthMap::at(const int x, const int y, const int h)
@@ -177,7 +195,7 @@ Vector2dVec DepthMap::getPointVec() const
         }
     }
     return result;
-} //TODO Anoop continue from here
+}
 
 void DepthMap::reconstructUncertainty(vector<int> & idxVec, 
             Vector3dVec & minDistVec, Vector3dVec & maxDistVec) const
@@ -219,6 +237,80 @@ void DepthMap::reconstructUncertainty(vector<int> & idxVec,
     }
 }
 
+void DepthMap::reconstruct(MHPack & result, const Flags flags) const
+{
+    result.idxVec.clear();
+    result.hypIdxVec.clear();
+    result.costVec.clear();
+    result.cloud.clear();
+    result.valVec.clear();
+
+    vector<double> depthVec;
+
+    const bool storeSigma = (bool)(flags & RECONSTRUCTION_WITH_SIGMA);
+    const bool minmax = (bool)(flags & MINMAX_DISTANCE_VEC_WITH_EMPTY);
+
+    if ( not (flags & RECONSTRUCT_QUERY_POINTS))
+    {
+        result.imagePointVec.clear();
+
+        const int searchsize = ( flags & ADD_ALL_HYPOTHESES ) ? valVec.size() : hStep; // Reminder: valVec.size() == hMax*hStep
+        for (int i = 0; i < searchsize; i++)
+        {
+            const double d = valVec[i];
+            if (d >= MIN_DEPTH)
+            {
+                depthVec.push_back(d);
+                result.idxVec.push_back( i % hStep );
+                result.hypIdxVec.push_back( i / hStep );
+                result.costVec.push_back( costVec[i] );
+                if (storeSigma) result.valVec.push_back( sigmaVec[i] );
+            }
+        }
+        result.imagePointVec = getPointVec(result.idxVec);
+    }
+    else
+    {
+        const Vector2dVec queryPointVec = result.imagePointVec;
+        for (int i = 0; i < queryPointVec.size(); i++)
+        {
+            const int hypSize = (flags & ADD_ALL_HYPOTHESES) ? hMax : 1;
+            const Vector2d & imagePoint = queryPointVec[i];
+            for(int h = 0; h < hypSize; h++)
+            {
+                const double d = nearest(imagePoint, h);
+                if (d >= MIN_DEPTH)
+                {
+                    depthVec.push_back( d );
+                    result.idxVec.push_back( x(imagePoint[0]) + y(imagePoint[1])*xMax );
+                    result.hypIdxVec.push_back( h );
+                    result.costVec.push_back( nearestCost(imagePoint, h) );
+                    if (storeSigma) result.valVec.push_back( nearestSigma(imagePoint, h) );
+                }
+            }
+        }
+        result.imagePointVec = getPointVec(result.idxVec);
+    }
+
+    vector<bool> maskVec;
+    cameraPtr->reconstructPointCloud(result.imagePointVec, result.cloud, maskVec);
+
+    for (int i = 0; i < result.cloud.size(); i++)
+    {
+        if (maskVec[i])
+        {
+            result.cloud[i] = result.cloud[i].normalized() * depthVec[i];
+            if (not storeSigma) result.valVec[i] = 0; // Access the image value and store here
+        }
+        else //TODO - Need to fix this
+        {
+            result.cloud[i] << 0,0,0; // Insert null vector
+            if (not storeSigma) result.valVec[i] = 0;
+        }
+    }
+}
+
+//TODO - Remove this and the next reconstruct() after updating the code
 void DepthMap::reconstruct(vector<int> & idxVec, Vector3dVec & result) const
 {
     result.clear();
@@ -272,6 +364,7 @@ void DepthMap::reconstruct(const Vector2dVec & queryPointVec,
     }
 }
 
+
 void DepthMap::project(const Vector3dVec & pointVec, Vector2dVec & result) const
 {
     cameraPtr->projectPointCloud(pointVec, result);
@@ -285,6 +378,7 @@ void DepthMap::toMat(Mat32f & out) const
 
 //TODO do not reconstruct all the points but a selected subset
 // to avoid reconstruction of points with bad disparity
+//TODO Anoop - Rewrite this later
 void DepthReprojector::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
         const Transformation<double> T12, DepthMap& output)
 {
