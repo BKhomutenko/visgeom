@@ -15,10 +15,25 @@ struct MHPack
 
     enum Data
     {
-    	RECONSTRUCTION_WITH_IMAGE_VALUES,
+    	NO_DATA,
+        RECONSTRUCTION_WITH_IMAGE_VALUES,
     	RECONSTRUCTION_WITH_SIGMA,
-    	MINMAX_DISTANCE_VEC_WITH_EMPTY
+    	MINMAX_DISTANCE_VEC_WITH_SIGN
     };
 
     Data datatype; // datatype of the values in cloud and valVec
+
+    // Default constructor
+    MHPack() :
+        datatype(NO_DATA) {}
+
+    // Copy constructor
+    MHPack(const MHPack & other) :
+        idxVec(other.idxVec),
+        imagePointVec(other.imagePointVec),
+        hypIdxVec(other.hypIdxVec),
+        costVec(other.costVec),
+        cloud(other.cloud),
+        valVec(other.valVec),
+        datatype(other.datatype) {}
 };

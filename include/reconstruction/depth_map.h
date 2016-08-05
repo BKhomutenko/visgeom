@@ -45,7 +45,7 @@ enum Flags : uint32_t
     RECONSTRUCT_QUERY_POINTS = 1,
     RECONSTRUCTION_WITH_IMAGE_VALUES = 2,
     RECONSTRUCTION_WITH_SIGMA = 4,
-    MINMAX_DISTANCE_VEC_WITH_EMPTY = 8,
+    MINMAX_DISTANCE_VEC_WITH_SIGN = 8,
     ADD_ALL_HYPOTHESES = 16
 };
 
@@ -153,18 +153,20 @@ public:
     Vector2dVec getPointVec(const std::vector<int> idxVec) const;
     Vector2dVec getPointVec() const;
     
+    //TODO - Remove this and next 2 functions, leave only the final 2 unified reconstruct functions
     void reconstructUncertainty(std::vector<int> & idxVec, 
             Vector3dVec & minDistVec,
             Vector3dVec & maxDistVec) const;
             
-    //TODO - Remove this and next function, leave only the final unified reconstruct function
     void reconstruct(std::vector<int> & idxVec, Vector3dVec & result) const;
     
     // idxVec corresponds to indices of points in queryPointVec
     void reconstruct(const Vector2dVec & queryPointVec,
             std::vector<int> & idxVec, Vector3dVec & result) const;
 
-    void reconstruct(MHPack & result, const Flags flags = (Flags)(RECONSTRUCTION_WITH_IMAGE_VALUES | ADD_ALL_HYPOTHESES) ) const;
+    void reconstructUncertainty(MHPack & result, const Flags flags = (Flags)(MINMAX_DISTANCE_VEC_WITH_SIGN | ADD_ALL_HYPOTHESES) ) const;
+
+    void reconstruct(MHPack & result, const Flags flags = (Flags)(RECONSTRUCTION_WITH_SIGMA | ADD_ALL_HYPOTHESES) ) const;
     
     //TODO make it bool and make it return a mask
     void project(const Vector3dVec & pointVec, Vector2dVec & result) const;
