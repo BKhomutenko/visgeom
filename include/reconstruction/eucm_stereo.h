@@ -46,6 +46,9 @@ struct StereoParameters : public ScaleParameters
     // cost parameters
     int lambdaStep = 5;
     int lambdaJump = 32;
+    
+    bool imageBasedCost = true;
+    
     int maxError = 150;
     int maxBias = 10;
     
@@ -163,10 +166,13 @@ private:
     Vector2iVec pointPxVec1;
     Vector2iVec pinfPxVec;
     
+    // to be able to change the jump cost
+    int jumpCost;
     
     const int DISPARITY_MARGIN = 20;
     Mat32s uCache, vCache;
     Mat8u errorBuffer;
+    Mat8u costBuffer;
     Mat32s tableauLeft, tableauRight; //FIXME check the type through the code
     Mat32s tableauTop, tableauBottom;
     Mat32s smallDisparity;

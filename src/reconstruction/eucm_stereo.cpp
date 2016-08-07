@@ -123,6 +123,7 @@ void EnhancedStereo::createBuffer()
     tableauBottom.create(params.yMax, bufferWidth);
     smallDisparity.create(params.yMax, params.xMax * params.hypMax);
     finalErrorMat.create(params.yMax, params.xMax * params.hypMax);
+    if (params.imageBasedCost) costBuffer.create(params.yMax, params.xMax);
     uCache.create(params.yMax, params.xMax * (params.dispMax + 2*DISPARITY_MARGIN));
     vCache.create(params.yMax, params.xMax * (params.dispMax + 2*DISPARITY_MARGIN));
     if (params.verbosity > 2) 
@@ -197,6 +198,23 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 fill(outPtr + 1, outPtr + params.dispMax, 255);
                 continue;
             }
+            
+            if (params.imageBasedCost) 
+            {
+                switch (step)
+                {
+                case 1:
+                    costBuffer(y, x) = params.lambdaJump / 2;
+                    break;
+                case 2:
+                    costBuffer(y, x) = params.lambdaJump;
+                    break;
+                default:
+                    costBuffer(y, x) = params.lambdaJump * 2;
+                    break;
+                }
+            }
+            
             const int nSteps = (params.dispMax  + step - 1 ) / step; 
                
             //sample the curve 
@@ -299,7 +317,7 @@ void EnhancedStereo::computeDynamicStep(const int32_t* inCost, const uint8_t * e
     int & val0 = outCost[0];
     val0 = inCost[0];
     val0 = min(val0, inCost[1] + params.lambdaStep);
-    val0 = min(val0, bestCost + params.lambdaJump);
+    val0 = min(val0, bestCost + jumpCost);
     val0 += error[0];
     for (int i = 1; i < params.dispMax-1; i++)
     {
@@ -307,13 +325,13 @@ void EnhancedStereo::computeDynamicStep(const int32_t* inCost, const uint8_t * e
         val = inCost[i];
         val = min(val, inCost[i + 1] + params.lambdaStep);
         val = min(val, inCost[i - 1] + params.lambdaStep);
-        val = min(val, bestCost + params.lambdaJump);
+        val = min(val, bestCost + jumpCost);
         val += error[i];
     }
     int & vald = outCost[params.dispMax - 1];
     vald = inCost[params.dispMax - 1];
     vald = min(vald, inCost[params.dispMax - 2] + params.lambdaStep);
-    vald = min(vald, bestCost + params.lambdaJump);
+    vald = min(vald, bestCost + jumpCost);
     vald += error[params.dispMax - 1];
 }
 
@@ -321,6 +339,9 @@ void EnhancedStereo::computeDynamicProgramming()
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::computeDynamicProgramming" << endl;
     if (params.verbosity > 1) cout << "    left" << endl;
+    
+    if (not params.imageBasedCost) jumpCost = params.lambdaJump;
+    
     // left tableau init
     for (int y = 0; y < params.yMax; y++)
     {
@@ -331,6 +352,7 @@ void EnhancedStereo::computeDynamicProgramming()
         // fill up the tableau
         for (int x = 1; x < params.xMax; x++)
         {
+            if (params.imageBasedCost) jumpCost = costBuffer(y, x);
             computeDynamicStep(tableauRow + (x - 1)*params.dispMax,
                     errorRow + x*params.dispMax, tableauRow + x*params.dispMax);
         }
@@ -346,6 +368,7 @@ void EnhancedStereo::computeDynamicProgramming()
         
         for (int x = params.xMax - 2; x >= 0; x--)
         {
+            if (params.imageBasedCost) jumpCost = costBuffer(y, x);
             computeDynamicStep(tableauRow + (x + 1)*params.dispMax, 
                     errorRow + x*params.dispMax, tableauRow + x*params.dispMax);
         }
@@ -359,6 +382,7 @@ void EnhancedStereo::computeDynamicProgramming()
         copy(errorCol.data, errorCol.data + params.dispMax, (int*)(tableauCol.data));
         for (int y = 1; y < params.yMax; y++)
         {
+            if (params.imageBasedCost) jumpCost = costBuffer(y, x);
             computeDynamicStep((int32_t*)(tableauCol.row(y-1).data), 
                     errorCol.row(y).data,
                     (int32_t*)(tableauCol.row(y).data));
@@ -376,6 +400,7 @@ void EnhancedStereo::computeDynamicProgramming()
                 (int32_t*)(tableauCol.row(vLast).data));
         for (int y = params.yMax - 2; y >= 0; y--)
         {
+            if (params.imageBasedCost) jumpCost = costBuffer(y, x);
             computeDynamicStep((int32_t*)(tableauCol.row(y+1).data), 
                     errorCol.row(y).data,
                     (int32_t*)(tableauCol.row(y).data));
@@ -397,6 +422,7 @@ void EnhancedStereo::reconstructDisparity()
         for (int x = 0; x < params.xMax; x++)
         {
             int minCost = 0;
+            int minCostDisp = -1;
             for (int hypIdx = 0; hypIdx < params.hypMax; hypIdx++)
             {
                 int32_t & bestDisp = smallDisparity(y, x + hypIdx * params.xMax);
@@ -410,14 +436,16 @@ void EnhancedStereo::reconstructDisparity()
                     int acc = dynRow1[base + d] + dynRow2[base + d] 
                             + dynRow3[base + d] + dynRow4[base + d] - 2*errRow[base + d];
                             
-                    if (bestErr > acc and acc > minCost)
+                    if ( bestErr > acc and ( acc > minCost or 
+                            (acc == minCost and d != minCostDisp) ) )
                     {
                         if (hypIdx > 0 and acc > minCost + params.maxHypDiff) continue;
                         bestDisp = d;
                         bestErr = acc;
                     }
                 }
-                if (hypIdx == 0) minCost = bestErr;
+                minCost = bestErr;
+                minCostDisp = bestDisp;
             }
             if (params.verbosity > 3) cout << "    best error: " << finalErrorMat(y, x) << endl;
         }
