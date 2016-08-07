@@ -31,12 +31,23 @@ NOTE:
 
 #include "camera/generic_camera.h"
 #include "utils/scale_parameters.h"
+#include "utils/MHPack.h"
 
 const double DEFAULT_DEPTH = 1;
 const double MIN_DEPTH = 0.1;
 const double DEFAULT_SIGMA_DEPTH = 100;
 const double DEFAULT_COST_DEPTH = 100;
 const double OUT_OF_RANGE = 0.0;
+
+
+enum Flags : uint32_t
+{
+    RECONSTRUCT_QUERY_POINTS = 1,
+    RECONSTRUCTION_WITH_IMAGE_VALUES = 2,
+    RECONSTRUCTION_WITH_SIGMA = 4,
+    MINMAX_DISTANCE_VEC_WITH_SIGN = 8,
+    ADD_ALL_HYPOTHESES = 16
+};
 
 class DepthMap : private ScaleParameters
 {
@@ -110,6 +121,10 @@ public:
     // nearest neighbor interpolation for the uncertainty
     double nearestSigma(const int u, const int v, const int h = 0) const;
     double nearestSigma(const Vector2d pt, const int h = 0) const;
+
+    // nearest neighbor interpolation for the hypothesis cost
+    double nearestCost(const int u, const int v, const int h = 0) const;
+    double nearestCost(const Vector2d pt, const int h = 0) const;
     
     // to access the elements directly
     double & at(const int x, const int y, const int h = 0);
@@ -138,6 +153,7 @@ public:
     Vector2dVec getPointVec(const std::vector<int> idxVec) const;
     Vector2dVec getPointVec() const;
     
+    //TODO - Remove this and next 2 functions, leave only the final 2 unified reconstruct functions
     void reconstructUncertainty(std::vector<int> & idxVec, 
             Vector3dVec & minDistVec,
             Vector3dVec & maxDistVec) const;
@@ -147,6 +163,10 @@ public:
     // idxVec corresponds to indices of points in queryPointVec
     void reconstruct(const Vector2dVec & queryPointVec,
             std::vector<int> & idxVec, Vector3dVec & result) const;
+
+    void reconstructUncertainty(MHPack & result, const Flags flags = (Flags)(MINMAX_DISTANCE_VEC_WITH_SIGN | ADD_ALL_HYPOTHESES) ) const;
+
+    void reconstruct(MHPack & result, const Flags flags = (Flags)(RECONSTRUCTION_WITH_SIGMA | ADD_ALL_HYPOTHESES) ) const;
     
     //TODO make it bool and make it return a mask
     void project(const Vector3dVec & pointVec, Vector2dVec & result) const;
