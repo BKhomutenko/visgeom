@@ -40,13 +40,12 @@ const double DEFAULT_COST_DEPTH = 100;
 const double OUT_OF_RANGE = 0.0;
 
 
-enum Flags : uint32_t
+enum ReconstructionFlags : uint32_t
 {
-    RECONSTRUCT_QUERY_POINTS = 1,
-    RECONSTRUCTION_WITH_IMAGE_VALUES = 2,
-    RECONSTRUCTION_WITH_SIGMA = 4,
-    MINMAX_DISTANCE_VEC_WITH_SIGN = 8,
-    ADD_ALL_HYPOTHESES = 16
+    QUERY_POINTS = 1,
+    IMAGE_VALUES = 2,
+    MINMAX = 4,
+    ALL_HYPOTHESES = 8
 };
 
 class DepthMap : private ScaleParameters
@@ -102,7 +101,9 @@ public:
         setTo(DEFAULT_DEPTH, DEFAULT_SIGMA_DEPTH, DEFAULT_COST_DEPTH);
     }
     
-    void setTo(const double val, const double sigmaVal, const double costVal = DEFAULT_COST_DEPTH)
+    void setTo(const double val, 
+        const double sigmaVal, 
+        const double costVal = DEFAULT_COST_DEPTH)
     {
         fill(valVec.begin(), valVec.end(), val);
         fill(sigmaVec.begin(), sigmaVec.end(), sigmaVal);
@@ -152,6 +153,9 @@ public:
     
     Vector2dVec getPointVec(const std::vector<int> idxVec) const;
     Vector2dVec getPointVec() const;
+
+    vector<int> getIdxVec(const ReconstructionFlags flags) const;
+    vector<int> getIdxVec(const ReconstructionFlags flags, const Vector2dVec queryPointVec) const;
     
     //TODO - Remove this and next 2 functions, leave only the final 2 unified reconstruct functions
     void reconstructUncertainty(std::vector<int> & idxVec, 
@@ -164,9 +168,14 @@ public:
     void reconstruct(const Vector2dVec & queryPointVec,
             std::vector<int> & idxVec, Vector3dVec & result) const;
 
-    void reconstructUncertainty(MHPack & result, const Flags flags = (Flags)(MINMAX_DISTANCE_VEC_WITH_SIGN | ADD_ALL_HYPOTHESES) ) const;
-
-    void reconstruct(MHPack & result, const Flags flags = (Flags)(RECONSTRUCTION_WITH_SIGMA | ADD_ALL_HYPOTHESES) ) const;
+    // Reconstructs 2d points into corresponding 3d pointcloud
+    // result.idxVec corresponds to indices of points in original queryPointVec
+    // To use QUERY_POINT, insert the query point vector into result.idxVec. Do not
+    //   use ALL_HYPOTHESES with QUERY_POINT.
+    // To use IMAGE_VALUES, insert the value vector into result.valVec. This should
+    //   only be used along with QUERY_POINT
+    void reconstruct(MHPack & result, 
+        const ReconstructionFlags flags = ALL_HYPOTHESES ) const;
     
     //TODO make it bool and make it return a mask
     void project(const Vector3dVec & pointVec, Vector2dVec & result) const;
@@ -179,6 +188,10 @@ public:
     
     static DepthMap generatePlane(const ICamera * camera, const ScaleParameters & params, 
             Transformation<double> TcameraPlane, const Vector3dVec & polygonVec);
+
+private:
+    // Small helper function for reconstruct()
+    void pushPoint(MHPack & result, const int i, const int idx, const double val = -1.0) const;
     
 private:
     std::vector<double> valVec;
