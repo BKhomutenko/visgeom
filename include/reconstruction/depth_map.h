@@ -42,6 +42,7 @@ const double OUT_OF_RANGE = 0.0;
 
 enum ReconstructionFlags : uint32_t
 {
+    NONE = 0,
     QUERY_POINTS = 1,
     IMAGE_VALUES = 2,
     MINMAX = 4,
@@ -114,6 +115,7 @@ public:
     
     //check the limits
     bool isValid(const int x, const int y, const int h = 0) const;
+    bool isValid(const Vector2d pt, const int h=0) const;
     
     // nearest neighbor interpolation
     double nearest(const int u, const int v, const int h = 0) const;
@@ -189,6 +191,21 @@ public:
     static DepthMap generatePlane(const ICamera * camera, const ScaleParameters & params, 
             Transformation<double> TcameraPlane, const Vector3dVec & polygonVec);
 
+    /*
+    Takes the depthmap from the first image, reconstructs the pointcloud
+    in the frame of the second image, then reprojects into second image
+    frame. Reconstructs the cloud at the image points specified by the 
+    first pointcloud, and sends this back to the first image. This 
+    pointcloud is transformed into the frame of the first image, and each
+    point in this cloud is projected onto the line of it's original point.
+    This new depthmap is the reprojected depthmap.
+    */
+    void wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
+            const Transformation<double> T12, DepthMap& output) const;
+
+    DepthMap wrapDepth(const Transformation<double> T12,
+            const ScaleParameters & scaleParams) const;
+
 private:
     // Small helper function for reconstruct()
     void pushPoint(MHPack & result, const int i, const int idx, const double val = -1.0) const;
@@ -202,26 +219,3 @@ private:
     
     ICamera * cameraPtr;
 };
-
-
-class DepthReprojector
-{
-
-public:
-	DepthReprojector() {}
-    
-    /*
-    Takes the depthmap from the first image, reconstructs the pointcloud
-    in the frame of the second image, then reprojects into second image
-    frame. Reconstructs the cloud at the image points specified by the 
-    first pointcloud, and sends this back to the first image. This 
-    pointcloud is transformed into the frame of the first image, and each
-    point in this cloud is projected onto the line of it's original point.
-    This new depthmap is the reprojected depthmap.
-    */
-	void wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
-	        const Transformation<double> T12, DepthMap& output);
-private:
-	//null
-};
-

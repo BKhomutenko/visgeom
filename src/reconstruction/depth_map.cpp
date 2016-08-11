@@ -51,6 +51,11 @@ bool DepthMap::isValid(const int x, const int y, const int h) const
     return ( (x >= 0) and (x < xMax) and (y >= 0) and (y < yMax) and (h >= 0) and (h < hMax) );
 }
 
+bool DepthMap::isValid(const Vector2d pt, const int h) const
+{
+    return isValid(pt[0], pt[1], h);
+}
+
 
 // nearest neighbor interpolation
 double DepthMap::nearest(const int u, const int v, const int h) const
@@ -399,9 +404,9 @@ void DepthMap::toMat(Mat32f & out) const
 
 //TODO do not reconstruct all the points but a selected subset
 // to avoid reconstruction of points with bad disparity
-//TODo - Add support to insert multiple hypotheses into output depthmap
-void DepthReprojector::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
-        const Transformation<double> T12, DepthMap& output)
+//TODO - Add support to insert multiple hypotheses into output depthmap
+void DepthMap::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
+        const Transformation<double> T12, DepthMap& output) const
 {
 	//Step 1 : Get point-cloud of first camera in first frame
 	// vector<int> idx0Vec;
@@ -447,6 +452,41 @@ void DepthReprojector::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
 		// output.sigma(idx0) = dMap2.nearestSigma(point12Vec[idx1]);
         output.sigma(idx0) = cloud22MH.valVec[idx1]; // As we used RECONSTRUCTION_WITH_SIGMA
 	}
+}
+
+//TODO - Add support to insert multiple hypotheses into output depthmap
+DepthMap DepthMap::wrapDepth(const Transformation<double> T12, 
+    const ScaleParameters & scaleParams) const
+{
+    DepthMap dMap2(cameraPtr, scaleParams);
+
+    //Step 1 : Get point-cloud of current frame
+    MHPack cloud11MH;
+    this->reconstruct(cloud11MH, NONE);
+
+    //Step 2 : Transform cloud into keyframe
+    Vector3dVec cloud12;
+    T12.inverseTransform(cloud11MH.cloud, cloud12);
+
+    //Step 3 : Project point cloud on keyframe
+    Vector2dVec point12Vec;
+    dMap2.project(cloud12, point12Vec);
+
+    //Step 4 : Fill in data for depthmap
+    vector<int> idx12Vec = getIdxVec(NONE, point12Vec);
+    for (int i = 0; i < idx12Vec.size(); i++)
+    {
+        const int idx2 = idx12Vec[i];
+        const int idx1 = cloud11MH.idxVec[idx2];
+        if(isValid(point12Vec[i]))
+        {
+            dMap2.at(idx2) = cloud12[idx2].norm();
+            dMap2.sigma(idx2) = this->sigma(idx1);
+            dMap2.cost(idx2) = this->cost(idx1);
+        }
+    }
+
+    return dMap2;
 }
 
 DepthMap DepthMap::generatePlane(const ICamera * camera, const ScaleParameters & params, 
