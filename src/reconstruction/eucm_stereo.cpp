@@ -204,13 +204,13 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 switch (step)
                 {
                 case 1:
-                    costBuffer(y, x) = params.lambdaJump / 2;
-                    break;
-                case 2:
                     costBuffer(y, x) = params.lambdaJump;
                     break;
+                case 2:
+                    costBuffer(y, x) = params.lambdaJump * 3;
+                    break;
                 default:
-                    costBuffer(y, x) = params.lambdaJump * 2;
+                    costBuffer(y, x) = params.lambdaJump * 6;
                     break;
                 }
             }
@@ -409,6 +409,7 @@ void EnhancedStereo::computeDynamicProgramming()
     
 }
 
+//TODO make with local minima
 void EnhancedStereo::reconstructDisparity()
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::reconstructDisparityMono" << endl;

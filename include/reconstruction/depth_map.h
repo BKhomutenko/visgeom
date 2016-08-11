@@ -180,6 +180,7 @@ public:
     static DepthMap generatePlane(const ICamera * camera, const ScaleParameters & params, 
             Transformation<double> TcameraPlane, const Vector3dVec & polygonVec);
     
+    void merge(const DepthMap & depth2, const Transformation<double> T12);
 private:
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty
