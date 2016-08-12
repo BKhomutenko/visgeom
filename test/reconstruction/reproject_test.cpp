@@ -55,10 +55,11 @@ int main(int argc, char** argv)
     
     DepthMap depth1wrap;
      
-    DepthReprojector reprojector;
+    //DepthReprojector reprojector;
     
     Timer timer;
-    reprojector.wrapDepth(depth0, depth1, T01, depth1wrap);
+    //reprojector.wrapDepth(depth0, depth1, T01, depth1wrap);
+    depth0.wrapDepth(depth0, depth1, T01, depth1wrap); // Modification to account for new commit changes
     cout << timer.elapsed() << endl;
     Mat32f img0(ROWS, COLS), img1(ROWS, COLS), img1wrap(ROWS, COLS);
     
