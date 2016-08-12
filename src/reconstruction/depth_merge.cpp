@@ -29,7 +29,7 @@ NOTE:
 #include "eigen.h"
 
 const int COST_CHANGE = 10;
-const int MAX_COST = 35;
+const int MAX_COST = 35; //TODO link to DEFAULT_COST
 
 bool match(double v1, double s1, double v2, double s2)
 {
@@ -52,8 +52,11 @@ void DepthMap::merge(const DepthMap & depth2, const Transformation<double> T12)
         for (int x = 0; x < xMax; x++)
         {
             vector<bool> matchedMeasurementVec(depth2.hMax, false);
+            //first match real hypotheses
             for (int h1 = 0; h1 < hMax; h1++)
             {
+                double & cost1 = cost(x, y, h1);
+                if (cost1 > MAX_COST) continue;
                 bool improved = false;
                 for (int h2 = 0; h2 < depth2.hMax; h2++)
                 {
@@ -64,8 +67,8 @@ void DepthMap::merge(const DepthMap & depth2, const Transformation<double> T12)
                     {
                         filter(at(x, y, h1), sigma(x, y, h1),
                              depth2.at(x, y, h2), depth2.sigma(x, y, h2);
-                        ///FIXME if cost == DEFAULT     
-                        cost(x, y, h1) -= COST_CHANGE;
+                       
+                        cost1 = max(cost1 - COST_CHANGE, 0);
                         improved = true;
                         matchedMeasurementVec(h2) = true;
                         break;
@@ -77,19 +80,21 @@ void DepthMap::merge(const DepthMap & depth2, const Transformation<double> T12)
             int h2 = 0;
             for (int h1 = 0; h1 < hMax; h1++)
             {
-                while (h2 < depth2.hMax and matchedMeasurementVec(h2)) h2++;
                 if (cost(x, y, h1) > MAX_COST)
                 {
-                    //delete the hypothesis and replace it with a new one
-                    if (h2 >= depth2.hMax)
+                    while (h2 < depth2.hMax and matchedMeasurementVec(h2)) h2++;
+                    if (h2 < depth2.hMax)
+                    {
+                        at(x, y, h1) = depth2.at(x, y, h2);
+                        sigma(x, y, h1) = depth2.sigma(x, y, h2);
+                        //it gives the hyp 2 turns
+                        cost(x, y, h1) = MAX_COST - COST_CHANGE;
+                    }
+                    else
                     {
                         at(x, y, h1) = DEFAULT_DEPTH;
                         sigma(x, y, h1) = DEFAULT_SIGMA;
                         cost(x, y, h1) = DEFAULT_COST;
-                    }
-                    else
-                    {
-                        
                     }
                 }
             }
