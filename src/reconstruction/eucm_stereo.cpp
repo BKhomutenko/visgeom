@@ -55,8 +55,8 @@ void EnhancedStereo::computeReconstructed()
     {
         for (int x = 0; x < params.xMax; x++)
         {
-            pointVec1.emplace_back(params.u(x), params.v(y));
-            pointPxVec1.emplace_back(params.u(x), params.v(y));
+            pointVec1.emplace_back(params.uConv(x), params.vConv(y));
+            pointPxVec1.emplace_back(params.uConv(x), params.vConv(y));
         }
     }
     camera1->reconstructPointCloud(pointVec1, reconstVec, maskVec);
@@ -124,6 +124,7 @@ void EnhancedStereo::createBuffer()
     smallDisparity.create(params.yMax, params.xMax * params.hypMax);
     finalErrorMat.create(params.yMax, params.xMax * params.hypMax);
     if (params.imageBasedCost) costBuffer.create(params.yMax, params.xMax);
+    if (params.salientPoints) salientBuffer.create(params.yMax, params.xMax);
     uCache.create(params.yMax, params.xMax * (params.dispMax + 2*DISPARITY_MARGIN));
     vCache.create(params.yMax, params.xMax * (params.dispMax + 2*DISPARITY_MARGIN));
     if (params.verbosity > 2) 
@@ -142,11 +143,23 @@ void EnhancedStereo::comuteStereo(const Mat8u & img1, const Mat8u & img2, DepthM
     {
         for (int x = 0; x < params.xMax; x++)
         {
-            computeDepth(x, y, depth.at(x, y), depth.sigma(x, y));
+            for (int h = 0; h < params.hypMax; h++)
+            {
+                if (salientBuffer(y, x) or not params.salientPoints) 
+                {
+                    computeDepth(depth.at(x, y, h), depth.sigma(x, y, h), x, y, h);
+                }
+                else 
+                {
+                    depth.at(x, y, h) = DEFAULT_DEPTH;
+                    depth.sigma(x, y, h) = DEFAULT_SIGMA_DEPTH;
+                }
+            }
         }
     }
 }
 
+//TODO remove, depricated function
 void EnhancedStereo::comuteStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat)
 {
     computeCurveCost(img1, img2);
@@ -155,8 +168,6 @@ void EnhancedStereo::comuteStereo(const Mat8u & img1, const Mat8u & img2, Mat32f
     computeDepth(depthMat);
 }
 
-//TODO change u,v to x,y
-//TODO make step change scaleable and define in in a loop
 void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::computeCurveCost" << endl;
@@ -168,7 +179,10 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     vector<int> kernelVec, waveVec;
     const int NORMALIZER = initKernel(kernelVec, LENGTH);
     const int WAVE_NORM = initWave(waveVec, LENGTH);
-    EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM/2, waveVec.data(), {1, 2, 3, 5});
+    EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM/3, waveVec.data(), {1, 2, 3, 5});
+    
+    if (params.salientPoints) salientBuffer.setTo(0);
+    
     for (int y = 0; y < params.yMax; y++)
     {
         for (int x = 0; x < params.xMax; x++)
@@ -186,7 +200,8 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 fill(outPtr + 1, outPtr + params.dispMax, 255);
                 continue;
             }
-            // compute the local image descriptor -- a piece of the epipolar curve on the first image
+            // compute the local image descriptor,
+            // a piece of the epipolar curve on the first image
             vector<uint8_t> descriptor;
             CurveRasterizer<int, Polynomial2> descRaster = getCurveRasteriser1(idx);
             const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
@@ -213,6 +228,12 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                     costBuffer(y, x) = params.lambdaJump * 6;
                     break;
                 }
+            }
+            
+            //TODO revise the criterion (step == 1)
+            if (params.salientPoints and step == 1)
+            {
+                salientBuffer(y, x) = 1;
             }
             
             const int nSteps = (params.dispMax  + step - 1 ) / step; 
@@ -413,6 +434,7 @@ void EnhancedStereo::computeDynamicProgramming()
 void EnhancedStereo::reconstructDisparity()
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::reconstructDisparityMono" << endl;
+    const int hypShift = params.xMax*params.yMax;
     for (int y = 0; y < params.yMax; y++)
     {
         int32_t* dynRow1 = (int32_t*)(tableauLeft.row(y).data);
@@ -422,12 +444,20 @@ void EnhancedStereo::reconstructDisparity()
         uint8_t* errRow = errorBuffer.row(y).data;
         for (int x = 0; x < params.xMax; x++)
         {
+            if (params.salientPoints and salientBuffer(y, x) == 0)
+            {
+                for (int hypIdx = 0; hypIdx < params.hypMax; hypIdx++)
+                {
+                    smallDisparity(y, x * params.hypMax + hypIdx) = -1;
+                }
+                continue;
+            }
             int minCost = 0;
             int minCostDisp = -1;
             for (int hypIdx = 0; hypIdx < params.hypMax; hypIdx++)
             {
-                int32_t & bestDisp = smallDisparity(y, x + hypIdx * params.xMax);
-                int32_t & bestErr = finalErrorMat(y, x + hypIdx * params.xMax);
+                int32_t & bestDisp = smallDisparity(y, x * params.hypMax + hypIdx);
+                int32_t & bestErr = finalErrorMat(y, x * params.hypMax + hypIdx);
                 bestErr = INT32_MAX;
                 bestDisp = -1;
                 for (int d = 0; d < params.dispMax; d++)
@@ -445,6 +475,7 @@ void EnhancedStereo::reconstructDisparity()
                         bestErr = acc;
                     }
                 }
+                if (bestDisp == -1) break;
                 minCost = bestErr;
                 minCostDisp = bestDisp;
             }
@@ -501,6 +532,7 @@ bool EnhancedStereo::triangulate(double x1, double y1, double x2, double y2, Vec
     return true;
 }
 
+//TODO remove this function, depricated
 void EnhancedStereo::computeDepth(Mat32f & distance)
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::computeDepth(Mat32f &)" << endl;
@@ -514,23 +546,24 @@ void EnhancedStereo::computeDepth(Mat32f & distance)
     }
 }
 
-bool EnhancedStereo::computeDepth(int x, int y, double & dist, double & sigma)
+bool EnhancedStereo::computeDepth(double & dist, double & sigma, int x, int y, int h)
 {
     if (params.verbosity > 3) cout << "EnhancedStereo::computeDepth(int *)" << endl;
+    assert(not (params.hypMax == 1 and h > 0));
     
     int idx = getLinearIndex(x, y);
     if (not maskVec[idx])
     { 
-        dist = 0;
-        sigma = 0;
+        dist = OUT_OF_RANGE;
+        sigma = OUT_OF_RANGE;
         return false;
     
     }
-    int disparity = smallDisparity(y, x);
+    int disparity = smallDisparity(y, x*params.hypMax + h);
     if (disparity < 0) 
     {
         dist = OUT_OF_RANGE;
-        sigma = 0;
+        sigma = OUT_OF_RANGE;
         return true;
     }
     
@@ -572,25 +605,26 @@ bool EnhancedStereo::computeDepth(int x, int y, double & dist, double & sigma)
         else
         {
             dist = OUT_OF_RANGE;
-            sigma = 0;
+            sigma = OUT_OF_RANGE;
             return false;
         }
     }
     else 
     {
         dist = OUT_OF_RANGE;
-        sigma = 0;
+        sigma = OUT_OF_RANGE;
         return false;
     }
 }
 
-double EnhancedStereo::computeDepth(int x, int y)
+double EnhancedStereo::computeDepth(int x, int y, int h)
 {
     if (params.verbosity > 3) cout << "EnhancedStereo::computeDepth(int *)" << endl;
+    assert(not (params.hypMax == 1 and h > 0));
     
     int idx = getLinearIndex(x, y);
     if (not maskVec[idx]) return 0;
-    int disparity = smallDisparity(y, x);
+    int disparity = smallDisparity(y, x*params.hypMax + h);
     if (disparity < 0) 
     {
         return OUT_OF_RANGE;
@@ -621,7 +655,7 @@ double EnhancedStereo::computeDepth(int x, int y)
     }
     else 
     {
-        return 0;
+        return OUT_OF_RANGE;
     }
 }
 

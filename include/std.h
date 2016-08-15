@@ -30,6 +30,7 @@ STL types and methods
 // Containers
 using std::vector;
 using std::array;
+using std::pair;
 
 // Algorithms
 using std::copy;

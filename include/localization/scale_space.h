@@ -40,8 +40,8 @@ public:
         if (gradientOn) resizeGradient();
     }
     
-    using ScaleParameters::u;
-    using ScaleParameters::v;
+    using ScaleParameters::uConv;
+    using ScaleParameters::vConv;
     
     void setGradient(bool val)
     {

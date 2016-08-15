@@ -77,6 +77,7 @@ void DepthMap::merge(const DepthMap & depth2, const Transformation<double> T12)
                 if (not improved) cost(x, y, h1) += COST_CHANGE;
             }
             // discard bad hypotheses
+            // TODO rearrange hypotheses
             int h2 = 0;
             for (int h1 = 0; h1 < hMax; h1++)
             {

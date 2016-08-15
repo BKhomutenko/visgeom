@@ -54,8 +54,8 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
             if (gu*gu + gv*gv < GRAD_THRESH) continue; 
             //TODO change the threshold depending on the image size or use adaptive random sampling
             // to speed up the computation
-            int ub = scaleSpace1.u(us);
-            int vb = scaleSpace1.v(vs);
+            int ub = scaleSpace1.uConv(us);
+            int vb = scaleSpace1.vConv(vs);
             if (verbosity > 4) cout << "    " << vs << " " << us << endl;
             valVec.push_back(img1(vs, us));
             imagePointVec.emplace_back(ub, vb);

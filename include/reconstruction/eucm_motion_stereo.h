@@ -47,6 +47,7 @@ struct MotionStereoParameters
     int dispMax = 48;
 };
 
+
 class MotionStereo
 {
 public:
@@ -67,15 +68,172 @@ public:
         camera2 = NULL;
     }    
     
+    //TODO figure out how to treat the mask efficiently
     void setBaseImage(const Mat8u & image)
     {
         image.copyTo(img1);
         computeMask();
     }
     
+    /*
+    -Select salient points and points with defined depth
+    -reproject all the points onto the next image
+    -for those which have small uncertainties just keep that value
+    -for those with wide uncertainty or without a value recompute it
+
+    hypothesis quality must be evaluated using normal Kalman filtering
+    That is, at every step the uncertainty grows. Once it reaches a certain value,
+    the hypothesis is removed
+
+    two sets of points must be treated separately:
+    -points with bad descriptors but with depth estimation. 
+        Project forward, increment uncertainty
+    -points with good descriptors : 
+        -with depth estimation. Project forward using serach 
+        (if the search distance is greater than 1)
+        -withoud depth estimation. Generate new hypotheses using complete epipolar search
+    */
+    //TODO cam1, cam2 are not needed
+    void reprojectDepth(Transformation<double> T12, const Mat8u & img2, DepthMap & depth)
+    {
+        
+        epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
+        StereoEpipoles epipoles(camera1, camera2, T12);
+        
+        const int LENGTH = params.descLength;
+        const int HALF_LENGTH = LENGTH / 2;
+        
+        vector<int> kernelVec, waveVec;
+        const int NORMALIZER = initKernel(kernelVec, LENGTH);
+        const int WAVE_NORM = initWave(waveVec, LENGTH);
+        EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1});
+        
+        MHPack flatPack, salientPack;
+        vector<vector<uint8_t>> descriptorVec;
+        for (int y = 0; y < depth.yMax; y++)
+        {
+            for (int x = 0; x < depth.xMax; x++)
+            {
+                Vector2d pt(depth.uConv(x), depth.vConv(y));
+                Vector3d X;
+                if (not camera1->reconstructPoint(pt, X)) continue;
+                
+                CurveRasterizer<int, Polynomial2> descRaster(round(pt), epipoles.getFirstPx(),
+                                                epipolarPtr->getFirst(X));
+                if (epipoles.firstIsInverted()) descRaster.setStep(-1);
+                vector<uint8_t> descriptor;
+                const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
+                if (step < 1) continue;
+                
+                if (not epipolarDescriptor.goodResp())
+                {
+                    // cannot be used for motion stereo
+                    
+                    // the depth is not defined either
+                    if (depth.at(x, y) < MIN_DEPTH) continue; 
+                    
+                    flatPack.imagePointVec.push_back(pt);
+                }
+                else if (depth.at(x, y) < MIN_DEPTH)
+                {
+                    descriptorVec.push_back(descriptor);
+                    salientPack.imagePointVec.push_back(pt);
+                }
+            }
+        }
+        
+        //TODO check that sigmaVec is reconstructed
+        depth.reconstruct(flatPack, QUERY_POINTS | ALL_HYPOTHESES);
+        depth.reconstruct(salientPack, QUERY_POINTS | DEFAULT_VALUES | MINMAX | ALL_HYPOTHESES);
+        
+        depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
+        
+        // for the flat pack project points and replace the hypotheses in depth
+        
+        T12.transform(flatPack.cloud, flatPack.cloud);
+        for (int idx = 0; idx < flatPack.cloud.size(); idx++)
+        {
+            depth.pushHypothesis(flatPack.cloud[idx], flatPack.sigmaVec[idx]);
+        }
+        
+        // for the salient pack compute stereo and for corresponding pixel push new hypothesis
+        T12.transform(flatPack.cloud, salientPack.cloud);
+        for (int idx = 0; idx < salientPack.cloud.size(); idx+=2)
+        {
+            
+            
+        
+            // project min-max points
+            Vector2d ptMin, ptMax;
+            camera2->projectPoint(salientPack.cloud[idx], ptMin);
+            camera2->projectPoint(salientPack.cloud[idx + 1], ptMax);
+            
+            // if distance is small push depth hyp with the same sigma
+            if ((ptMin - ptMax).squaredNorm() < 8)
+            {
+                depth.pushHypothesis(0.5*(salientPack.cloud[idx] + salientPack.cloud[idx + 1]),
+                            flatPack.sigmaVec[idx/2]);
+            }
+            else
+            {
+                // if distance is big enough
+                // search along epipolar curve
+                //TODO optimize fo Vector2i 
+                CurveRasterizer<int, Polynomial2> raster(round(ptMax), round(ptMin),
+                                                epipolarPtr->getSecond(salientPack.cloud[idx + 1]));
+                Vector2i diff = round(ptMax - ptMin);
+                const int distance = min(int(diff.norm()), params.dispMax);
+                
+                raster.steps(-HALF_LENGTH);
+                vector<uint8_t> sampleVec;
+                vector<int> uVec, vVec;
+                const int margin = LENGTH - 1;
+                uVec.reserve(distance + margin);
+                vVec.reserve(distance + margin);
+                sampleVec.reserve(distance + margin);
+                for (int d = 0; d < distance + margin; d++, raster.step())
+                {
+                    if (raster.v < 0 or raster.v >= img2.rows 
+                        or raster.u < 0 or raster.u >= img2.cols) sampleVec.push_back(0);
+                    else sampleVec.push_back(img2(raster.v, raster.u));
+                    uVec.push_back(raster.u);
+                    vVec.push_back(raster.v);
+                }
+                
+                vector<uint8_t> & descriptor = descriptorVec[idx];
+                
+                int dBest = 0;
+                int eBest = LENGTH*255;
+                int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
+                for (int d = 0; d < distance; d++)
+                {
+                    int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
+                    int bias = 0; // min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
+                    int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
+                                        descriptor.begin(), sampleVec.begin() + d, bias, 1);
+                    if (eBest > acc)
+                    {
+                        eBest = acc;
+                        dBest = d;
+                    }
+                }
+                // triangulate and improve sigma
+                Vector3d X1, X2;
+                triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
+                        uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], X1);
+                triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
+                        uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], X2);
+                depth.pushHypothesis(X1, (X2 - X1).norm() / 2);
+            }
+        }        
+        //release dynamic objects
+        delete epipolarPtr;
+        epipolarPtr = NULL;
+    }    
+    
     //TODO split into functions
     void computeDepth(Transformation<double> T12,
-            Mat8u img2, DepthMap & depth)
+            const Mat8u & img2, DepthMap & depth)
     {
         if (params.verbosity > 0) cout << "MotionStereo::computeDepth" << endl;
         epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
@@ -86,8 +244,8 @@ public:
         if (params.verbosity > 1) cout << "    initializing the depth map" << endl;
         
         if (params.verbosity > 1) cout << "    descriptor kernel selection" << endl;
-        int LENGTH = params.descLength;
-        int HALF_LENGTH = LENGTH / 2;
+        const int LENGTH = params.descLength;
+        const int HALF_LENGTH = LENGTH / 2;
         
         // compute the weights for matching cost
         // TODO make a separate header and a cpp file miscellaneous
@@ -110,7 +268,6 @@ public:
         Vector3dVec minDist2Vec, maxDist2Vec;
         T12.inverseTransform(minDistVec, minDist2Vec);
         T12.inverseTransform(maxDistVec, maxDist2Vec);
-        cout << 111 << endl;
         Vector2dVec pointMinVec;
         Vector2dVec pointMaxVec;
         vector<bool> maskMinVec, maskMaxVec;
@@ -208,7 +365,7 @@ public:
     }
     
    
-    // TODO a lot of overlap with EnhancedStereo, think about merging them of deriving them
+    // TODO a lot of overlap with EnhancedStereo, think about merging them or deriving them
     bool triangulate(double x1, double y1, double x2, double y2, Vector3d & X)
     {
         if (params.verbosity > 3) cout << "EnhancedStereo::triangulate" << endl;
@@ -258,6 +415,7 @@ public:
     
     
 private:
+    
     EnhancedEpipolar * epipolarPtr;
     // based on the image gradient
     void computeMask()

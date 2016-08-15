@@ -44,11 +44,11 @@ struct ScaleParameters
     }
     
     // from image to small disparity coordiante transform
-    int x(double u) const { return round((u - u0) / scale); }
-    int y(double v) const { return round((v - v0) / scale); }
+    int xConv(double u) const { return round((u - u0) / scale); }
+    int yConv(double v) const { return round((v - v0) / scale); }
     
     // from small disparity to image coordiante transform    
-    int u(int x) const { return x * scale + u0; }
-    int v(int y) const { return y * scale + v0; }
+    int uConv(int x) const { return x * scale + u0; }
+    int vConv(int y) const { return y * scale + v0; }
 };
 

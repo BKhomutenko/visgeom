@@ -49,6 +49,13 @@ struct StereoParameters : public ScaleParameters
     
     bool imageBasedCost = true;
     
+    //TODO get a meaningful threshold/ method to discard
+    //temporarily descriptor step must be 1
+    //all non-salient points are discarded
+    bool salientPoints = true;
+    
+    //TODO try to discard dull points completely
+    
     int maxError = 150;
     int maxBias = 10;
     
@@ -58,8 +65,8 @@ struct StereoParameters : public ScaleParameters
     bool useUVCache = true;
     
     //multi-hypoteses
-    int hypMax = 1;
-    int maxHypDiff = 25;
+    int hypMax = 3;
+    int maxHypDiff = 10;
 };
 
 class EnhancedStereo
@@ -141,8 +148,8 @@ public:
     bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X);
     void computeDepth(Mat32f & distanceMat);
             
-    double computeDepth(int x, int y);
-    bool computeDepth(int x, int y, double & dist, double & sigma);
+    double computeDepth(int x, int y, int h = 0);
+    bool computeDepth(double & dist, double & sigma, int x, int y, int h = 0);
     
     void fillGaps(uint8_t * const data, const int step);
     
@@ -172,7 +179,8 @@ private:
     const int DISPARITY_MARGIN = 20;
     Mat32s uCache, vCache;
     Mat8u errorBuffer;
-    Mat8u costBuffer;
+    Mat8u costBuffer; //TODO maybe merge with salientBuffer
+    Mat8u salientBuffer; 
     Mat32s tableauLeft, tableauRight; //FIXME check the type through the code
     Mat32s tableauTop, tableauBottom;
     Mat32s smallDisparity;
