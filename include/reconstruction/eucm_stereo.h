@@ -65,7 +65,7 @@ struct StereoParameters : public ScaleParameters
     bool useUVCache = true;
     
     //multi-hypoteses
-    int hypMax = 3;
+    int hypMax = 1;
     int maxHypDiff = 10;
 };
 
@@ -103,10 +103,10 @@ public:
     void computeUVCache();
     
     // An interface function
-    void comuteStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depthMap);
+    void computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depthMap);
     
     // An interface function
-    void comuteStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat);
+    void computeStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat);
     
     //// EPIPOLAR GEOMETRY
     

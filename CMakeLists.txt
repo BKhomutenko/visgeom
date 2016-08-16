@@ -98,6 +98,16 @@ add_executable( motion_test
 
 target_link_libraries( motion_test ${OpenCV_LIBS} )
 
+add_executable( merge_test
+    test/reconstruction/merge_test.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+)
+
+target_link_libraries( merge_test ${OpenCV_LIBS} )
+
+
 ### LOCALIZATION ###
 
 add_executable( photometric

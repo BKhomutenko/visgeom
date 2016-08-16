@@ -87,13 +87,16 @@ public:
     {
         if (this != &other)
         {
+            ScaleParameters::operator = (other);
+
             delete cameraPtr;
             cameraPtr = other.cameraPtr->clone();
-            ScaleParameters::operator = (other);
+            
             valVec = other.valVec;
             sigmaVec = other.sigmaVec;
             costVec = other.costVec;
             hMax = other.hMax;
+            hStep = other.hStep;
         }
         return *this;
     }

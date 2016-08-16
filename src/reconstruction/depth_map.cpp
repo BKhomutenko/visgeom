@@ -425,7 +425,7 @@ void DepthMap::project(const Vector3dVec & pointVec, Vector2dVec & result) const
 void DepthMap::toMat(Mat32f & out) const
 {
     out.create(yMax, xMax);
-    copy(valVec.begin(), valVec.begin()+hStep, (float*)out.data);
+    copy(valVec.begin(), valVec.begin() + hStep, (float*)out.data);
 }
 
 //TODO do not reconstruct all the points but a selected subset

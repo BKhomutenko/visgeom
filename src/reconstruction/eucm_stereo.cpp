@@ -133,17 +133,17 @@ void EnhancedStereo::createBuffer()
     }
 }
 
-void EnhancedStereo::comuteStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depth)
+void EnhancedStereo::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depth)
 {
     computeCurveCost(img1, img2);
     computeDynamicProgramming();
     reconstructDisparity();
-    depth = DepthMap(camera1, params);
-    for (int y = 0; y < params.yMax; y++)
+    depth = DepthMap(camera1, params, params.hypMax);
+    for (int h = 0; h < params.hypMax; h++)
     {
-        for (int x = 0; x < params.xMax; x++)
+        for (int y = 0; y < params.yMax; y++)
         {
-            for (int h = 0; h < params.hypMax; h++)
+            for (int x = 0; x < params.xMax; x++)
             {
                 if (salientBuffer(y, x) or not params.salientPoints) 
                 {
@@ -160,7 +160,7 @@ void EnhancedStereo::comuteStereo(const Mat8u & img1, const Mat8u & img2, DepthM
 }
 
 //TODO remove, depricated function
-void EnhancedStereo::comuteStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat)
+void EnhancedStereo::computeStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat)
 {
     computeCurveCost(img1, img2);
     computeDynamicProgramming();
@@ -537,11 +537,11 @@ void EnhancedStereo::computeDepth(Mat32f & distance)
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::computeDepth(Mat32f &)" << endl;
     distance.create(params.yMax, params.xMax);
-    for (int v = 0; v < params.yMax; v++)
+    for (int y = 0; y < params.yMax; y++)
     {
-        for (int u = 0; u < params.xMax; u++)
+        for (int x = 0; x < params.xMax; x++)
         {
-            distance(v, u) = computeDepth(u, v);
+            distance(y, x) = computeDepth(x, y);
         }
     }
 }

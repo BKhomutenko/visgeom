@@ -158,6 +158,7 @@ public:
         
         // for the salient pack compute stereo and for corresponding pixel push new hypothesis
         T12.transform(flatPack.cloud, salientPack.cloud);
+        Transform12 = T12.inverse();
         for (int idx = 0; idx < salientPack.cloud.size(); idx+=2)
         {
             
@@ -219,10 +220,10 @@ public:
                 }
                 // triangulate and improve sigma
                 Vector3d X1, X2;
-                triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
-                        uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], X1);
-                triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
-                        uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], X2);
+                triangulate(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], 
+                        salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], X1);
+                triangulate(uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], 
+                        salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], X2);
                 depth.pushHypothesis(X1, (X2 - X1).norm() / 2);
             }
         }        
@@ -437,6 +438,6 @@ private:
     
     Mat8u img1;    
     Mat8u maskMat; //TODO compute mask
-    MotionStereoParameters params;
+    const MotionStereoParameters params;
 };
 

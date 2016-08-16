@@ -130,7 +130,7 @@ int main(int argc, char** argv)
 
         Mat32f distMat;
         auto t2 = clock();
-        stereo.comuteStereo(img1, img2, distMat);
+        stereo.computeStereo(img1, img2, distMat);
         auto t3 = clock();
 //        cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
         
