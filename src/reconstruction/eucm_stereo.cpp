@@ -151,8 +151,8 @@ void EnhancedStereo::computeStereo(const Mat8u & img1, const Mat8u & img2, Depth
                 }
                 else 
                 {
-                    depth.at(x, y, h) = DEFAULT_DEPTH;
-                    depth.sigma(x, y, h) = DEFAULT_SIGMA_DEPTH;
+                    depth.at(x, y, h) = OUT_OF_RANGE;
+                    depth.sigma(x, y, h) = OUT_OF_RANGE;
                 }
             }
         }

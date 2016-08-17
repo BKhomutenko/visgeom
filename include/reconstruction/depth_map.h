@@ -42,7 +42,6 @@ const double OUT_OF_RANGE = 0.0;
 
 enum ReconstructionFlags : uint32_t
 {
-    NONE = 0,
     QUERY_POINTS = 1,
     IMAGE_VALUES = 2,
     MINMAX = 4,
@@ -116,7 +115,7 @@ public:
     }
     
     //TODO implement with multiHyp
-    void pushHypothesis(const Vector3d X, const double sigma);
+    bool pushHypothesis(const Vector3d X, const double sigma);
     
     void applyMask(const Mat8u & mask);
     
@@ -160,19 +159,20 @@ public:
     double & cost(const int idx);
     const double & cost(const int idx) const;
     
-    Vector2dVec getPointVec(const std::vector<int> idxVec) const;
+    Vector2dVec getPointVec(const std::vector<int> & idxVec) const;
     Vector2dVec getPointVec() const;
 
-    vector<int> getIdxVec(const uint32_t reconstFlags) const;
-    vector<int> getIdxVec(const uint32_t reconstFlags, const Vector2dVec queryPointVec) const;
+    vector<int> getIdxVec(const Vector2dVec & queryPointVec = Vector2dVec()) const;
     
-    //TODO - Remove this and next 2 functions, leave only the final 2 unified reconstruct functions
+    //TODO - Depecrated
     void reconstructUncertainty(std::vector<int> & idxVec, 
             Vector3dVec & minDistVec,
             Vector3dVec & maxDistVec) const;
             
+    //TODO - Depecrated
     void reconstruct(std::vector<int> & idxVec, Vector3dVec & result) const;
     
+    //TODO - Depecrated
     // idxVec corresponds to indices of points in queryPointVec
     void reconstruct(const Vector2dVec & queryPointVec,
             std::vector<int> & idxVec, Vector3dVec & result) const;
@@ -184,7 +184,7 @@ public:
     // To use IMAGE_VALUES, insert the value vector into result.valVec. This should
     //   only be used along with QUERY_POINT
     void reconstruct(MHPack & result, 
-        const uint32_t reconstFlags = 0 ) const;
+    const uint32_t reconstFlags = 0 ) const;
     
     //TODO make it bool and make it return a mask
     void project(const Vector3dVec & pointVec, Vector2dVec & result) const;

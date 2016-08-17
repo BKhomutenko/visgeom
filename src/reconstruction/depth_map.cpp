@@ -56,22 +56,26 @@ bool DepthMap::isValid(const Vector2d pt, const int h) const
     return isValid(pt[0], pt[1], h);
 }
 
-void DepthMap::pushHypothesis(const Vector3d X, const double sigmaVal)
+bool DepthMap::pushHypothesis(const Vector3d X, const double sigmaVal)
 {
     
     Vector2d pt;
-    cameraPtr->projectPoint(X, pt);
+    if (not cameraPtr->projectPoint(X, pt)) return false;
     
-    int x = xConv(pt[0]);
-    int y = yConv(pt[1]);
+    const int x = xConv(pt[0]);
+    const int y = yConv(pt[1]);
+    
+    cout << pt[0] << " " << pt[1] << " / " << x << " " << y << endl;
     int h = 0;
-    while (h < hMax and at(x, y, h) < MIN_DEPTH) h++;
-    if (h == hMax) return;    
+    while (h < hMax and at(x, y, h) >= MIN_DEPTH) h++;
+    if (h == hMax) return false;    
+    const double d = X.norm();
     
-    double d = X.norm();
+    if (not isValid(x, y, h)) return false;
     
     at(x, y, h) = d;
     sigma(x, y, h) = sigmaVal;
+    return true;
 }
 
 
@@ -191,7 +195,7 @@ const double & DepthMap::cost(const int idx) const
     return costVec[idx];
 }
 
-Vector2dVec DepthMap::getPointVec(const std::vector<int> idxVec) const
+Vector2dVec DepthMap::getPointVec(const std::vector<int> & idxVec) const
 {
     Vector2dVec result;
     result.reserve(idxVec.size());
@@ -217,6 +221,7 @@ Vector2dVec DepthMap::getPointVec() const
     return result;
 }
 
+//TODO - Depecrated
 void DepthMap::reconstructUncertainty(vector<int> & idxVec, 
             Vector3dVec & minDistVec, Vector3dVec & maxDistVec) const
 {
@@ -257,7 +262,7 @@ void DepthMap::reconstructUncertainty(vector<int> & idxVec,
     }
 }
 
-
+//TODO - Depecrated
 void DepthMap::reconstruct(vector<int> & idxVec, Vector3dVec & result) const
 {
     result.clear();
@@ -290,6 +295,7 @@ void DepthMap::reconstruct(vector<int> & idxVec, Vector3dVec & result) const
     }
 }
 
+//TODO - Depecrated
 void DepthMap::reconstruct(const Vector2dVec & queryPointVec,
         vector<int> & idxVec, Vector3dVec & result) const
 {
@@ -321,43 +327,37 @@ void DepthMap::pushPoint(MHPack & result, const int i, const int idx, const doub
     if (val>=0) result.valVec.push_back( val );
 }
 
-vector<int> DepthMap::getIdxVec(const uint32_t reconstFlags) const
+vector<int> DepthMap::getIdxVec(const Vector2dVec & queryPointVec) const
 {
-    const int limit = (reconstFlags & ALL_HYPOTHESES) ? valVec.size() : hStep;
-    vector<int> outIdxVec(limit);
-    for(int i = 0; i < limit; i++)
-    {
-        outIdxVec.push_back(i);
-    }
-    return outIdxVec;
-}
-
-vector<int> DepthMap::getIdxVec(const uint32_t reconstFlags, const Vector2dVec queryPointVec) const
-{
-    // When using QUERY_POINTS, only the first hypothesis is to be used
-    if(reconstFlags & ALL_HYPOTHESES)
-    {
-        std::cerr << "Error: Tried to use QUERY_POINTS along with ALL_HYPOTHESES for uint32_t" << std::endl;
-        std::exit(0);
-    }
     vector<int> outIdxVec(queryPointVec.size());
-    for(int i = 0; i < queryPointVec.size(); i++)
+    if(queryPointVec.size()!=0)
     {
-        const int xd = xConv(queryPointVec[i][0]);
-        const int yd = yConv(queryPointVec[i][1]);
-        if (isValid(xd, yd)) outIdxVec.push_back( xd + yd*xMax );
-        else outIdxVec.push_back(-1); // Idx of -1 to correspond to error
+        for(int i = 0; i < queryPointVec.size(); i++)
+        {
+            const int xd = xConv(queryPointVec[i][0]);
+            const int yd = yConv(queryPointVec[i][1]);
+            if (isValid(xd, yd)) outIdxVec.push_back( xd + yd*xMax );
+            else outIdxVec.push_back(-1); // Idx of -1 to correspond to error
+        }
+    }
+    else
+    {
+        for(int i=0; i < hStep; i++) // hStep === xMax * yMax
+        {
+            outIdxVec.push_back(i);
+        }
     }
     return outIdxVec;
 }
 
-//TODO implement multy-hypothesis reconstruction
 void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
 {
-    const bool image_values_flag = bool(reconstFlags & IMAGE_VALUES);
-    const bool minmax_flag = bool(reconstFlags & MINMAX);
+    const bool image_values_flag = (bool)(reconstFlags & IMAGE_VALUES);
+    const bool minmax_flag = (bool)(reconstFlags & MINMAX);
+    const int numHyps = (reconstFlags & ALL_HYPOTHESES) ? hMax : 1;
+
     // Convert query points to query indexes
-    const vector<int> queryIdxVec = (reconstFlags & QUERY_POINTS) ? getIdxVec(reconstFlags, result.imagePointVec) : getIdxVec(reconstFlags);
+    const vector<int> queryIdxVec = (reconstFlags & QUERY_POINTS) ? getIdxVec(result.imagePointVec) : getIdxVec();
     const vector<double> queryValVec = (image_values_flag) ? result.valVec : vector<double>(queryIdxVec.size(), -1.0);
 
     result.idxVec.clear();
@@ -372,30 +372,34 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
     vector<double> depthVec;
     for (int i = 0; i < queryIdxVec.size(); i++)
     {
-        const int queryIdx = queryIdxVec[i];
-        if (queryIdx < 0) continue;
-        double depth = valVec[queryIdx];
-        double sigma = sigmaVec[queryIdx];
-        if (depth < MIN_DEPTH)
+        if (queryIdxVec[i] < 0) continue;
+
+        for (int h = 0; h < numHyps; h++)
         {
-            if (reconstFlags & DEFAULT_VALUES)
+            const int queryIdx = queryIdxVec[i] + h*hStep;
+            double depth = valVec[queryIdx];
+            double sigma = sigmaVec[queryIdx];
+            if (depth < MIN_DEPTH)
             {
-                depth = DEFAULT_DEPTH;
-                sigma = DEFAULT_SIGMA_DEPTH;
+                if (reconstFlags & DEFAULT_VALUES)
+                {
+                    depth = DEFAULT_DEPTH;
+                    sigma = DEFAULT_SIGMA_DEPTH;
+                }
+                else continue;
             }
-            else continue;
-        }
-        if(minmax_flag)
-        {
-            depthVec.push_back( max(depth-2*sigma, MIN_DEPTH) );
-            pushPoint(result, i, queryIdx, queryValVec[i]);
-            depthVec.push_back( depth + 2*sigma );
-            pushPoint(result, i, queryIdx, queryValVec[i]);
-        }
-        else
-        {
-            depthVec.push_back(depth);
-            pushPoint(result, i, queryIdx, queryValVec[i]);
+            if(minmax_flag)
+            {
+                depthVec.push_back( max(depth-2*sigma, MIN_DEPTH) );
+                pushPoint(result, i, queryIdx, queryValVec[i]);
+                depthVec.push_back( depth + 2*sigma );
+                pushPoint(result, i, queryIdx, queryValVec[i]);
+            }
+            else
+            {
+                depthVec.push_back(depth);
+                pushPoint(result, i, queryIdx, queryValVec[i]);
+            }
         }
     }
     result.imagePointVec = getPointVec(result.idxVec);
@@ -411,6 +415,8 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
         }
         else
         {
+            //TODO make all data in MHPack valid
+            //that is discard all non-reconstructed points and other data associated to them
             result.cloud[i] << 0,0,0; // Insert null vector
         }
     }
@@ -488,7 +494,7 @@ DepthMap DepthMap::wrapDepth(const Transformation<double> T12,
 
     //Step 1 : Get point-cloud of current frame
     MHPack cloud11MH;
-    this->reconstruct(cloud11MH, NONE);
+    this->reconstruct(cloud11MH, 0);
 
     //Step 2 : Transform cloud into keyframe
     Vector3dVec cloud12;
@@ -499,7 +505,7 @@ DepthMap DepthMap::wrapDepth(const Transformation<double> T12,
     dMap2.project(cloud12, point12Vec);
 
     //Step 4 : Fill in data for depthmap
-    vector<int> idx12Vec = getIdxVec(NONE, point12Vec);
+    vector<int> idx12Vec = getIdxVec(point12Vec);
     for (int i = 0; i < idx12Vec.size(); i++)
     {
         const int idx2 = idx12Vec[i];

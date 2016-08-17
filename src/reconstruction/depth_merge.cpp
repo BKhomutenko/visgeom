@@ -78,6 +78,7 @@ void DepthMap::merge(const DepthMap & depth2, const Transformation<double> T12)
             }
             // discard bad hypotheses
             // TODO rearrange hypotheses
+            // TODO use pushHypothesis (with an overload) to add them
             int h2 = 0;
             for (int h1 = 0; h1 < hMax; h1++)
             {

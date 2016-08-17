@@ -136,6 +136,7 @@ public:
                 }
                 else if (depth.at(x, y) < MIN_DEPTH)
                 {
+                    //FIXME if some points are not reconstructed indexes are not matched
                     descriptorVec.push_back(descriptor);
                     salientPack.imagePointVec.push_back(pt);
                 }
@@ -150,14 +151,15 @@ public:
         
         // for the flat pack project points and replace the hypotheses in depth
         
-        T12.transform(flatPack.cloud, flatPack.cloud);
+//        T12.inverseTransform(flatPack.cloud, flatPack.cloud);
+        cout << flatPack.cloud.size() << "  " << flatPack.sigmaVec.size() << endl;
         for (int idx = 0; idx < flatPack.cloud.size(); idx++)
         {
             depth.pushHypothesis(flatPack.cloud[idx], flatPack.sigmaVec[idx]);
         }
         
         // for the salient pack compute stereo and for corresponding pixel push new hypothesis
-        T12.transform(flatPack.cloud, salientPack.cloud);
+//        T12.inverseTransform(flatPack.cloud, salientPack.cloud);
         Transform12 = T12.inverse();
         for (int idx = 0; idx < salientPack.cloud.size(); idx+=2)
         {
@@ -168,13 +170,14 @@ public:
             Vector2d ptMin, ptMax;
             camera2->projectPoint(salientPack.cloud[idx], ptMin);
             camera2->projectPoint(salientPack.cloud[idx + 1], ptMax);
-            
+            /*
             // if distance is small push depth hyp with the same sigma
             if ((ptMin - ptMax).squaredNorm() < 8)
             {
                 depth.pushHypothesis(0.5*(salientPack.cloud[idx] + salientPack.cloud[idx + 1]),
                             flatPack.sigmaVec[idx/2]);
             }
+            
             else
             {
                 // if distance is big enough
@@ -226,7 +229,9 @@ public:
                         salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], X2);
                 depth.pushHypothesis(X1, (X2 - X1).norm() / 2);
             }
+            */
         }        
+        
         //release dynamic objects
         delete epipolarPtr;
         epipolarPtr = NULL;
