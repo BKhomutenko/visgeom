@@ -38,38 +38,39 @@ int main(int argc, char** argv)
     scaleParams.scale = 2;
     
     Transformation<double> T01(0.7, 0.1, 0.5, 0.1, -0.3, 0.5);
-    Transformation<double> T0plane(0, 0, 1.5, 0, 0, 0);
+    Transformation<double> T0plane(0, 0, 0.5, 0, 0, 0);
     scaleParams.uMax = COLS;
     scaleParams.vMax = ROWS;
     scaleParams.setEqualMargin();
-    
     EnhancedCamera camera(params.data());
     
 //     Init the localizer
-    DepthMap depth0 = DepthMap::generatePlane(&camera, scaleParams, T0plane,
+    DepthMap depth = DepthMap::generatePlane(&camera, scaleParams, T0plane,
          vector<Vector3d>{Vector3d(-0.5, -0.5, 0), Vector3d(0.5, -0.5, 0),
                           Vector3d(0.5, 0.5, 0), Vector3d(-0.5, 0.5, 0) } );
-    
-    DepthMap depth1 = DepthMap::generatePlane(&camera, scaleParams, T01.inverseCompose(T0plane),
-         vector<Vector3d>{Vector3d(-0.5, -0.5, 0), Vector3d(0.5, -0.5, 0),
-                          Vector3d(0.5, 0.5, 0), Vector3d(-0.5, 0.5, 0) } );
-    
-    DepthMap depth1wrap;
-     
-    //DepthReprojector reprojector;
     
     Timer timer;
-    //reprojector.wrapDepth(depth0, depth1, T01, depth1wrap);
-    depth0.wrapDepth(depth0, depth1, T01, depth1wrap); // Modification to account for new commit changes
+    MHPack pack;
+    cout << 111 << endl; 
+    depth.reconstruct(pack);
+    cout << 111 << endl;
+    DepthMap depthProjected(&camera, scaleParams);
+    cout << 111 << endl;
+    for (int i = 0; i < pack.cloud.size(); i++)
+    {
+        depthProjected.pushHypothesis(pack.cloud[i], pack.sigmaVec[i]);
+    }
+    cout << 111 << endl; 
     cout << timer.elapsed() << endl;
-    Mat32f img0, img1, img1wrap;
 
-    depth0.toMat(img0);
-    depth1.toMat(img1);
-    imshow("img0", img0 / 10);
-    imshow("img1", img1 / 10);
-    imshow("diff", img0 - img1wrap + 0.5);
-    imshow("img1wrap", img1wrap);
+    Mat32f img0, img1;
+    
+    depth.toMat(img0);
+    depthProjected.toMat(img1);
+    
+    imshow("img0", img0);
+    imshow("img1", img1);
+    imshow("diff", img0 - img1 + 0.5);
     waitKey();
     
     return 0;

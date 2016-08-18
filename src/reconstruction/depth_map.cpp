@@ -65,7 +65,7 @@ bool DepthMap::pushHypothesis(const Vector3d X, const double sigmaVal)
     const int x = xConv(pt[0]);
     const int y = yConv(pt[1]);
     
-    cout << pt[0] << " " << pt[1] << " / " << x << " " << y << endl;
+//    cout << pt[0] << " " << pt[1] << " / " << x << " " << y << endl;
     int h = 0;
     while (h < hMax and at(x, y, h) >= MIN_DEPTH) h++;
     if (h == hMax) return false;    
@@ -533,7 +533,8 @@ DepthMap DepthMap::generatePlane(const ICamera * camera, const ScaleParameters &
     {
         for (int u = 0; u < params.xMax; u++)
         {
-            depth.at(u, v) = 0;
+            depth.at(u, v) = OUT_OF_RANGE;
+            depth.sigma(u, v) = OUT_OF_RANGE;
             Vector3d vec; // the direction vector
             if (not camera->reconstructPoint(Vector2d(params.uConv(u), params.vConv(v)), vec)) continue;
             double zvec = z.dot(vec);
@@ -557,6 +558,7 @@ DepthMap DepthMap::generatePlane(const ICamera * camera, const ScaleParameters &
             double alpha = tz / zvec;
             vec *= alpha;
             depth.at(u, v) = vec.norm();
+            depth.sigma(u, v) = 1;
         }
     }
     return depth;
