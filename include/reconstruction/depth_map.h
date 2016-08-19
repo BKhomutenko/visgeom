@@ -118,7 +118,7 @@ public:
     }
     
     //TODO implement with multiHyp
-    bool pushHypothesis(const Vector3d X, const double sigma);
+    bool pushHypothesis(const Vector3d & X, const double sigma);
     
     void applyMask(const Mat8u & mask);
     
@@ -219,9 +219,6 @@ public:
             const ScaleParameters & scaleParams) const;
 
 private:
-    // Small helper function for reconstruct()
-    //FIXME not used, to rewrite
-    void pushPoint(MHPack & result, const int idx, const int h, const double val = 0) const;
 
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty

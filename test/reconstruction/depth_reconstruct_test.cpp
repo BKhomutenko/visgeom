@@ -51,17 +51,13 @@ int main(int argc, char** argv)
     
     Timer timer;
     MHPack pack;
-    cout << 111 << endl; 
-    depth.reconstruct(pack);
-    cout << 111 << endl;
+    depth.reconstruct(pack, SIGMA_VALUE);
     DepthMap depthProjected(&camera, scaleParams);
     depthProjected.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
-    cout << 111 << endl;
     for (int i = 0; i < pack.cloud.size(); i++)
     {
         depthProjected.pushHypothesis(pack.cloud[i], pack.sigmaVec[i]);
     }
-    cout << 111 << endl; 
     cout << timer.elapsed() << endl;
 
     Mat32f img0, img1;

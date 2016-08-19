@@ -56,7 +56,7 @@ bool DepthMap::isValid(const Vector2d pt, const int h) const
     return isValid(pt[0], pt[1], h);
 }
 
-bool DepthMap::pushHypothesis(const Vector3d X, const double sigmaVal)
+bool DepthMap::pushHypothesis(const Vector3d & X, const double sigmaVal)
 {
     
     Vector2d pt;
@@ -69,15 +69,22 @@ bool DepthMap::pushHypothesis(const Vector3d X, const double sigmaVal)
 
     if (not isValid(x, y)) return false;
     int h = 0;
-    while (h < hMax and at(x, y, h) >= MIN_DEPTH) h++;
+    while ((h < hMax) and (at(x, y, h) >= MIN_DEPTH) and (sigma(x, y, h) <= sigmaVal) ) h++;
     if (h == hMax) return false;    
-    
-//    cout << pt[0] << " " << pt[1] << " / " << x << " " << y << endl;
-    
-    const double d = X.norm();
-    
-    at(x, y, h) = d;
-    sigma(x, y, h) = sigmaVal;
+
+    //Insert element into stack, so that stack is always sorted in sigma ascending order
+    double temp_d = X.norm();
+    double temp_sigma = sigmaVal;
+    double temp2_d;
+    double temp2_sigma;
+    while (h < hMax)
+    {
+        temp2_d = at(x, y, h);
+        temp2_sigma = sigma(x, y, h);
+        at(x, y, h) = temp_d;
+        sigma(x, y, h) = temp_sigma;
+        h++;
+    }
     return true;
 }
 
@@ -321,15 +328,6 @@ void DepthMap::reconstruct(const Vector2dVec & queryPointVec,
 }
 
 
-void DepthMap::pushPoint(MHPack & result, const int idx, const int h, const double val) const
-{
-    result.idxVec.push_back( idx );
-    result.hypIdxVec.push_back( h );
-    result.costVec.push_back( costVec[idx + hStep * h] );
-    result.sigmaVec.push_back( sigmaVec[idx + hStep * h] );
-    result.valVec.push_back( val );
-}
-
 vector<int> DepthMap::getIdxVec(const Vector2dVec & queryPointVec) const
 {
     vector<int> outIdxVec;
@@ -361,17 +359,21 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
 
     // Convert query points to query indices
     vector<int> queryIdxVec;
+    Vector2dVec queryPointVec;
     if (reconstFlags & QUERY_INDICES)
     {
         swap(queryIdxVec, result.idxVec);
+        queryPointVec = getPointVec(queryIdxVec);
     }
     else if (reconstFlags & QUERY_POINTS)
     {
         queryIdxVec = getIdxVec(result.imagePointVec);
+        swap(queryPointVec, result.imagePointVec);
     }
     else
     {
         queryIdxVec = getIdxVec();
+        queryPointVec = getPointVec(queryIdxVec);
     }
 
     result.idxVec.clear();
@@ -417,11 +419,10 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
             if (reconstFlags & SIGMA_VALUE) result.sigmaVec.push_back(sigma);
             result.idxVec.push_back(queryIdx);
             result.hypIdxVec.push_back(h);
+            result.imagePointVec.push_back(queryPointVec[i]);
             if (reconstFlags & INDEX_MAPPING) result.idxMapVec.push_back(i);
         }
     }
-    
-    result.imagePointVec = getPointVec(result.idxVec);
     
 
     vector<bool> maskVec;
