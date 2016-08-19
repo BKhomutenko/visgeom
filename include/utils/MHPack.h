@@ -6,6 +6,7 @@
 // Multi-hypothesis point-cloud data structure
 struct MHPack
 {
+    std::vector<int> idxMapVec; // Index of the point in the query vector
     std::vector<int> idxVec; // Index of the point in the depthmap vector
     Vector2dVec imagePointVec; // Index of the pixel on the original image
     std::vector<int> hypIdxVec; // Index for the hypothesis from the original depthmap

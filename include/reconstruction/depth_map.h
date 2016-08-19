@@ -46,7 +46,10 @@ enum ReconstructionFlags : uint32_t
     IMAGE_VALUES = 2,
     MINMAX = 4,
     ALL_HYPOTHESES = 8,
-    DEFAULT_VALUES = 16
+    DEFAULT_VALUES = 16,
+    SIGMA_VALUE = 32,
+    QUERY_INDICES = 64,  //  stronger than QUERY_POINTS
+    INDEX_MAPPING = 128    
 };
 
 class DepthMap : public ScaleParameters
@@ -70,7 +73,7 @@ public:
     DepthMap(const ICamera * camera, const ScaleParameters & params, const int hMax = 1):
             ScaleParameters(params),
             cameraPtr(camera->clone()),
-            valVec(xMax*yMax*hMax, DEFAULT_DEPTH),
+            valVec(xMax*yMax*hMax, OUT_OF_RANGE),
             sigmaVec(xMax*yMax*hMax, DEFAULT_SIGMA_DEPTH),
             costVec(xMax*yMax*hMax, DEFAULT_COST_DEPTH),
             hMax(hMax),
@@ -162,6 +165,7 @@ public:
     Vector2dVec getPointVec(const std::vector<int> & idxVec) const;
     Vector2dVec getPointVec() const;
 
+    //TODO overload instead of default args
     vector<int> getIdxVec(const Vector2dVec & queryPointVec = Vector2dVec()) const;
     
     //TODO - Depecrated
@@ -183,8 +187,7 @@ public:
     //   use ALL_HYPOTHESES with QUERY_POINT.
     // To use IMAGE_VALUES, insert the value vector into result.valVec. This should
     //   only be used along with QUERY_POINT
-    void reconstruct(MHPack & result, 
-    const uint32_t reconstFlags = 0 ) const;
+    void reconstruct(MHPack & result, const uint32_t reconstFlags = 0 ) const;
     
     //TODO make it bool and make it return a mask
     void project(const Vector3dVec & pointVec, Vector2dVec & result) const;
@@ -217,7 +220,8 @@ public:
 
 private:
     // Small helper function for reconstruct()
-    void pushPoint(MHPack & result, const int i, const int idx, const double val = -1.0) const;
+    //FIXME not used, to rewrite
+    void pushPoint(MHPack & result, const int idx, const int h, const double val = 0) const;
 
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty

@@ -65,13 +65,16 @@ bool DepthMap::pushHypothesis(const Vector3d X, const double sigmaVal)
     const int x = xConv(pt[0]);
     const int y = yConv(pt[1]);
     
-//    cout << pt[0] << " " << pt[1] << " / " << x << " " << y << endl;
+    
+
+    if (not isValid(x, y)) return false;
     int h = 0;
     while (h < hMax and at(x, y, h) >= MIN_DEPTH) h++;
     if (h == hMax) return false;    
-    const double d = X.norm();
     
-    if (not isValid(x, y, h)) return false;
+//    cout << pt[0] << " " << pt[1] << " / " << x << " " << y << endl;
+    
+    const double d = X.norm();
     
     at(x, y, h) = d;
     sigma(x, y, h) = sigmaVal;
@@ -201,7 +204,7 @@ Vector2dVec DepthMap::getPointVec(const std::vector<int> & idxVec) const
     result.reserve(idxVec.size());
     for (auto & idx : idxVec)
     {
-        const int idxh = idx % hStep;
+        const int idxh = idx % hStep; //FIXME
         result.emplace_back(uConv(idxh % xMax), vConv(idxh / xMax));
     }
     return result;
@@ -318,18 +321,18 @@ void DepthMap::reconstruct(const Vector2dVec & queryPointVec,
 }
 
 
-void DepthMap::pushPoint(MHPack & result, const int i, const int idx, const double val) const
+void DepthMap::pushPoint(MHPack & result, const int idx, const int h, const double val) const
 {
-    result.idxVec.push_back( i ); // Index of element in queryIdxVec
-    result.hypIdxVec.push_back( idx / hStep );
-    result.costVec.push_back( costVec[idx] );
-    result.sigmaVec.push_back( sigmaVec[idx] );
-    if (val>=0) result.valVec.push_back( val );
+    result.idxVec.push_back( idx );
+    result.hypIdxVec.push_back( h );
+    result.costVec.push_back( costVec[idx + hStep * h] );
+    result.sigmaVec.push_back( sigmaVec[idx + hStep * h] );
+    result.valVec.push_back( val );
 }
 
 vector<int> DepthMap::getIdxVec(const Vector2dVec & queryPointVec) const
 {
-    vector<int> outIdxVec(queryPointVec.size());
+    vector<int> outIdxVec;
     if(queryPointVec.size()!=0)
     {
         for(int i = 0; i < queryPointVec.size(); i++)
@@ -344,41 +347,53 @@ vector<int> DepthMap::getIdxVec(const Vector2dVec & queryPointVec) const
     {
         for(int i=0; i < hStep; i++) // hStep === xMax * yMax
         {
-            outIdxVec.push_back(i);
+            if (valVec[i] >= MIN_DEPTH) outIdxVec.push_back(i);
         }
     }
     return outIdxVec;
 }
 
+
 void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
 {
-    const bool image_values_flag = (bool)(reconstFlags & IMAGE_VALUES);
-    const bool minmax_flag = (bool)(reconstFlags & MINMAX);
+    assert(not (reconstFlags & IMAGE_VALUES)); //FIXME imageValues are not implemented
     const int numHyps = (reconstFlags & ALL_HYPOTHESES) ? hMax : 1;
 
-    // Convert query points to query indexes
-    const vector<int> queryIdxVec = (reconstFlags & QUERY_POINTS) ? getIdxVec(result.imagePointVec) : getIdxVec();
-    const vector<double> queryValVec = (image_values_flag) ? result.valVec : vector<double>(queryIdxVec.size(), -1.0);
+    // Convert query points to query indices
+    vector<int> queryIdxVec;
+    if (reconstFlags & QUERY_INDICES)
+    {
+        swap(queryIdxVec, result.idxVec);
+    }
+    else if (reconstFlags & QUERY_POINTS)
+    {
+        queryIdxVec = getIdxVec(result.imagePointVec);
+    }
+    else
+    {
+        queryIdxVec = getIdxVec();
+    }
 
     result.idxVec.clear();
+    result.idxMapVec.clear();
     result.imagePointVec.clear();
     result.hypIdxVec.clear();
     result.costVec.clear();
     result.sigmaVec.clear();
     result.cloud.clear();
     result.valVec.clear();
-    result.datatype = (minmax_flag) ? MHPack::MINMAX_DISTANCE_VEC_WITH_SIGN : MHPack::RECONSTRUCTION_WITH_SIGMA;
+//    result.datatype = (minmax_flag) ? MHPack::MINMAX_DISTANCE_VEC_WITH_SIGN : MHPack::RECONSTRUCTION_WITH_SIGMA;
 
     vector<double> depthVec;
     for (int i = 0; i < queryIdxVec.size(); i++)
     {
-        if (queryIdxVec[i] < 0) continue;
+        if (queryIdxVec[i] < 0 or queryIdxVec[i] > hStep) continue;
 
         for (int h = 0; h < numHyps; h++)
         {
-            const int queryIdx = queryIdxVec[i] + h*hStep;
-            double depth = valVec[queryIdx];
-            double sigma = sigmaVec[queryIdx];
+            const int queryIdx = queryIdxVec[i];
+            double depth = valVec[queryIdx + h*hStep];
+            double sigma = sigmaVec[queryIdx + h*hStep]; //TODO discard points with sigma > sigmaMax
             if (depth < MIN_DEPTH)
             {
                 if (reconstFlags & DEFAULT_VALUES)
@@ -388,36 +403,59 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
                 }
                 else continue;
             }
-            if(minmax_flag)
+            
+            if (reconstFlags & MINMAX) 
             {
-                depthVec.push_back( max(depth-2*sigma, MIN_DEPTH) );
-                pushPoint(result, i, queryIdx, queryValVec[i]);
-                depthVec.push_back( depth + 2*sigma );
-                pushPoint(result, i, queryIdx, queryValVec[i]);
+                depthVec.push_back(max(depth - 2*sigma, MIN_DEPTH));
+                depthVec.push_back(depth + 2*sigma);
             }
             else
             {
                 depthVec.push_back(depth);
-                pushPoint(result, i, queryIdx, queryValVec[i]);
             }
+            
+            if (reconstFlags & SIGMA_VALUE) result.sigmaVec.push_back(sigma);
+            result.idxVec.push_back(queryIdx);
+            result.hypIdxVec.push_back(h);
+            if (reconstFlags & INDEX_MAPPING) result.idxMapVec.push_back(i);
         }
     }
+    
     result.imagePointVec = getPointVec(result.idxVec);
+    
 
     vector<bool> maskVec;
-    cameraPtr->reconstructPointCloud( result.imagePointVec, result.cloud, maskVec );
-
-    for (int i = 0; i < result.cloud.size(); i++)
+    Vector3dVec cloud;
+    cameraPtr->reconstructPointCloud( result.imagePointVec, cloud, maskVec );
+    
+    result.cloud.reserve((reconstFlags & MINMAX) ? 2 * cloud.size() : cloud.size());
+    for (int i = 0; i < cloud.size(); i++)
     {
         if (maskVec[i])
         {
-            result.cloud[i] = result.cloud[i].normalized() * depthVec[i];
+            if (reconstFlags & MINMAX)
+            {
+                result.cloud.push_back(cloud[i].normalized() * depthVec[2*i]);
+                result.cloud.push_back(cloud[i].normalized() * depthVec[2*i + 1]);
+            }
+            else
+            {
+                result.cloud.push_back(cloud[i].normalized() * depthVec[i]);
+            }
         }
         else
         {
-            //TODO make all data in MHPack valid
+            //FIXME make all data in MHPack valid
             //that is discard all non-reconstructed points and other data associated to them
-            result.cloud[i] << 0,0,0; // Insert null vector
+            if (reconstFlags & MINMAX)
+            {
+                result.cloud.emplace_back(0, 0, 0);
+                result.cloud.emplace_back(0, 0, 0);
+            }
+            else
+            {
+                result.cloud.emplace_back(0, 0, 0);
+            }
         }
     }
 }

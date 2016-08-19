@@ -55,6 +55,7 @@ int main(int argc, char** argv)
     depth.reconstruct(pack);
     cout << 111 << endl;
     DepthMap depthProjected(&camera, scaleParams);
+    depthProjected.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
     cout << 111 << endl;
     for (int i = 0; i < pack.cloud.size(); i++)
     {

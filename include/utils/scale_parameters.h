@@ -30,8 +30,8 @@ struct ScaleParameters
     // basic parameters
     int scale = 1;
     int u0 = 0, v0 = 0;
-    int uMax, vMax;
-    int xMax, yMax;
+    int uMax = 1, vMax = 1;
+    int xMax = 1, yMax = 1;
     
     void setEqualMargin()
     {

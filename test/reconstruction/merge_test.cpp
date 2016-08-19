@@ -117,6 +117,7 @@ int main(int argc, char** argv)
     Transformation<double> TleftRight3 = T03.compose(TbaseCamera).inverseCompose(T04.compose(TbaseCamera));
     StereoParameters stereoParams;
     stereoParams.verbosity = 1;
+    stereoParams.hypMax = 1;
     paramFile >> stereoParams.u0;
     paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
@@ -133,8 +134,8 @@ int main(int argc, char** argv)
     
     Mat8u img1 = imread(fileName1, 0);
     Mat8u img2 = imread(fileName2, 0);
-    Mat8u img3 = imread(fileName1, 0);
-    Mat8u img4 = imread(fileName2, 0);
+    Mat8u img3 = imread(fileName3, 0);
+    Mat8u img4 = imread(fileName4, 0);
     
     stereoParams.uMax = img1.cols;
     stereoParams.vMax = img1.rows;
@@ -161,7 +162,7 @@ int main(int argc, char** argv)
     DepthMap depth1, depth3;
     
     MotionStereoParameters motionParams;
-    
+    motionParams.dispMax = 16;
     MotionStereo motionStereo(&camera1, &camera2, motionParams);
     
     timer.reset();
@@ -198,6 +199,8 @@ int main(int argc, char** argv)
    
     imshow("out1", depth1Mat / 3);
     imshow("out2", depth2Mat / 3);
+    imshow("img1", img1);
+    imshow("img3", img3);
     waitKey(); 
     return 0;
 }

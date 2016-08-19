@@ -134,7 +134,7 @@ public:
                     
                     flatPack.imagePointVec.push_back(pt);
                 }
-                else if (depth.at(x, y) < MIN_DEPTH)
+                else
                 {
                     //FIXME if some points are not reconstructed indexes are not matched
                     descriptorVec.push_back(descriptor);
@@ -144,47 +144,45 @@ public:
         }
         
         //TODO check that sigmaVec is reconstructed
-        depth.reconstruct(flatPack, QUERY_POINTS | ALL_HYPOTHESES);
-        depth.reconstruct(salientPack, QUERY_POINTS | DEFAULT_VALUES | MINMAX | ALL_HYPOTHESES);
-        
+        depth.reconstruct(flatPack, QUERY_POINTS | SIGMA_VALUE);
+        depth.reconstruct(salientPack, QUERY_POINTS /*| DEFAULT_VALUES*/  | MINMAX | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING);
         depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
         
         // for the flat pack project points and replace the hypotheses in depth
         
-//        T12.inverseTransform(flatPack.cloud, flatPack.cloud);
-        cout << flatPack.cloud.size() << "  " << flatPack.sigmaVec.size() << endl;
+        /*T12.inverseTransform(flatPack.cloud, flatPack.cloud);
+//        cout << flatPack.cloud.size() << "  " << flatPack.sigmaVec.size() << endl;
         for (int idx = 0; idx < flatPack.cloud.size(); idx++)
         {
             depth.pushHypothesis(flatPack.cloud[idx], flatPack.sigmaVec[idx]);
-        }
+        }*/
         
         // for the salient pack compute stereo and for corresponding pixel push new hypothesis
-//        T12.inverseTransform(flatPack.cloud, salientPack.cloud);
+        T12.inverseTransform(salientPack.cloud, salientPack.cloud);
         Transform12 = T12.inverse();
-        for (int idx = 0; idx < salientPack.cloud.size(); idx+=2)
+        for (int idx = 0; idx < salientPack.imagePointVec.size(); idx++)
         {
             
-            
-        
             // project min-max points
             Vector2d ptMin, ptMax;
-            camera2->projectPoint(salientPack.cloud[idx], ptMin);
-            camera2->projectPoint(salientPack.cloud[idx + 1], ptMax);
-            /*
-            // if distance is small push depth hyp with the same sigma
-            if ((ptMin - ptMax).squaredNorm() < 8)
-            {
-                depth.pushHypothesis(0.5*(salientPack.cloud[idx] + salientPack.cloud[idx + 1]),
-                            flatPack.sigmaVec[idx/2]);
-            }
+            camera2->projectPoint(salientPack.cloud[2*idx], ptMin);
+            camera2->projectPoint(salientPack.cloud[2*idx + 1], ptMax);
             
+//            cout << salientPack.cloud[2*idx].norm() << " " << salientPack.cloud[2*idx + 1].norm() << endl;
+            
+            // if distance is small push depth hyp with the same sigma
+            if ((ptMin - ptMax).squaredNorm() < 15)
+            {
+                depth.pushHypothesis(0.5*(salientPack.cloud[2*idx] + salientPack.cloud[2*idx + 1]),
+                            salientPack.sigmaVec[idx]);
+            }
             else
             {
                 // if distance is big enough
                 // search along epipolar curve
                 //TODO optimize fo Vector2i 
                 CurveRasterizer<int, Polynomial2> raster(round(ptMax), round(ptMin),
-                                                epipolarPtr->getSecond(salientPack.cloud[idx + 1]));
+                                                epipolarPtr->getSecond(salientPack.cloud[2*idx]));
                 Vector2i diff = round(ptMax - ptMin);
                 const int distance = min(int(diff.norm()), params.dispMax);
                 
@@ -204,7 +202,7 @@ public:
                     vVec.push_back(raster.v);
                 }
                 
-                vector<uint8_t> & descriptor = descriptorVec[idx];
+                vector<uint8_t> & descriptor = descriptorVec[salientPack.idxMapVec[idx]];
                 
                 int dBest = 0;
                 int eBest = LENGTH*255;
@@ -223,14 +221,16 @@ public:
                 }
                 // triangulate and improve sigma
                 Vector3d X1, X2;
+                
                 triangulate(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], 
                         salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], X1);
                 triangulate(uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], 
                         salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], X2);
+                cout << X1.transpose() - 0.5*(salientPack.cloud[2*idx] + salientPack.cloud[2*idx + 1]).transpose() << endl;
                 depth.pushHypothesis(X1, (X2 - X1).norm() / 2);
             }
-            */
-        }        
+            
+        }     
         
         //release dynamic objects
         delete epipolarPtr;
