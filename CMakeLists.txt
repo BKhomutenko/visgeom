@@ -94,14 +94,13 @@ add_executable( depth_reconstruct_test
 
 target_link_libraries( depth_reconstruct_test ${OpenCV_LIBS} )
 
-#add_executable( motion_test
-#    test/reconstruction/motion_test.cpp
-#    src/reconstruction/eucm_stereo.cpp
-#    src/reconstruction/eucm_epipolar.cpp
-#    src/reconstruction/depth_map.cpp
-#)
+add_executable( motion_test
+    test/reconstruction/motion_test.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+)
 
-#target_link_libraries( motion_test ${OpenCV_LIBS} )
+target_link_libraries( motion_test ${OpenCV_LIBS} )
 
 add_executable( merge_test
     test/reconstruction/merge_test.cpp

@@ -197,10 +197,11 @@ int main(int argc, char** argv)
     
     
    
-    imshow("out1", depth1Mat / 3);
-    imshow("out2", depth2Mat / 3);
+    
     imshow("img1", img1);
     imshow("img3", img3);
+    imshow("out1", depth1Mat / 3);
+    imshow("out2", depth2Mat / 3);
     waitKey(); 
     return 0;
 }
