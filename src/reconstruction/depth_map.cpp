@@ -72,7 +72,11 @@ bool DepthMap::pushHypothesis(const int x, const int y, const double d, const do
 {
     if (not isValid(x, y)) return false;
     int h = 0;
-    while ((h < hMax) and (at(x, y, h) >= MIN_DEPTH) and (sigma(x, y, h) <= sigmaVal) ) h++;
+    while (h < hMax)
+    {
+        if ( (at(x, y, h) >= MIN_DEPTH) and (sigma(x, y, h) <= sigmaVal) ) h++;
+        else break;
+    }
     if (h == hMax) return false;    
 
     //Insert element into stack, so that stack is always sorted in sigma ascending order
@@ -647,5 +651,99 @@ DepthMap DepthMap::generatePlane(const ICamera * camera, const ScaleParameters &
         }
     }
     return depth;
+}
+
+void DepthMap::pixelMedianFilter(const int x, const int y, const int h)
+{
+    vector<double> depths;
+    vector<double> sigmas;
+    for (int y1 = max(0, y-1); y1 < min(yMax, y+1); ++y1)
+    {
+        for (int x1 = max(0, x-1); x1 < min(xMax, x+1); ++x1)
+        {
+            for (int h1 = 0; h1 < hMax; ++h1)
+            {
+                const double d = at(x1, y1, h1);
+                if (d > MIN_DEPTH)
+                {
+                    depths.push_back(d);
+                    sigmas.push_back(sigma(x1, y1, h1));
+                }
+            }
+        }
+    }
+    if (depths.size() < 1) return; // Do nothing
+    // Sort vectors in order of increasing depth
+    for (int i = 0; i < depths.size()-1; ++i)
+    {
+        for (int j = i+1; j < depths.size(); ++j)
+        {
+            if(depths[i] > depths[j])
+            {
+                const double temp_d = depths[i];
+                depths[i] = depths[j];
+                depths[j] = temp_d;
+                const double temp_s = sigmas[i];
+                sigmas[i] = sigmas[j];
+                sigmas[j] = temp_d;
+            }
+        }
+    }
+    //Choose median element and assign it to point
+    const int median = depths.size() / 2;
+    at(x, y, h) = depths[median];
+    sigma(x, y, h) = depths[median];
+}
+
+void DepthMap::pixelAverageFilter(const Vector3iVec & matches)
+{
+    double sum_d = 0, sum_s = 0;
+    for (int i = 0; i < matches.size(); ++i)
+    {
+        const Vector3i & point = matches[i];
+        sum_d += at(point[0], point[1], point[2]);
+        sum_s += sigma(point[0], point[1], point[2]);
+    }
+    const Vector3i & base = matches[0];
+    at(base[0], base[1], base[2]) = sum_d / matches.size();
+    sigma(base[0], base[1], base[2]) = sum_s / matches.size();
+}
+
+void DepthMap::filterNoise()
+{
+    const int minMatches = 2;
+    // Three loops to loop through every hypothesis
+    for (int y = 0; y < yMax; ++y)
+    {
+        for (int x = 0; x < xMax; ++x)
+        {
+            for (int h = 0; h < hMax; ++h)
+            {
+                // Check if hypothesis matches at least minMatches neighbour hyps
+                Vector3iVec matches;
+                matches.emplace_back(x, y, h); // Store current hypothesis
+                const double d = at(x, y, h);
+                const double s = sigma(x, y, h);
+                for (int y1 = max(0, y-1); y1 < min(yMax, y+1); ++y1 )
+                {
+                    for (int x1 = max(0, x-1); x1 < min(xMax, x+1); ++x1 )
+                    {
+                        for (int h1 = 0; h1 < hMax; ++h)
+                        {
+                            if( match(d, s, at(x1,y1,h1), sigma(x1,y1,h1)) )
+                            {
+                                matches.emplace_back(x1,y1,h1);
+                                break; //break out of h1 loop, go to next pixel
+                            }
+                        }
+                    }
+                }
+                // If does not match minimum requirement, then median filter
+                if (matches.size() < minMatches + 1) pixelMedianFilter(x,y,h);
+                // If it does match at least 2, then average
+                else pixelAverageFilter(matches);
+            }
+        }
+    }
 }
 

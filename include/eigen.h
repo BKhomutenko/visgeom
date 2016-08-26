@@ -1,3 +1,4 @@
+
 /*
 This file is part of visgeom.
 
@@ -47,6 +48,7 @@ using Eigen::Vector2d;
 using Eigen::Vector3d;
 using Eigen::Matrix3d;
 using Eigen::Vector2i;
+using Eigen::Vector3i;
 using Eigen::Map;
 
 template<typename T>
@@ -58,6 +60,7 @@ using Vector2dVec = std::vector<Vector2d>;
 using Vector3dVec = std::vector<Vector3d>;
 
 using Vector2iVec = std::vector<Vector2i>;
+using Vector3iVec = std::vector<Vector3i>;
 
 inline Vector2i round(const Vector2d & x)
 {
