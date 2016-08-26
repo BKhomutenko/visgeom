@@ -31,19 +31,6 @@ NOTE:
 const int COST_CHANGE = 10;
 const int MAX_COST = 35; //TODO link to DEFAULT_COST
 
-bool match(double v1, double s1, double v2, double s2)
-{
-    double delta = abs(v1 - v2);
-    return delta < 2 * s1 or delta < 2 * s2;
-}
-
-void filter(double & v1, double & s1, double v2, double s2)
-{
-    double denom = s1 + s2;
-    v1 = (v1 * s2 + v2 * s1) / denom;
-    s1 = s1 * s2 / denom;
-}
-
 void DepthMap::merge(const DepthMap & depth2)
 {
     assert((ScaleParameters)(*this) == (ScaleParameters)depth2);

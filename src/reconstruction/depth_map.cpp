@@ -58,22 +58,25 @@ bool DepthMap::isValid(const Vector2d pt, const int h) const
 
 bool DepthMap::pushHypothesis(const Vector3d & X, const double sigmaVal)
 {
-    
     Vector2d pt;
     if (not cameraPtr->projectPoint(X, pt)) return false;
     
     const int x = xConv(pt[0]);
     const int y = yConv(pt[1]);
-    
-    
+    const double d = X.norm();
 
+    return pushHypothesis(x, y, d, sigmaVal);
+}
+
+bool DepthMap::pushHypothesis(const int x, const int y, const double d, const double sigmaVal)
+{
     if (not isValid(x, y)) return false;
     int h = 0;
     while ((h < hMax) and (at(x, y, h) >= MIN_DEPTH) and (sigma(x, y, h) <= sigmaVal) ) h++;
     if (h == hMax) return false;    
 
     //Insert element into stack, so that stack is always sorted in sigma ascending order
-    double temp_d = X.norm();
+    double temp_d = d;
     double temp_sigma = sigmaVal;
     double temp2_d;
     double temp2_sigma;
@@ -88,6 +91,49 @@ bool DepthMap::pushHypothesis(const Vector3d & X, const double sigmaVal)
     return true;
 }
 
+// Returns true if the two depths and sigmas are within an acceptable tolerance of each other
+bool DepthMap::match(double v1, double s1, double v2, double s2)
+{
+    double delta = abs(v1 - v2);
+    return delta < 2 * s1 or delta < 2 * s2;
+}
+
+// Performs a filtered merge on the input depths and sigmas
+void DepthMap::filter(double & v1, double & s1, double v2, double s2)
+{
+    double denom = s1 + s2;
+    v1 = (v1 * s2 + v2 * s1) / denom;
+    s1 = s1 * s2 / denom;
+}
+
+bool DepthMap::filterPushHypothesis(const Vector3d & X, const double sigmaVal)
+{
+    Vector2d pt;
+    if (not cameraPtr->projectPoint(X,pt)) return false;
+
+    const int x = xConv(pt[0]);
+    const int y = yConv(pt[1]);
+    const double d = X.norm();
+
+    return filterPushHypothesis(x, y, d, sigmaVal);
+}
+
+bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, const double sigmaVal)
+{
+    if (not isValid(x, y)) return false;
+    for(int h = 0; h < hMax; ++h)
+    {
+        double & d1 = at(x, y, h);
+        double & sigma1 = sigma(x, y, h);
+        if( match(d1, sigma1, d, sigmaVal) )
+        {
+            filter(d1, sigma1, d, sigmaVal);
+            return true;
+        }
+    }
+    //The program reaches this area if no matches were found
+    return pushHypothesis(x, y, d, sigmaVal);
+}
 
 // nearest neighbor interpolation
 double DepthMap::nearest(const int u, const int v, const int h) const
