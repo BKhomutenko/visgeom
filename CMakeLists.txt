@@ -52,32 +52,32 @@ include_directories(include)
 
 ### RECONSTRUCTION ###
 
-#add_executable( stereo 
-#    test/reconstruction/stereo_test.cpp
-#    src/reconstruction/eucm_stereo.cpp
-#    src/reconstruction/eucm_epipolar.cpp
-#    src/reconstruction/depth_map.cpp
-#)
+add_executable( stereo 
+    test/reconstruction/stereo_test.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+)
 
-#target_link_libraries( stereo ${OpenCV_LIBS} )
+target_link_libraries( stereo ${OpenCV_LIBS} )
 
-#add_executable( multistereo 
-#    test/reconstruction/stereo_multibase.cpp
-#    src/reconstruction/eucm_stereo.cpp
-#    src/reconstruction/eucm_epipolar.cpp
-#    src/reconstruction/depth_map.cpp
-#)
+add_executable( multistereo 
+    test/reconstruction/stereo_multibase.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+)
 
-#target_link_libraries( multistereo ${OpenCV_LIBS} )
+target_link_libraries( multistereo ${OpenCV_LIBS} )
 
-#add_executable( generate_plane 
-#    test/reconstruction/generate_plane.cpp
-#    src/reconstruction/eucm_stereo.cpp
-#    src/reconstruction/eucm_epipolar.cpp
-#    src/reconstruction/depth_map.cpp
-#)
+add_executable( generate_plane 
+    test/reconstruction/generate_plane.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+)
 
-#target_link_libraries( generate_plane ${OpenCV_LIBS} )
+target_link_libraries( generate_plane ${OpenCV_LIBS} )
 
 
 add_executable( reproject_plane
@@ -107,6 +107,7 @@ add_executable( merge_test
     src/reconstruction/eucm_stereo.cpp
     src/reconstruction/eucm_epipolar.cpp
     src/reconstruction/depth_map.cpp
+    src/reconstruction/depth_merge.cpp
 )
 
 target_link_libraries( merge_test ${OpenCV_LIBS} )

@@ -50,5 +50,12 @@ struct ScaleParameters
     // from small disparity to image coordiante transform    
     int uConv(int x) const { return x * scale + u0; }
     int vConv(int y) const { return y * scale + v0; }
+    
+    bool operator == (const ScaleParameters & other) const
+    {
+        return scale == other.scale and u0 == other.u0 and v0 == other.v0 and
+                uMax == other.uMax and vMax == other.vMax and 
+                xMax == other.xMax and yMax == other.yMax;
+    }
 };
 

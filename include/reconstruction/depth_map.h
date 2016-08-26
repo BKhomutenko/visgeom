@@ -201,7 +201,7 @@ public:
     static DepthMap generatePlane(const ICamera * camera, const ScaleParameters & params, 
             Transformation<double> TcameraPlane, const Vector3dVec & polygonVec);
     
-    void merge(const DepthMap & depth2, const Transformation<double> T12);
+    void merge(const DepthMap & depth2);
 
     /*
     Takes the depthmap from the first image, reconstructs the pointcloud

@@ -91,6 +91,8 @@ int main(int argc, char** argv)
     
     StereoParameters stereoParams;
     stereoParams.verbosity = 2;
+    stereoParams.salientPoints = false;
+    stereoParams.maxBias = 8;
     paramFile >> stereoParams.u0;
     paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
