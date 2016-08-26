@@ -34,7 +34,7 @@ const int MAX_COST = 35; //TODO link to DEFAULT_COST
 bool match(double v1, double s1, double v2, double s2)
 {
     double delta = abs(v1 - v2);
-    return delta < 2 * s1 or  delta < 2 * s2;
+    return delta < 2 * s1 or delta < 2 * s2;
 }
 
 void filter(double & v1, double & s1, double v2, double s2)
@@ -44,9 +44,9 @@ void filter(double & v1, double & s1, double v2, double s2)
     s1 = s1 * s2 / denom;
 }
 
-void DepthMap::merge(const DepthMap & depth2, const Transformation<double> T12)
+void DepthMap::merge(const DepthMap & depth2)
 {
-    assert((ScaleParams)(*this) == (ScaleParams)depth2);
+    assert((ScaleParameters)(*this) == (ScaleParameters)depth2);
     for (int y = 0; y < yMax; y++)
     {
         for (int x = 0; x < xMax; x++)
@@ -61,16 +61,16 @@ void DepthMap::merge(const DepthMap & depth2, const Transformation<double> T12)
                 for (int h2 = 0; h2 < depth2.hMax; h2++)
                 {
                     
-                    if (not matchedMeasurementVec(h2) and
+                    if ( not matchedMeasurementVec[h2] and
                             match(at(x, y, h1), sigma(x, y, h1),
-                             depth2.at(x, y, h2), depth2.sigma(x, y, h2))
+                             depth2.at(x, y, h2), depth2.sigma(x, y, h2)) )
                     {
-                        filter(at(x, y, h1), sigma(x, y, h1),
-                             depth2.at(x, y, h2), depth2.sigma(x, y, h2);
+                        filter( at(x, y, h1), sigma(x, y, h1),
+                             depth2.at(x, y, h2), depth2.sigma(x, y, h2) );
                        
-                        cost1 = max(cost1 - COST_CHANGE, 0);
+                        cost1 = max(cost1 - COST_CHANGE, 0.);
                         improved = true;
-                        matchedMeasurementVec(h2) = true;
+                        matchedMeasurementVec[h2] = true;
                         break;
                     }
                 }
@@ -82,9 +82,9 @@ void DepthMap::merge(const DepthMap & depth2, const Transformation<double> T12)
             int h2 = 0;
             for (int h1 = 0; h1 < hMax; h1++)
             {
-                if (cost(x, y, h1) > MAX_COST)
+                if (at(x, y, h1) < MIN_DEPTH)
                 {
-                    while (h2 < depth2.hMax and matchedMeasurementVec(h2)) h2++;
+                    while (h2 < depth2.hMax and matchedMeasurementVec[h2]) h2++;
                     if (h2 < depth2.hMax)
                     {
                         at(x, y, h1) = depth2.at(x, y, h2);
@@ -95,8 +95,8 @@ void DepthMap::merge(const DepthMap & depth2, const Transformation<double> T12)
                     else
                     {
                         at(x, y, h1) = DEFAULT_DEPTH;
-                        sigma(x, y, h1) = DEFAULT_SIGMA;
-                        cost(x, y, h1) = DEFAULT_COST;
+                        sigma(x, y, h1) = DEFAULT_SIGMA_DEPTH;
+                        cost(x, y, h1) = DEFAULT_COST_DEPTH;
                     }
                 }
             }

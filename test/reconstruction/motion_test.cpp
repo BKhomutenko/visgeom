@@ -5,6 +5,9 @@
 #include "reconstruction/eucm_motion_stereo.h"
 #include "utils/scale_parameters.h"
 
+
+//TODO use SGM stereo as prior to the motion stereo to improve the accuacy
+
 int main(int argc, char** argv)
 {	
     ifstream paramFile(argv[1]);

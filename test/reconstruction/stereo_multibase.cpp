@@ -75,6 +75,7 @@ int main(int argc, char** argv)
     
     StereoParameters stereoParams;
     stereoParams.verbosity = 3;
+    stereoParams.salientPoints = false;
     paramFile >> stereoParams.u0;
     paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
@@ -114,7 +115,8 @@ int main(int argc, char** argv)
         stereo.computeStereo(img1, img2, depth);
         auto t3 = clock();
         cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
-        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
+//        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
+        imwrite(imageDir + "res" + to_string(counter++) + ".png", stereo.disparity()*3);
     }
     return 0;
 }

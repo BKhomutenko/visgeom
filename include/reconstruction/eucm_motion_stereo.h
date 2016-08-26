@@ -150,30 +150,33 @@ public:
         
         // for the flat pack project points and replace the hypotheses in depth
         
-        /*T12.inverseTransform(flatPack.cloud, flatPack.cloud);
+        T12.inverseTransform(flatPack.cloud, flatPack.cloud);
 //        cout << flatPack.cloud.size() << "  " << flatPack.sigmaVec.size() << endl;
         for (int idx = 0; idx < flatPack.cloud.size(); idx++)
         {
             depth.pushHypothesis(flatPack.cloud[idx], flatPack.sigmaVec[idx]);
-        }*/
+        }
         
         // for the salient pack compute stereo and for corresponding pixel push new hypothesis
-        T12.inverseTransform(salientPack.cloud, salientPack.cloud);
+        Vector3dVec cloud2;
+        T12.inverseTransform(salientPack.cloud, cloud2);
         Transform12 = T12.inverse();
+        int dispAcc = 0;
+        int dispCount = 0;
         for (int idx = 0; idx < salientPack.imagePointVec.size(); idx++)
         {
             
             // project min-max points
             Vector2d ptMin, ptMax;
-            camera2->projectPoint(salientPack.cloud[2*idx], ptMin);
-            camera2->projectPoint(salientPack.cloud[2*idx + 1], ptMax);
+            camera2->projectPoint(cloud2[2*idx], ptMin);
+            camera2->projectPoint(cloud2[2*idx + 1], ptMax);
             
-//            cout << salientPack.cloud[2*idx].norm() << " " << salientPack.cloud[2*idx + 1].norm() << endl;
+//            cout << cloud2[2*idx].norm() << " " << cloud2[2*idx + 1].norm() << endl;
             
             // if distance is small push depth hyp with the same sigma
-            if ((ptMin - ptMax).squaredNorm() < 15)
+            if ((ptMin - ptMax).squaredNorm() < 5)
             {
-                depth.pushHypothesis(0.5*(salientPack.cloud[2*idx] + salientPack.cloud[2*idx + 1]),
+                depth.pushHypothesis(0.5*(cloud2[2*idx] + cloud2[2*idx + 1]),
                             salientPack.sigmaVec[idx]);
             }
             else
@@ -181,8 +184,11 @@ public:
                 // if distance is big enough
                 // search along epipolar curve
                 //TODO optimize fo Vector2i 
+                
+                // query 3D point must be projected into 1st frame
                 CurveRasterizer<int, Polynomial2> raster(round(ptMax), round(ptMin),
                                                 epipolarPtr->getSecond(salientPack.cloud[2*idx]));
+                
                 Vector2i diff = round(ptMax - ptMin);
                 const int distance = min(int(diff.norm()), params.dispMax);
                 
@@ -205,12 +211,12 @@ public:
                 vector<uint8_t> & descriptor = descriptorVec[salientPack.idxMapVec[idx]];
                 
                 int dBest = 0;
-                int eBest = LENGTH*255;
+                int eBest = LENGTH*65535;
                 int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
                 for (int d = 0; d < distance; d++)
                 {
                     int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-                    int bias = 0; // min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
+                    int bias = 0; //min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
                     int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
                                         descriptor.begin(), sampleVec.begin() + d, bias, 1);
                     if (eBest > acc)
@@ -219,19 +225,39 @@ public:
                         dBest = d;
                     }
                 }
-                // triangulate and improve sigma
-                Vector3d X1, X2;
+                dispAcc += dBest;
+                dispCount++;
+//                auto poly1 = epipolarPtr->getSecond(salientPack.cloud[2*idx]);
+//                
+//                cout << "    curve : " << poly1(ptMin[0], ptMin[1]) << " " 
+//                    << poly1(ptMax[0], ptMax[1]) <<  " " << poly1(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH]) <<endl;
                 
+//                cout << ptMax.transpose() << " / " << uVec[dBest + HALF_LENGTH] << " " 
+//                    << vVec[dBest + HALF_LENGTH] << " / " << ptMin.transpose() << " / " << dBest << " " << distance << endl;
+                
+                // put the original depth to the new pixel
+           
+//                int xd = depth.xConv(uVec[dBest + HALF_LENGTH]);
+//                int yd = depth.yConv(vVec[dBest + HALF_LENGTH]);
+//                if (not depth.isValid(xd, yd)) continue;
+//                depth.at(xd, yd) = 0.5*(salientPack.cloud[2*idx] + salientPack.cloud[2*idx + 1]).norm();
+//                depth.sigma(xd, yd) = 1;
+
+                // put the original hypothesis
+//                depth.pushHypothesis(0.5*(salientPack.cloud[2*idx] + salientPack.cloud[2*idx + 1]), 1);
+
+                // triangulate and improve sigma
+                 Vector3d X1, X2;
                 triangulate(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], 
                         salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], X1);
                 triangulate(uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], 
                         salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], X2);
-                cout << X1.transpose() - 0.5*(salientPack.cloud[2*idx] + salientPack.cloud[2*idx + 1]).transpose() << endl;
+//                cout << X1.transpose() - 0.5*(salientPack.cloud[2*idx] + salientPack.cloud[2*idx + 1]).transpose() << endl;
                 depth.pushHypothesis(X1, (X2 - X1).norm() / 2);
             }
             
         }     
-        
+        cout << double(dispAcc) / dispCount << endl;
         //release dynamic objects
         delete epipolarPtr;
         epipolarPtr = NULL;
@@ -345,7 +371,7 @@ public:
             for (int d = 0; d < distance; d++)
             {
                 int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-                int bias = 0; // min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
+                int bias = min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
                 int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
                                     descriptor.begin(), sampleVec.begin() + d, bias, step);
 //                cout << acc << endl;
