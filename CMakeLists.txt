@@ -112,6 +112,14 @@ add_executable( merge_test
 
 target_link_libraries( merge_test ${OpenCV_LIBS} )
 
+add_executable( motion_gradual
+    test/reconstruction/motion_gradual.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+)
+
+target_link_libraries( motion_gradual ${OpenCV_LIBS} )
 
 ### LOCALIZATION ###
 

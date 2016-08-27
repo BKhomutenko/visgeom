@@ -271,16 +271,12 @@ public:
         epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
         StereoEpipoles epipoles(camera1, camera2, T12);
         Transform12 = T12;
-        // init the output mat
-        //TODO think about overhead
-        if (params.verbosity > 1) cout << "    initializing the depth map" << endl;
         
         if (params.verbosity > 1) cout << "    descriptor kernel selection" << endl;
         const int LENGTH = params.descLength;
         const int HALF_LENGTH = LENGTH / 2;
         
         // compute the weights for matching cost
-        // TODO make a separate header and a cpp file miscellaneous
         vector<int> kernelVec, waveVec;
         const int NORMALIZER = initKernel(kernelVec, LENGTH);
         const int WAVE_NORM = initWave(waveVec, LENGTH);
@@ -389,7 +385,7 @@ public:
             triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
                     uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], X2);
             depth.at(idxVec[ptIdx]) = X1.norm();
-            depth.sigma(idxVec[ptIdx]) = (X2 - X1).norm() / 2;
+            depth.sigma(idxVec[ptIdx]) = (X2 - X1).norm()/1.5;
         }
         
         delete epipolarPtr;

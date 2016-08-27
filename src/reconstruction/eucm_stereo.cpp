@@ -41,7 +41,8 @@ CurveRasterizer<int, Polynomial2> EnhancedStereo::getCurveRasteriser1(int idx)
 CurveRasterizer<int, Polynomial2> EnhancedStereo::getCurveRasteriser2(int idx)
 {
     Vector2i pinfPx = pinfPxVec[idx];
-    CurveRasterizer<int, Polynomial2> raster(pinfPx, epipoles.getSecondPx(), epipolar.getSecond(reconstVec[idx]));
+    CurveRasterizer<int, Polynomial2> raster(pinfPx, epipoles.getSecondPx(),
+             epipolar.getSecond(reconstVec[idx]));
     if (epipoles.secondIsInverted()) raster.setStep(-1);
     return raster;
 }
@@ -139,13 +140,14 @@ void EnhancedStereo::computeStereo(const Mat8u & img1, const Mat8u & img2, Depth
     computeDynamicProgramming();
     reconstructDisparity();
     depth = DepthMap(camera1, params, params.hypMax);
+    assert((ScaleParameters)depth == (ScaleParameters)params);
     for (int h = 0; h < params.hypMax; h++)
     {
         for (int y = 0; y < params.yMax; y++)
         {
             for (int x = 0; x < params.xMax; x++)
             {
-                if (salientBuffer(y, x) or not params.salientPoints) 
+                if (not params.salientPoints or salientBuffer(y, x)) 
                 {
                     computeDepth(depth.at(x, y, h), depth.sigma(x, y, h), x, y, h);
                 }
@@ -168,6 +170,63 @@ void EnhancedStereo::computeStereo(const Mat8u & img1, const Mat8u & img2, Mat32
     computeDepth(depthMat);
 }
 
+//FIXME temporary function
+const int FLAW_COST = 10;
+vector<int> compareDescriptor(const vector<uint8_t> & desc, const vector<uint8_t> & sampleVec)
+{
+    const int HALF_LENGTH = desc.size() / 2;
+    vector<int> rowA(sampleVec.size()), rowB(sampleVec.size());
+    
+    //match the first half
+    for (int i = 0; i < sampleVec.size(); i++)
+    {
+        rowA[i] = (abs(sampleVec[i] - desc[0]));
+    }
+    for (int i = 1; i <= HALF_LENGTH; i++)
+    {
+        rowB[0] = (rowA[0] + FLAW_COST + abs(sampleVec[0] - desc[i]));
+        int cost = min(rowA[i] + FLAW_COST, rowA[0]);
+        rowB[1] = (cost + abs(sampleVec[i] - desc[i]));
+        for (int j = 2; j < sampleVec.size(); j++)
+        {
+            cost = min(min(rowA[j] + FLAW_COST, rowA[j - 1]), rowA[j - 2] + FLAW_COST);
+            rowB[j] = (cost+ abs(sampleVec[j] - desc[i]));
+        }
+        swap(rowA, rowB);
+    }
+    vector<int> rowC(sampleVec.size()); //center cost
+    swap(rowA, rowC);
+    
+    //match the second half (from the last pixel to first)
+    for (int i = 0; i < sampleVec.size(); i++)
+    {
+        rowA[i] = (abs(sampleVec[i] - desc.back()));
+    }
+    for (int i = desc.size() - 1; i > HALF_LENGTH + 1; i--)
+    {
+        for (int j = 0; j < sampleVec.size() - 2; j++)
+        {
+            int cost = min(min(rowA[j] + FLAW_COST, rowA[j + 1]), rowA[j + 2] + FLAW_COST);
+            rowB[j] = (cost + abs(sampleVec[j] - desc[i]));
+        }
+        int j = sampleVec.size() - 2;
+        int cost = min(rowA[j] + FLAW_COST, rowA[j + 1]);
+        rowB[j] = (cost + abs(sampleVec[j] - desc[i]));
+        rowB.back() = (rowA.back() + FLAW_COST + abs(sampleVec.back() - desc[i]));
+        swap(rowA, rowB);
+    }
+    
+    //accumulate the cost
+    for (int i = 0; i < sampleVec.size() - 2; i++)
+    {
+        rowC[i] += min(min(rowA[i] + FLAW_COST, rowA[i + 1]), rowA[i + 2] + FLAW_COST);
+    }
+    int i = rowC.size() - 2;
+    rowC[i] += min(rowA[i] + FLAW_COST, rowA[i + 1]);
+    rowC.back() += rowA.back() + FLAW_COST;
+    return rowC;
+} 
+
 void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 {
     if (params.verbosity > 0) cout << "EnhancedStereo::computeCurveCost" << endl;
@@ -188,7 +247,7 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
         for (int x = 0; x < params.xMax; x++)
         {
             int idx = getLinearIndex(x, y);
-            if (params.verbosity > 3) 
+            if (params.verbosity > 4) 
             {
                 cout << "    x: " << x << " y: " << y << "  idx: " << idx; 
                 cout << "  mask: " << maskVec[idx] <<  endl;
@@ -267,11 +326,13 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                     else sampleVec[i] = img2(raster.v, raster.u);
                 }
             }
-            //compute the bias;
+//            vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+//            //compute the bias;
             int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
             
             // fill up the cost buffer
             uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;
+//            auto costIter = costVec.begin() + HALF_LENGTH;
             for (int d = 0; d < nSteps; d++, outPtr += step)
             {
                 int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
@@ -279,6 +340,9 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
                                 descriptor.begin(), sampleVec.begin() + d, bias);
                 *outPtr = acc / NORMALIZER;
+
+//                *outPtr = *costIter / LENGTH;
+//                ++costIter;
             }
             if (step > 1) fillGaps(errorBuffer.row(y).data + x*params.dispMax, step);
         }
@@ -433,7 +497,7 @@ void EnhancedStereo::computeDynamicProgramming()
 //TODO make with local minima
 void EnhancedStereo::reconstructDisparity()
 {
-    if (params.verbosity > 0) cout << "EnhancedStereo::reconstructDisparityMono" << endl;
+    if (params.verbosity > 0) cout << "EnhancedStereo::reconstructDisparity" << endl;
     const int hypShift = params.xMax*params.yMax;
     for (int y = 0; y < params.yMax; y++)
     {
@@ -479,9 +543,9 @@ void EnhancedStereo::reconstructDisparity()
                 minCost = bestErr;
                 minCostDisp = bestDisp;
             }
-            if (params.verbosity > 3) cout << "    best error: " << finalErrorMat(y, x) << endl;
+            if (params.verbosity > 4) cout << "    x: " << x << " best error: " << finalErrorMat(y, x) << endl;
         }
-        
+        if (params.verbosity > 3) cout << "    y: " << y << endl;
     }
 }
 
