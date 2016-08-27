@@ -56,31 +56,88 @@ bool DepthMap::isValid(const Vector2d pt, const int h) const
     return isValid(pt[0], pt[1], h);
 }
 
-bool DepthMap::pushHypothesis(const Vector3d X, const double sigmaVal)
+bool DepthMap::pushHypothesis(const Vector3d & X, const double sigmaVal)
 {
-    
     Vector2d pt;
     if (not cameraPtr->projectPoint(X, pt)) return false;
     
     const int x = xConv(pt[0]);
     const int y = yConv(pt[1]);
-    
-    
+    const double d = X.norm();
 
+    return pushHypothesis(x, y, d, sigmaVal);
+}
+
+bool DepthMap::pushHypothesis(const int x, const int y, const double d, const double sigmaVal)
+{
     if (not isValid(x, y)) return false;
     int h = 0;
-    while (h < hMax and at(x, y, h) >= MIN_DEPTH) h++;
+    while (h < hMax)
+    {
+        if ( (at(x, y, h) >= MIN_DEPTH) and (sigma(x, y, h) <= sigmaVal) ) h++;
+        else break;
+    }
     if (h == hMax) return false;    
-    
-//    cout << pt[0] << " " << pt[1] << " / " << x << " " << y << endl;
-    
-    const double d = X.norm();
-    
-    at(x, y, h) = d;
-    sigma(x, y, h) = sigmaVal;
+
+    //Insert element into stack, so that stack is always sorted in sigma ascending order
+    double temp_d = d;
+    double temp_sigma = sigmaVal;
+    double temp2_d;
+    double temp2_sigma;
+    while (h < hMax)
+    {
+        temp2_d = at(x, y, h);
+        temp2_sigma = sigma(x, y, h);
+        at(x, y, h) = temp_d;
+        sigma(x, y, h) = temp_sigma;
+        h++;
+    }
     return true;
 }
 
+// Returns true if the two depths and sigmas are within an acceptable tolerance of each other
+bool DepthMap::match(double v1, double s1, double v2, double s2)
+{
+    double delta = abs(v1 - v2);
+    return delta < 2 * s1 or delta < 2 * s2;
+}
+
+// Performs a filtered merge on the input depths and sigmas
+void DepthMap::filter(double & v1, double & s1, double v2, double s2)
+{
+    double denom = s1 + s2;
+    v1 = (v1 * s2 + v2 * s1) / denom;
+    s1 = s1 * s2 / denom;
+}
+
+bool DepthMap::filterPushHypothesis(const Vector3d & X, const double sigmaVal)
+{
+    Vector2d pt;
+    if (not cameraPtr->projectPoint(X,pt)) return false;
+
+    const int x = xConv(pt[0]);
+    const int y = yConv(pt[1]);
+    const double d = X.norm();
+
+    return filterPushHypothesis(x, y, d, sigmaVal);
+}
+
+bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, const double sigmaVal)
+{
+    if (not isValid(x, y)) return false;
+    for(int h = 0; h < hMax; ++h)
+    {
+        double & d1 = at(x, y, h);
+        double & sigma1 = sigma(x, y, h);
+        if( match(d1, sigma1, d, sigmaVal) )
+        {
+            filter(d1, sigma1, d, sigmaVal);
+            return true;
+        }
+    }
+    //The program reaches this area if no matches were found
+    return pushHypothesis(x, y, d, sigmaVal);
+}
 
 // nearest neighbor interpolation
 double DepthMap::nearest(const int u, const int v, const int h) const
@@ -321,15 +378,6 @@ void DepthMap::reconstruct(const Vector2dVec & queryPointVec,
 }
 
 
-void DepthMap::pushPoint(MHPack & result, const int idx, const int h, const double val) const
-{
-    result.idxVec.push_back( idx );
-    result.hypIdxVec.push_back( h );
-    result.costVec.push_back( costVec[idx + hStep * h] );
-    result.sigmaVec.push_back( sigmaVec[idx + hStep * h] );
-    result.valVec.push_back( val );
-}
-
 vector<int> DepthMap::getIdxVec(const Vector2dVec & queryPointVec) const
 {
     vector<int> outIdxVec;
@@ -361,17 +409,21 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
 
     // Convert query points to query indices
     vector<int> queryIdxVec;
+    Vector2dVec queryPointVec;
     if (reconstFlags & QUERY_INDICES)
     {
         swap(queryIdxVec, result.idxVec);
+        queryPointVec = getPointVec(queryIdxVec);
     }
     else if (reconstFlags & QUERY_POINTS)
     {
         queryIdxVec = getIdxVec(result.imagePointVec);
+        swap(queryPointVec, result.imagePointVec);
     }
     else
     {
         queryIdxVec = getIdxVec();
+        queryPointVec = getPointVec(queryIdxVec);
     }
 
     result.idxVec.clear();
@@ -417,11 +469,10 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
             if (reconstFlags & SIGMA_VALUE) result.sigmaVec.push_back(sigma);
             result.idxVec.push_back(queryIdx);
             result.hypIdxVec.push_back(h);
+            result.imagePointVec.push_back(queryPointVec[i]);
             if (reconstFlags & INDEX_MAPPING) result.idxMapVec.push_back(i);
         }
     }
-    
-    result.imagePointVec = getPointVec(result.idxVec);
     
 
     vector<bool> maskVec;
@@ -600,5 +651,99 @@ DepthMap DepthMap::generatePlane(const ICamera * camera, const ScaleParameters &
         }
     }
     return depth;
+}
+
+void DepthMap::pixelMedianFilter(const int x, const int y, const int h)
+{
+    vector<double> depths;
+    vector<double> sigmas;
+    for (int y1 = max(0, y-1); y1 < min(yMax, y+1); ++y1)
+    {
+        for (int x1 = max(0, x-1); x1 < min(xMax, x+1); ++x1)
+        {
+            for (int h1 = 0; h1 < hMax; ++h1)
+            {
+                const double d = at(x1, y1, h1);
+                if (d > MIN_DEPTH)
+                {
+                    depths.push_back(d);
+                    sigmas.push_back(sigma(x1, y1, h1));
+                }
+            }
+        }
+    }
+    if (depths.size() < 1) return; // Do nothing
+    // Sort vectors in order of increasing depth
+    for (int i = 0; i < depths.size()-1; ++i)
+    {
+        for (int j = i+1; j < depths.size(); ++j)
+        {
+            if(depths[i] > depths[j])
+            {
+                const double temp_d = depths[i];
+                depths[i] = depths[j];
+                depths[j] = temp_d;
+                const double temp_s = sigmas[i];
+                sigmas[i] = sigmas[j];
+                sigmas[j] = temp_d;
+            }
+        }
+    }
+    //Choose median element and assign it to point
+    const int median = depths.size() / 2;
+    at(x, y, h) = depths[median];
+    sigma(x, y, h) = depths[median];
+}
+
+void DepthMap::pixelAverageFilter(const Vector3iVec & matches)
+{
+    double sum_d = 0, sum_s = 0;
+    for (int i = 0; i < matches.size(); ++i)
+    {
+        const Vector3i & point = matches[i];
+        sum_d += at(point[0], point[1], point[2]);
+        sum_s += sigma(point[0], point[1], point[2]);
+    }
+    const Vector3i & base = matches[0];
+    at(base[0], base[1], base[2]) = sum_d / matches.size();
+    sigma(base[0], base[1], base[2]) = sum_s / matches.size();
+}
+
+void DepthMap::filterNoise()
+{
+    const int minMatches = 2;
+    // Three loops to loop through every hypothesis
+    for (int y = 0; y < yMax; ++y)
+    {
+        for (int x = 0; x < xMax; ++x)
+        {
+            for (int h = 0; h < hMax; ++h)
+            {
+                // Check if hypothesis matches at least minMatches neighbour hyps
+                Vector3iVec matches;
+                matches.emplace_back(x, y, h); // Store current hypothesis
+                const double d = at(x, y, h);
+                const double s = sigma(x, y, h);
+                for (int y1 = max(0, y-1); y1 < min(yMax, y+1); ++y1 )
+                {
+                    for (int x1 = max(0, x-1); x1 < min(xMax, x+1); ++x1 )
+                    {
+                        for (int h1 = 0; h1 < hMax; ++h)
+                        {
+                            if( match(d, s, at(x1,y1,h1), sigma(x1,y1,h1)) )
+                            {
+                                matches.emplace_back(x1,y1,h1);
+                                break; //break out of h1 loop, go to next pixel
+                            }
+                        }
+                    }
+                }
+                // If does not match minimum requirement, then median filter
+                if (matches.size() < minMatches + 1) pixelMedianFilter(x,y,h);
+                // If it does match at least 2, then average
+                else pixelAverageFilter(matches);
+            }
+        }
+    }
 }
 

@@ -117,8 +117,11 @@ public:
         fill(costVec.begin(), costVec.end(), costVal);
     }
     
-    //TODO implement with multiHyp
-    bool pushHypothesis(const Vector3d X, const double sigma);
+    bool pushHypothesis(const Vector3d & X, const double sigma);
+    bool pushHypothesis(const int x, const int y, const double depth, const double sigma);
+
+    bool filterPushHypothesis(const Vector3d & X, const double sigma);
+    bool filterPushHypothesis(const int x, const int y, const double depth, const double sigma);
     
     void applyMask(const Mat8u & mask);
     
@@ -218,10 +221,16 @@ public:
     DepthMap wrapDepth(const Transformation<double> T12,
             const ScaleParameters & scaleParams) const;
 
+    // Filters all hypotheses to remove noise, using either a median filter or 
+    // average filter, depending on the number of matching neighbour hypotheses
+    void filterNoise();
+
 private:
-    // Small helper function for reconstruct()
-    //FIXME not used, to rewrite
-    void pushPoint(MHPack & result, const int idx, const int h, const double val = 0) const;
+    static bool match(double v1, double s1, double v2, double s2);
+    static void filter(double & v1, double & s1, double v2, double s2);
+
+    void pixelMedianFilter(const int x, const int y, const int h);
+    void pixelAverageFilter(const Vector3iVec & matches);
 
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty
