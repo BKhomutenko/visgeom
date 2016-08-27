@@ -171,7 +171,7 @@ int main(int argc, char** argv)
     
     cout << "    first stereo : " << timer.elapsed() << endl;
     
-    Mat32f depth1Mat, depth2Mat, depth3Mat;
+    Mat32f depth1Mat, depth2Mat, depth3Mat, depth3FilteredMat;
     depth1.toMat(depth1Mat);
     
     timer.reset();
@@ -191,6 +191,8 @@ int main(int argc, char** argv)
     
     depth3.merge(depth1);
     depth3.toMat(depth3Mat);
+    depth3.filterNoise();
+    depth3.toMat(depth3FilteredMat);
     //TODO compare to the ground truth
 //    
 //    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
@@ -210,6 +212,7 @@ int main(int argc, char** argv)
     imshow("out1", depth1Mat / 3);
     imshow("out2", depth2Mat / 3);
     imshow("out3", depth3Mat / 3);
+    imshow("out3", depth3FilteredMat / 3);
     waitKey(); 
     return 0;
 }
