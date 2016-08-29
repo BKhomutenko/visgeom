@@ -40,11 +40,11 @@ struct MotionStereoParameters
 {
     int scale = 3;
     int descLength = 5;
-    int gradientThresh = 10;
+    int gradientThresh = 3;
     int verbosity = 0;
     int uMargin = 25, vMargin = 25;  // RoI left upper corner
     int biasMax = 10;
-    int dispMax = 48;
+    int dispMax = 25;
 };
 
 
@@ -74,6 +74,63 @@ public:
         image.copyTo(img1);
         computeMask();
     }
+    
+    //FIXME temporary function
+    const int FLAW_COST = 7;
+    vector<int> compareDescriptor(const vector<uint8_t> & desc, const vector<uint8_t> & sampleVec)
+    {
+        const int HALF_LENGTH = desc.size() / 2;
+        vector<int> rowA(sampleVec.size()), rowB(sampleVec.size());
+        
+        //match the first half
+        for (int i = 0; i < sampleVec.size(); i++)
+        {
+            rowA[i] = (abs(sampleVec[i] - desc[0]));
+        }
+        for (int i = 1; i <= HALF_LENGTH; i++)
+        {
+            rowB[0] = (rowA[0] + FLAW_COST + abs(sampleVec[0] - desc[i]));
+            int cost = min(rowA[i] + FLAW_COST, rowA[0]);
+            rowB[1] = (cost + abs(sampleVec[i] - desc[i]));
+            for (int j = 2; j < sampleVec.size(); j++)
+            {
+                cost = min(min(rowA[j] + FLAW_COST, rowA[j - 1]), rowA[j - 2] + FLAW_COST);
+                rowB[j] = (cost+ abs(sampleVec[j] - desc[i]));
+            }
+            swap(rowA, rowB);
+        }
+        vector<int> rowC(sampleVec.size()); //center cost
+        swap(rowA, rowC);
+        
+        //match the second half (from the last pixel to first)
+        for (int i = 0; i < sampleVec.size(); i++)
+        {
+            rowA[i] = (abs(sampleVec[i] - desc.back()));
+        }
+        for (int i = desc.size() - 1; i > HALF_LENGTH + 1; i--)
+        {
+            for (int j = 0; j < sampleVec.size() - 2; j++)
+            {
+                int cost = min(min(rowA[j] + FLAW_COST, rowA[j + 1]), rowA[j + 2] + FLAW_COST);
+                rowB[j] = (cost + abs(sampleVec[j] - desc[i]));
+            }
+            int j = sampleVec.size() - 2;
+            int cost = min(rowA[j] + FLAW_COST, rowA[j + 1]);
+            rowB[j] = (cost + abs(sampleVec[j] - desc[i]));
+            rowB.back() = (rowA.back() + FLAW_COST + abs(sampleVec.back() - desc[i]));
+            swap(rowA, rowB);
+        }
+        
+        //accumulate the cost
+        for (int i = 0; i < sampleVec.size() - 2; i++)
+        {
+            rowC[i] += min(min(rowA[i] + FLAW_COST, rowA[i + 1]), rowA[i + 2] + FLAW_COST);
+        }
+        int i = rowC.size() - 2;
+        rowC[i] += min(rowA[i] + FLAW_COST, rowA[i + 1]);
+        rowC.back() += rowA.back() + FLAW_COST;
+        return rowC;
+    } 
     
     /*
     -Select salient points and points with defined depth
@@ -338,18 +395,34 @@ public:
             //sample the second image
             //TODO traverse the epipolar line in the opposit direction and respect the disparity limit
             Vector2i goal = round(pointMinVec[ptIdx]);
-            CurveRasterizer<int, Polynomial2> raster(round(pointMaxVec[ptIdx]), goal,
+            Vector2i start = round(pointMaxVec[ptIdx]);
+            CurveRasterizer<int, Polynomial2> raster(start, goal,
                                                 epipolarPtr->getSecond(minDistVec[ptIdx]));
-            Vector2i diff = round(pointMaxVec[ptIdx]) - goal;
+            Vector2i diff = start - goal;
+            
+            /*{
+                Vector3d X1, X2;
+                triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
+//                        pointMinVec[ptIdx][0], pointMinVec[ptIdx][1], X1);
+                        goal[0], goal[1], X1);
+                triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
+//                        pointMaxVec[ptIdx][0], pointMaxVec[ptIdx][1], X2);
+                        start[0], start[1], X2);
+                cout << "MIN MAX" << endl;
+                cout << minDistVec[ptIdx].transpose() - X1.transpose() << endl;
+                cout << maxDistVec[ptIdx].transpose() - X2.transpose() << endl;
+            }*/
+            
+            
             const int distance = min(int(diff.norm()), params.dispMax);
             raster.steps(-HALF_LENGTH*step);
             vector<uint8_t> sampleVec;
             vector<int> uVec, vVec;
-            const int margin = LENGTH*step - 1;
+            const int margin = LENGTH - 1;
             uVec.reserve(distance + margin);
             vVec.reserve(distance + margin);
             sampleVec.reserve(distance + margin);
-            for (int d = 0; d < distance + margin; d++, raster.step())
+            for (int d = 0; d < distance + margin; d++, raster.steps(step))
             {
                 if (raster.v < 0 or raster.v >= img2.rows 
                     or raster.u < 0 or raster.u >= img2.cols) sampleVec.push_back(0);
@@ -359,18 +432,22 @@ public:
             }
             
             if (params.verbosity > 2) cout << "        find the best candidate" << endl;
+            
+            vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+            
             //compute the error and find the best candidate
             int dBest = 0;
             int eBest = LENGTH*255;
-            int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
+//            int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
 //            cout << "ERROR CURVE " << step << endl;
             for (int d = 0; d < distance; d++)
             {
-                int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-                int bias = min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
-                int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
-                                    descriptor.begin(), sampleVec.begin() + d, bias, step);
+//                int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
+//                int bias = min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
+//                int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
+//                                    descriptor.begin(), sampleVec.begin() + d, bias, step);
 //                cout << acc << endl;
+                int acc = costVec[d + HALF_LENGTH];
                 if (eBest > acc)
                 {
                     eBest = acc;
@@ -379,13 +456,45 @@ public:
             }
             
             //TODO make triangulation checks and 
+            
             Vector3d X1, X2;
             triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
                     uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], X1);
             triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
                     uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], X2);
             depth.at(idxVec[ptIdx]) = X1.norm();
-            depth.sigma(idxVec[ptIdx]) = (X2 - X1).norm()/1.5;
+            depth.sigma(idxVec[ptIdx]) = (X2 - X1).norm()/2;
+//            if (distance > 5)
+//            {
+//                cout << "BAD DISTANCE: " << distance << endl;
+//                cout << start.transpose() << "   " << goal.transpose() << endl;        
+//            }
+//            if ( depth.sigma(idxVec[ptIdx]) > 0.5)
+//            {
+//                cout << distance << endl;
+//                cout << "depth: " << depth.at(idxVec[ptIdx]) << " +-" << depth.sigma(idxVec[ptIdx]) << endl;
+//                cout << "samples:" << endl;
+//                for (auto & x : sampleVec)
+//                {
+//                    cout << " " << int(x);
+//                }
+//                cout << endl;
+//                cout << "descriptor:" << endl;
+//                for (auto & x : descriptor)
+//                {
+//                    cout << " " << int(x);
+//                }
+//                cout << endl;
+//                cout << "cost:" << endl;
+//                for (auto & x : costVec)
+//                {
+//                    cout << " " << int(x);
+//                }
+//                cout << endl<< endl;
+//            }
+            
+//            cout << minDistVec[ptIdx].norm() << "  " << X1.norm() 
+//                    << "  " << maxDistVec[ptIdx].norm() << endl;
         }
         
         delete epipolarPtr;
@@ -452,7 +561,7 @@ private:
         Sobel(img1, gradx, CV_16S, 1, 0, 1);
         Sobel(img1, grady, CV_16S, 0, 1, 1);
         Mat16s gradAbs = abs(gradx) + abs(grady);
-        GaussianBlur(gradAbs, gradAbs, Size(5, 5), 0, 0);
+        GaussianBlur(gradAbs, gradAbs, Size(7, 7), 0, 0);
         Mat8u gradAbs8u;
         gradAbs.convertTo(gradAbs8u, CV_8U);
         threshold(gradAbs8u, maskMat, params.gradientThresh, 128, CV_THRESH_BINARY);

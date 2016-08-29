@@ -197,6 +197,7 @@ public:
     
     //TODO make a wrap method
     void toMat(Mat32f & out) const;
+    void sigmaToMat(Mat32f & out) const;
     
     int getWidth() const { return xMax; }
     int getHeight() const { return yMax; }

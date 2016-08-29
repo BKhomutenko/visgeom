@@ -523,6 +523,12 @@ void DepthMap::toMat(Mat32f & out) const
     copy(valVec.begin(), valVec.begin() + hStep, (float*)out.data);
 }
 
+void DepthMap::sigmaToMat(Mat32f & out) const
+{
+    out.create(yMax, xMax);
+    copy(sigmaVec.begin(), sigmaVec.begin() + hStep, (float*)out.data);
+}
+
 //TODO do not reconstruct all the points but a selected subset
 // to avoid reconstruction of points with bad disparity
 //TODO - Add support to insert multiple hypotheses into output depthmap

@@ -171,7 +171,7 @@ void EnhancedStereo::computeStereo(const Mat8u & img1, const Mat8u & img2, Mat32
 }
 
 //FIXME temporary function
-const int FLAW_COST = 10;
+const int FLAW_COST = 7;
 vector<int> compareDescriptor(const vector<uint8_t> & desc, const vector<uint8_t> & sampleVec)
 {
     const int HALF_LENGTH = desc.size() / 2;
@@ -359,7 +359,7 @@ void EnhancedStereo::fillGaps(uint8_t * const data, const int step)
     case 2:
         for (base = 2; base < params.dispMax; base += 2)
         {
-            data[base - 1] = (data[base - 2] + data[base]) >> 1;
+            data[base - 1] = (data[base - 2] + data[base]) / 2;
         }
         break;
     case 3:

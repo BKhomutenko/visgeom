@@ -79,12 +79,15 @@ int main(int argc, char** argv)
     stereoParams.descLength = 5;
     
     StereoParameters stereoParams2;
+    stereoParams2.salientPoints = false;
     stereoParams2.verbosity = 3;
 //    stereoParams.salientPoints = false;
     paramFile >> stereoParams2.u0;
     paramFile >> stereoParams2.v0;
     paramFile >> stereoParams2.dispMax;
     paramFile >> stereoParams2.scale;
+    stereoParams.descLength = (stereoParams2.scale / 2 + 1) * 2 + 1;
+    stereoParams.dispMax = 6;
     paramFile.ignore();
     string imageDir;
     getline(paramFile, imageDir);
@@ -119,6 +122,8 @@ int main(int argc, char** argv)
     
     //do SGM to init the depth
     getline(paramFile, imageInfo);
+    getline(paramFile, imageInfo);
+    getline(paramFile, imageInfo);
     imageStream.str(imageInfo);
     imageStream.clear();
     imageStream >> imageName;
@@ -131,10 +136,12 @@ int main(int argc, char** argv)
     Timer timer;
     stereoSG.computeStereo(img1, img2, depth);
     cout << timer.elapsed() << endl; 
-    Mat32f res;
+    Mat32f res, sigmaRes;
     depth.toMat(res);
-    imshow("res" + to_string(counter++), res / 3);
-    
+    depth.sigmaToMat(sigmaRes);
+    imshow("res" + to_string(counter), res / 3);
+    imshow("sigma " + to_string(counter), sigmaRes*5);
+    counter++;
     while (getline(paramFile, imageInfo))
     {
         istringstream imageStream(imageInfo);
@@ -152,8 +159,11 @@ int main(int argc, char** argv)
         stereo.computeDepth(TleftRight, img2, depth);
         cout << timer.elapsed() << endl; 
         depth.toMat(res);
+        depth.sigmaToMat(sigmaRes);
 //        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
-        imshow("res" + to_string(counter++), res / 3);
+        imshow("res " + to_string(counter), res / 3);
+        imshow("sigma " + to_string(counter), sigmaRes*5);
+        counter++; 
     }
     waitKey();
     return 0;
