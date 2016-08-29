@@ -3,7 +3,7 @@
 #include "eigen.h"
 
 #include "reconstruction/curve_rasterizer.h"
-#include "reconstruction/eucm_stereo.h"
+#include "reconstruction/eucm_sgm.h"
 
 
 int main(int argc, char** argv)

@@ -27,7 +27,7 @@ Semi-global block matching algorithm for non-rectified images
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
-#include "reconstruction/eucm_stereo.h"
+#include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 
 CurveRasterizer<int, Polynomial2> EnhancedStereo::getCurveRasteriser1(int idx)

@@ -20,7 +20,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "ocv.h"
 #include "timer.h"
 
-#include "reconstruction/eucm_stereo.h"
+#include "reconstruction/eucm_sgm.h"
 
 
 using namespace cv;

@@ -4,7 +4,7 @@
 
 #include "camera/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
-#include "reconstruction/eucm_stereo.h"
+#include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 
 using namespace std;
