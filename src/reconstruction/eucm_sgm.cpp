@@ -30,7 +30,7 @@ Semi-global block matching algorithm for non-rectified images
 #include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 
-CurveRasterizer<int, Polynomial2> EnhancedStereo::getCurveRasteriser1(int idx)
+CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser1(int idx)
 {
     Vector2i pt = pointPxVec1[idx];
     CurveRasterizer<int, Polynomial2> raster(pt, epipoles.getFirstPx(), epipolar.getFirst(reconstVec[idx]));
@@ -38,7 +38,7 @@ CurveRasterizer<int, Polynomial2> EnhancedStereo::getCurveRasteriser1(int idx)
     return raster;
 }
 
-CurveRasterizer<int, Polynomial2> EnhancedStereo::getCurveRasteriser2(int idx)
+CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser2(int idx)
 {
     Vector2i pinfPx = pinfPxVec[idx];
     CurveRasterizer<int, Polynomial2> raster(pinfPx, epipoles.getSecondPx(),
@@ -48,7 +48,7 @@ CurveRasterizer<int, Polynomial2> EnhancedStereo::getCurveRasteriser2(int idx)
 }
 
 //TODO reconstruct the depth points, not everything
-void EnhancedStereo::computeReconstructed()
+void EnhancedSGM::computeReconstructed()
 {
     pointVec1.reserve(params.yMax*params.xMax);
     pointPxVec1.reserve(params.yMax*params.xMax);
@@ -63,13 +63,13 @@ void EnhancedStereo::computeReconstructed()
     camera1->reconstructPointCloud(pointVec1, reconstVec, maskVec);
 }
 
-void EnhancedStereo::computeRotated()
+void EnhancedSGM::computeRotated()
 {
     Transform12.inverseRotate(reconstVec, reconstRotVec);
 }
 
 //FIXME maskVec must be recomputed to discard not projected pInf
-void EnhancedStereo::computePinf()
+void EnhancedSGM::computePinf()
 {
     camera2->projectPointCloud(reconstRotVec, pinfVec);
     pinfPxVec.resize(pinfVec.size());
@@ -80,7 +80,7 @@ void EnhancedStereo::computePinf()
     }
 }
 
-void EnhancedStereo::computeUVCache()
+void EnhancedSGM::computeUVCache()
 {
     for (int y = 0; y < params.yMax; y++)
     {
@@ -112,9 +112,9 @@ void EnhancedStereo::computeUVCache()
     }
 }
 
-void EnhancedStereo::createBuffer()
+void EnhancedSGM::createBuffer()
 {
-    if (params.verbosity > 1) cout << "EnhancedStereo::createBuffer" << endl;
+    if (params.verbosity > 1) cout << "EnhancedSGM::createBuffer" << endl;
     assert(params.hypMax > 0);
     int bufferWidth = params.xMax*params.dispMax;
     errorBuffer.create(params.yMax, bufferWidth);
@@ -134,7 +134,7 @@ void EnhancedStereo::createBuffer()
     }
 }
 
-void EnhancedStereo::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depth)
+void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depth)
 {
     computeCurveCost(img1, img2);
     computeDynamicProgramming();
@@ -162,7 +162,7 @@ void EnhancedStereo::computeStereo(const Mat8u & img1, const Mat8u & img2, Depth
 }
 
 //TODO remove, depricated function
-void EnhancedStereo::computeStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat)
+void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat)
 {
     computeCurveCost(img1, img2);
     computeDynamicProgramming();
@@ -170,66 +170,9 @@ void EnhancedStereo::computeStereo(const Mat8u & img1, const Mat8u & img2, Mat32
     computeDepth(depthMat);
 }
 
-//FIXME temporary function
-const int FLAW_COST = 7;
-vector<int> compareDescriptor(const vector<uint8_t> & desc, const vector<uint8_t> & sampleVec)
+void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 {
-    const int HALF_LENGTH = desc.size() / 2;
-    vector<int> rowA(sampleVec.size()), rowB(sampleVec.size());
-    
-    //match the first half
-    for (int i = 0; i < sampleVec.size(); i++)
-    {
-        rowA[i] = (abs(sampleVec[i] - desc[0]));
-    }
-    for (int i = 1; i <= HALF_LENGTH; i++)
-    {
-        rowB[0] = (rowA[0] + FLAW_COST + abs(sampleVec[0] - desc[i]));
-        int cost = min(rowA[i] + FLAW_COST, rowA[0]);
-        rowB[1] = (cost + abs(sampleVec[i] - desc[i]));
-        for (int j = 2; j < sampleVec.size(); j++)
-        {
-            cost = min(min(rowA[j] + FLAW_COST, rowA[j - 1]), rowA[j - 2] + FLAW_COST);
-            rowB[j] = (cost+ abs(sampleVec[j] - desc[i]));
-        }
-        swap(rowA, rowB);
-    }
-    vector<int> rowC(sampleVec.size()); //center cost
-    swap(rowA, rowC);
-    
-    //match the second half (from the last pixel to first)
-    for (int i = 0; i < sampleVec.size(); i++)
-    {
-        rowA[i] = (abs(sampleVec[i] - desc.back()));
-    }
-    for (int i = desc.size() - 1; i > HALF_LENGTH + 1; i--)
-    {
-        for (int j = 0; j < sampleVec.size() - 2; j++)
-        {
-            int cost = min(min(rowA[j] + FLAW_COST, rowA[j + 1]), rowA[j + 2] + FLAW_COST);
-            rowB[j] = (cost + abs(sampleVec[j] - desc[i]));
-        }
-        int j = sampleVec.size() - 2;
-        int cost = min(rowA[j] + FLAW_COST, rowA[j + 1]);
-        rowB[j] = (cost + abs(sampleVec[j] - desc[i]));
-        rowB.back() = (rowA.back() + FLAW_COST + abs(sampleVec.back() - desc[i]));
-        swap(rowA, rowB);
-    }
-    
-    //accumulate the cost
-    for (int i = 0; i < sampleVec.size() - 2; i++)
-    {
-        rowC[i] += min(min(rowA[i] + FLAW_COST, rowA[i + 1]), rowA[i + 2] + FLAW_COST);
-    }
-    int i = rowC.size() - 2;
-    rowC[i] += min(rowA[i] + FLAW_COST, rowA[i + 1]);
-    rowC.back() += rowA.back() + FLAW_COST;
-    return rowC;
-} 
-
-void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
-{
-    if (params.verbosity > 0) cout << "EnhancedStereo::computeCurveCost" << endl;
+    if (params.verbosity > 0) cout << "EnhancedSGM::computeCurveCost" << endl;
     
     const int HALF_LENGTH = getHalfLength();
     const int LENGTH = HALF_LENGTH * 2 + 1;
@@ -326,30 +269,30 @@ void EnhancedStereo::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                     else sampleVec[i] = img2(raster.v, raster.u);
                 }
             }
-//            vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+            vector<int> costVec = compareDescriptor(descriptor, sampleVec);
 //            //compute the bias;
-            int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
+//            int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
             
             // fill up the cost buffer
             uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;
-//            auto costIter = costVec.begin() + HALF_LENGTH;
+            auto costIter = costVec.begin() + HALF_LENGTH;
             for (int d = 0; d < nSteps; d++, outPtr += step)
             {
-                int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-                int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
-                int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
-                                descriptor.begin(), sampleVec.begin() + d, bias);
-                *outPtr = acc / NORMALIZER;
+//                int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
+//                int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
+//                int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
+//                                descriptor.begin(), sampleVec.begin() + d, bias);
+//                *outPtr = acc / NORMALIZER;
 
-//                *outPtr = *costIter / LENGTH;
-//                ++costIter;
+                *outPtr = *costIter / LENGTH;
+                ++costIter;
             }
             if (step > 1) fillGaps(errorBuffer.row(y).data + x*params.dispMax, step);
         }
     }
 }
 
-void EnhancedStereo::fillGaps(uint8_t * const data, const int step)
+void EnhancedSGM::fillGaps(uint8_t * const data, const int step)
 {
     assert(step > 0);
     //linear interpolation for all intermediate points
@@ -392,7 +335,7 @@ void EnhancedStereo::fillGaps(uint8_t * const data, const int step)
     }
 }
 
-void EnhancedStereo::computeDynamicStep(const int32_t* inCost, const uint8_t * error, int32_t * outCost)
+void EnhancedSGM::computeDynamicStep(const int32_t* inCost, const uint8_t * error, int32_t * outCost)
 {
     int bestCost = inCost[0];
     for (int i = 1; i < params.dispMax; i++)
@@ -420,9 +363,9 @@ void EnhancedStereo::computeDynamicStep(const int32_t* inCost, const uint8_t * e
     vald += error[params.dispMax - 1];
 }
 
-void EnhancedStereo::computeDynamicProgramming()
+void EnhancedSGM::computeDynamicProgramming()
 {
-    if (params.verbosity > 0) cout << "EnhancedStereo::computeDynamicProgramming" << endl;
+    if (params.verbosity > 0) cout << "EnhancedSGM::computeDynamicProgramming" << endl;
     if (params.verbosity > 1) cout << "    left" << endl;
     
     if (not params.imageBasedCost) jumpCost = params.lambdaJump;
@@ -495,9 +438,9 @@ void EnhancedStereo::computeDynamicProgramming()
 }
 
 //TODO make with local minima
-void EnhancedStereo::reconstructDisparity()
+void EnhancedSGM::reconstructDisparity()
 {
-    if (params.verbosity > 0) cout << "EnhancedStereo::reconstructDisparity" << endl;
+    if (params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparity" << endl;
     const int hypShift = params.xMax*params.yMax;
     for (int y = 0; y < params.yMax; y++)
     {
@@ -549,57 +492,10 @@ void EnhancedStereo::reconstructDisparity()
     }
 }
 
-//TODO make error codes
-bool EnhancedStereo::triangulate(double x1, double y1, double x2, double y2, Vector3d & X)
-{
-    if (params.verbosity > 3) cout << "EnhancedStereo::triangulate" << endl;
-    //Vector3d v1n = v1 / v1.norm(), v2n = v2 / v2.norm();
-    Vector3d v1, v2;
-    if (not camera1->reconstructPoint(Vector2d(x1, y1), v1) or 
-        not camera2->reconstructPoint(Vector2d(x2, y2), v2) )
-    {
-        if (params.verbosity > 2) 
-        {
-            cout << "    not reconstructed " << Vector2d(x1, y1).transpose(); 
-            cout << " # " << Vector2d(x2, y2).transpose() << endl;
-        }
-        X = Vector3d(0, 0, 0);
-        return false;
-    }
-    Vector3d t = Transform12.trans();
-    v2 = Transform12.rotMat() * v2;
-    if (params.verbosity > 3) 
-    {
-        cout << "    pt1: " << x1 << " " << y1 << endl;
-        cout << "    x1: " << v1.transpose() << endl;
-        cout << "    pt2: " << x2 << " " << y2 << endl;
-        cout << "    x2: " << v2.transpose() << endl;
-    }
-    double v1v2 = v1.dot(v2);
-    double v1v1 = v1.dot(v1);
-    double v2v2 = v2.dot(v2);
-    double tv1 = t.dot(v1);
-    double tv2 = t.dot(v2);
-    double delta = -v1v1 * v2v2 + v1v2 * v1v2;
-    if (abs(delta) < 1e-10) // TODO the constant to be revised
-    {
-        if (params.verbosity > 2) 
-        {
-            cout << "    not triangulated " << abs(delta) << " " << (abs(delta) < 1e-10) << endl;
-        }
-        X = Vector3d(0, 0, 0);
-        return false;
-    }
-    double l1 = (-tv1 * v2v2 + tv2 * v1v2)/delta;
-    double l2 = (tv2 * v1v1 - tv1 * v1v2)/delta;
-    X = (v1*l1 + t + v2*l2)*0.5;
-    return true;
-}
-
 //TODO remove this function, depricated
-void EnhancedStereo::computeDepth(Mat32f & distance)
+void EnhancedSGM::computeDepth(Mat32f & distance)
 {
-    if (params.verbosity > 0) cout << "EnhancedStereo::computeDepth(Mat32f &)" << endl;
+    if (params.verbosity > 0) cout << "EnhancedSGM::computeDepth(Mat32f &)" << endl;
     distance.create(params.yMax, params.xMax);
     for (int y = 0; y < params.yMax; y++)
     {
@@ -610,9 +506,9 @@ void EnhancedStereo::computeDepth(Mat32f & distance)
     }
 }
 
-bool EnhancedStereo::computeDepth(double & dist, double & sigma, int x, int y, int h)
+bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int h)
 {
-    if (params.verbosity > 3) cout << "EnhancedStereo::computeDepth(int *)" << endl;
+    if (params.verbosity > 3) cout << "EnhancedSGM::computeDepth(int *)" << endl;
     assert(not (params.hypMax == 1 and h > 0));
     
     int idx = getLinearIndex(x, y);
@@ -681,9 +577,9 @@ bool EnhancedStereo::computeDepth(double & dist, double & sigma, int x, int y, i
     }
 }
 
-double EnhancedStereo::computeDepth(int x, int y, int h)
+double EnhancedSGM::computeDepth(int x, int y, int h)
 {
-    if (params.verbosity > 3) cout << "EnhancedStereo::computeDepth(int *)" << endl;
+    if (params.verbosity > 3) cout << "EnhancedSGM::computeDepth(int *)" << endl;
     assert(not (params.hypMax == 1 and h > 0));
     
     int idx = getLinearIndex(x, y);

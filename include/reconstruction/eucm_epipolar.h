@@ -30,12 +30,12 @@ A class that computes the epipolar curve equations for a calibrated stereo syste
 #include "camera/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/epipoles.h"
+#include "reconstruction/stereo_misc.h"
 
 class EnhancedEpipolar
 {
 public:
-    enum CameraIdx {CAMERA_1, CAMERA_2};
-    
+   
     EnhancedEpipolar(Transformation<double> T12, const EnhancedCamera * cam1,
             const EnhancedCamera * cam2, const int numberSteps, int verbosity = 0) :
         // initialize the members

@@ -29,11 +29,13 @@ Depth-from-motion class for semidense depth estimation
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 
-#include "eucm_epipolar.h"
-#include "curve_rasterizer.h"
-#include "depth_map.h"
-#include "epipolar_descriptor.h"
-#include "epipoles.h"
+#include "reconstruction/stereo_misc.h"
+#include "reconstruction/eucm_epipolar.h"
+#include "reconstruction/curve_rasterizer.h"
+#include "reconstruction/depth_map.h"
+#include "reconstruction/epipolar_descriptor.h"
+#include "reconstruction/epipoles.h"
+
 
 //TODO add errorMax threshold
 struct MotionStereoParameters

@@ -78,7 +78,7 @@ int main(int argc, char** argv)
     stereoParams.verbosity = 1;
     stereoParams.descLength = 5;
     
-    StereoParameters stereoParams2;
+    SGMParameters stereoParams2;
     stereoParams2.salientPoints = false;
     stereoParams2.verbosity = 3;
 //    stereoParams.salientPoints = false;
@@ -131,7 +131,7 @@ int main(int argc, char** argv)
     Mat8u img2 = imread(imageDir + imageName, 0);
     Transformation<double> T01(robotPose1.data()), T02(robotPose2.data());
     Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
-    EnhancedStereo stereoSG(TleftRight, &camera, &camera, stereoParams2);
+    EnhancedSGM stereoSG(TleftRight, &camera, &camera, stereoParams2);
     
     Timer timer;
     stereoSG.computeStereo(img1, img2, depth);

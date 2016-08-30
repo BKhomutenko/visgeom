@@ -32,17 +32,16 @@ NOTE:
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 
-#include "curve_rasterizer.h"
-#include "depth_map.h"
-#include "eucm_epipolar.h"
-#include "epipolar_descriptor.h"
 #include "utils/scale_parameters.h"
-#include "epipoles.h"
+#include "reconstruction/curve_rasterizer.h"
+#include "reconstruction/depth_map.h"
+#include "reconstruction/eucm_epipolar.h"
+#include "reconstruction/epipolar_descriptor.h"
+#include "reconstruction/epipoles.h"
+#include "reconstruction/eucm_stereo.h"
 
-struct StereoParameters : public ScaleParameters
+struct SGMParameters : public StereoParameters
 {
-    int dispMax = 48;
-    
     // cost parameters
     int lambdaStep = 5;
     int lambdaJump = 32;
@@ -54,35 +53,22 @@ struct StereoParameters : public ScaleParameters
     //all non-salient points are discarded
     bool salientPoints = true;
     
-    //TODO try to discard dull points completely
-    
-    int maxError = 150;
-    int maxBias = 10;
-    
-    int verbosity = 0;
-    int maxDepth = 100;
-    
     bool useUVCache = true;
-    
-    //multi-hypoteses
-    int hypMax = 1;
-    int maxHypDiff = 10;
 };
 
-class EnhancedStereo
+class EnhancedSGM : private EnhancedStereo
 {
 public:
     
-    EnhancedStereo(Transformation<double> T12, const EnhancedCamera * cam1,
-            const EnhancedCamera * cam2, const StereoParameters & stereoParams) :
+    EnhancedSGM(Transformation<double> T12, const EnhancedCamera * cam1,
+            const EnhancedCamera * cam2, const SGMParameters & parameters) :
+            EnhancedStereo(cam1, cam2, parameters),
             // initialize members
-            Transform12(T12), 
-            camera1(cam1->clone()),
-            camera2(cam2->clone()),
-            params(stereoParams),
+            params(parameters),
             epipolar(T12, cam1, cam2, 2500),
             epipoles(cam1, cam2, T12)
     { 
+        setTransformation(T12);
         assert(params.dispMax % 2 == 0);
         createBuffer();
         computeReconstructed();
@@ -91,7 +77,7 @@ public:
         if (params.useUVCache) computeUVCache();
     }
     
-    ~EnhancedStereo()
+    ~EnhancedSGM()
     {
         delete camera1;
         camera1 = NULL;
@@ -145,7 +131,6 @@ public:
     
     // reconstruction
     //TODO move elsewhere (e.g. create a class stereo system with two cameras and a transformation)
-    bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X);
     void computeDepth(Mat32f & distanceMat);
             
     double computeDepth(int x, int y, int h = 0);
@@ -157,12 +142,9 @@ public:
     
     Mat32s & disparity() { return smallDisparity; }
 private:
-    EnhancedEpipolar epipolar;
-    StereoEpipoles epipoles;
+    const EnhancedEpipolar epipolar;
+    const StereoEpipoles epipoles;
     
-    Transformation<double> Transform12;  // pose of camera 2 wrt camera 1
-    EnhancedCamera *camera1, *camera2;
-   
     std::vector<bool> maskVec;
     
     Vector2dVec pointVec1;  // the depth points on the image 1
@@ -187,6 +169,6 @@ private:
     Mat32s smallDisparity;
     Mat32s finalErrorMat;
     
-    const StereoParameters params;
+    const SGMParameters params;
 };
 
