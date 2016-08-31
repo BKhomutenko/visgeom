@@ -35,30 +35,23 @@ Depth-from-motion class for semidense depth estimation
 #include "reconstruction/depth_map.h"
 #include "reconstruction/epipolar_descriptor.h"
 #include "reconstruction/epipoles.h"
-
+#include "reconstruction/eucm_stereo.h"
 
 //TODO add errorMax threshold
-struct MotionStereoParameters
+struct MotionStereoParameters : StereoParameters
 {
-    int scale = 3;
     int descLength = 5;
     int gradientThresh = 3;
-    int verbosity = 0;
-    int uMargin = 25, vMargin = 25;  // RoI left upper corner
-    int biasMax = 10;
-    int dispMax = 25;
 };
 
 
-class MotionStereo
+class MotionStereo : private EnhancedStereo
 {
 public:
     MotionStereo(const EnhancedCamera * cam1, 
-        const EnhancedCamera * cam2, MotionStereoParameters params) :
-        // initialize the members
-        camera1(cam1->clone()),
-        camera2(cam2->clone()),
-        params(params)
+        const EnhancedCamera * cam2, MotionStereoParameters parameters) :
+        EnhancedStereo(cam1, cam2, parameters),
+        params(parameters)
     {
     }
 
@@ -76,64 +69,7 @@ public:
         image.copyTo(img1);
         computeMask();
     }
-    
-    //FIXME temporary function
-    const int FLAW_COST = 7;
-    vector<int> compareDescriptor(const vector<uint8_t> & desc, const vector<uint8_t> & sampleVec)
-    {
-        const int HALF_LENGTH = desc.size() / 2;
-        vector<int> rowA(sampleVec.size()), rowB(sampleVec.size());
-        
-        //match the first half
-        for (int i = 0; i < sampleVec.size(); i++)
-        {
-            rowA[i] = (abs(sampleVec[i] - desc[0]));
-        }
-        for (int i = 1; i <= HALF_LENGTH; i++)
-        {
-            rowB[0] = (rowA[0] + FLAW_COST + abs(sampleVec[0] - desc[i]));
-            int cost = min(rowA[i] + FLAW_COST, rowA[0]);
-            rowB[1] = (cost + abs(sampleVec[i] - desc[i]));
-            for (int j = 2; j < sampleVec.size(); j++)
-            {
-                cost = min(min(rowA[j] + FLAW_COST, rowA[j - 1]), rowA[j - 2] + FLAW_COST);
-                rowB[j] = (cost+ abs(sampleVec[j] - desc[i]));
-            }
-            swap(rowA, rowB);
-        }
-        vector<int> rowC(sampleVec.size()); //center cost
-        swap(rowA, rowC);
-        
-        //match the second half (from the last pixel to first)
-        for (int i = 0; i < sampleVec.size(); i++)
-        {
-            rowA[i] = (abs(sampleVec[i] - desc.back()));
-        }
-        for (int i = desc.size() - 1; i > HALF_LENGTH + 1; i--)
-        {
-            for (int j = 0; j < sampleVec.size() - 2; j++)
-            {
-                int cost = min(min(rowA[j] + FLAW_COST, rowA[j + 1]), rowA[j + 2] + FLAW_COST);
-                rowB[j] = (cost + abs(sampleVec[j] - desc[i]));
-            }
-            int j = sampleVec.size() - 2;
-            int cost = min(rowA[j] + FLAW_COST, rowA[j + 1]);
-            rowB[j] = (cost + abs(sampleVec[j] - desc[i]));
-            rowB.back() = (rowA.back() + FLAW_COST + abs(sampleVec.back() - desc[i]));
-            swap(rowA, rowB);
-        }
-        
-        //accumulate the cost
-        for (int i = 0; i < sampleVec.size() - 2; i++)
-        {
-            rowC[i] += min(min(rowA[i] + FLAW_COST, rowA[i + 1]), rowA[i + 2] + FLAW_COST);
-        }
-        int i = rowC.size() - 2;
-        rowC[i] += min(rowA[i] + FLAW_COST, rowA[i + 1]);
-        rowC.back() += rowA.back() + FLAW_COST;
-        return rowC;
-    } 
-    
+       
     /*
     -Select salient points and points with defined depth
     -reproject all the points onto the next image
@@ -219,7 +155,7 @@ public:
         // for the salient pack compute stereo and for corresponding pixel push new hypothesis
         Vector3dVec cloud2;
         T12.inverseTransform(salientPack.cloud, cloud2);
-        Transform12 = T12.inverse();
+        Transform12 = T12;
         int dispAcc = 0;
         int dispCount = 0;
         for (int idx = 0; idx < salientPack.imagePointVec.size(); idx++)
@@ -238,7 +174,8 @@ public:
                 depth.pushHypothesis(0.5*(cloud2[2*idx] + cloud2[2*idx + 1]),
                             salientPack.sigmaVec[idx]);
             }
-            else
+            else    //TODO make a separate function to compute stereo and merge it
+                    // call it from here and from computeDepth
             {
                 // if distance is big enough
                 // search along epipolar curve
@@ -306,13 +243,12 @@ public:
 //                depth.pushHypothesis(0.5*(salientPack.cloud[2*idx] + salientPack.cloud[2*idx + 1]), 1);
 
                 // triangulate and improve sigma
-                 Vector3d X1, X2;
-                triangulate(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], 
-                        salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], X1);
-                triangulate(uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], 
-                        salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], X2);
-//                cout << X1.transpose() - 0.5*(salientPack.cloud[2*idx] + salientPack.cloud[2*idx + 1]).transpose() << endl;
-                depth.pushHypothesis(X1, (X2 - X1).norm() / 2);
+                double d1 = triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
+                        uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], CAMERA_2);
+                double d2 = triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
+                        uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], CAMERA_2);
+                double sigma1 = abs(d2 - d1)/2;
+                depth.pushImageHypothesis(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], d1, sigma1);
             }
             
         }     
@@ -402,20 +338,6 @@ public:
                                                 epipolarPtr->getSecond(minDistVec[ptIdx]));
             Vector2i diff = start - goal;
             
-            /*{
-                Vector3d X1, X2;
-                triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
-//                        pointMinVec[ptIdx][0], pointMinVec[ptIdx][1], X1);
-                        goal[0], goal[1], X1);
-                triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
-//                        pointMaxVec[ptIdx][0], pointMaxVec[ptIdx][1], X2);
-                        start[0], start[1], X2);
-                cout << "MIN MAX" << endl;
-                cout << minDistVec[ptIdx].transpose() - X1.transpose() << endl;
-                cout << maxDistVec[ptIdx].transpose() - X2.transpose() << endl;
-            }*/
-            
-            
             const int distance = min(int(diff.norm()), params.dispMax);
             raster.steps(-HALF_LENGTH*step);
             vector<uint8_t> sampleVec;
@@ -444,6 +366,7 @@ public:
 //            cout << "ERROR CURVE " << step << endl;
             for (int d = 0; d < distance; d++)
             {
+                //TODO figure out what to do with bias
 //                int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
 //                int bias = min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
 //                int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
@@ -457,15 +380,16 @@ public:
                 }
             }
             
-            //TODO make triangulation checks and 
+            //TODO make triangulation check           
+            double d1 = triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
+                    uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH]);
+            double d2 = triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
+                    uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1]);
+            depth.at(idxVec[ptIdx]) = d1;
+            depth.sigma(idxVec[ptIdx]) = abs(d2 - d1)/2;
             
-            Vector3d X1, X2;
-            triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
-                    uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], X1);
-            triangulate(pointVec[ptIdx][0], pointVec[ptIdx][1], 
-                    uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], X2);
-            depth.at(idxVec[ptIdx]) = X1.norm();
-            depth.sigma(idxVec[ptIdx]) = (X2 - X1).norm()/2;
+            
+            
 //            if (distance > 5)
 //            {
 //                cout << "BAD DISTANCE: " << distance << endl;
@@ -501,57 +425,7 @@ public:
         
         delete epipolarPtr;
         epipolarPtr = NULL;
-    }
-    
-   
-    // TODO a lot of overlap with EnhancedStereo, think about merging them or deriving them
-    bool triangulate(double x1, double y1, double x2, double y2, Vector3d & X)
-    {
-        if (params.verbosity > 3) cout << "EnhancedStereo::triangulate" << endl;
-        //Vector3d v1n = v1 / v1.norm(), v2n = v2 / v2.norm();
-        Vector3d v1, v2;
-        if (not camera1->reconstructPoint(Vector2d(x1, y1), v1) or 
-            not camera2->reconstructPoint(Vector2d(x2, y2), v2) )
-        {
-            if (params.verbosity > 2) 
-            {
-                cout << "    not reconstructed " << Vector2d(x1, y1).transpose(); 
-                cout << " # " << Vector2d(x2, y2).transpose() << endl;
-            }
-            X = Vector3d(0, 0, 0);
-            return false;
-        }
-        Vector3d t = Transform12.trans();
-        v2 = Transform12.rotMat() * v2;
-        if (params.verbosity > 3) 
-        {
-            cout << "    pt1: " << x1 << " " << y1 << endl;
-            cout << "    x1: " << v1.transpose() << endl;
-            cout << "    pt2: " << x2 << " " << y2 << endl;
-            cout << "    x2: " << v2.transpose() << endl;
-        }
-        double v1v2 = v1.dot(v2);
-        double v1v1 = v1.dot(v1);
-        double v2v2 = v2.dot(v2);
-        double tv1 = t.dot(v1);
-        double tv2 = t.dot(v2);
-        double delta = -v1v1 * v2v2 + v1v2 * v1v2;
-        if (abs(delta) < 1e-10) // TODO the constant to be revised
-        {
-            if (params.verbosity > 2) 
-            {
-                cout << "    not triangulated " << abs(delta) << " " << (abs(delta) < 1e-10) << endl;
-            }
-            X = Vector3d(0, 0, 0);
-            return false;
-        }
-        double l1 = (-tv1 * v2v2 + tv2 * v1v2)/delta;
-        double l2 = (tv2 * v1v1 - tv1 * v1v2)/delta;
-        X = (v1*l1 + t + v2*l2)*0.5;
-        return true;
-    }
- 
-    
+    }    
     
 private:
     
@@ -569,11 +443,7 @@ private:
         threshold(gradAbs8u, maskMat, params.gradientThresh, 128, CV_THRESH_BINARY);
         
     }
-    
-    // pose of the first to the second camera
-    Transformation<double> Transform12;
-    EnhancedCamera *camera1, *camera2;
-    
+   
     Mat8u img1;    
     Mat8u maskMat; //TODO compute mask
     const MotionStereoParameters params;

@@ -125,8 +125,8 @@ double EnhancedStereo::triangulate(double u1, double v1, double u2, double v2,
         }
         return -1;
     }
-    if (camIdx == CAMERA_1) return (-tp * qq + tq * pq)/delta;
-    else return (tq * pp - tp * pq)/delta;
+    if (camIdx == CAMERA_1) return sqrt(pp) * (-tp * qq + tq * pq)/delta;
+    else return sqrt(qq) * (tq * pp - tp * pq)/delta;
 }
 
 

@@ -83,7 +83,6 @@ public:
     //// EPIPOLAR GEOMETRY
     bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X) const;
     
-    //TODO replace distance by length coefficient
     // returns the distance between corresponding camera and the point
     double triangulate(double u1, double v1, double u2, double v2, CameraIdx camIdx = CAMERA_1) const;
     

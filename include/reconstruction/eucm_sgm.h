@@ -63,7 +63,6 @@ public:
     EnhancedSGM(Transformation<double> T12, const EnhancedCamera * cam1,
             const EnhancedCamera * cam2, const SGMParameters & parameters) :
             EnhancedStereo(cam1, cam2, parameters),
-            // initialize members
             params(parameters),
             epipolar(T12, cam1, cam2, 2500),
             epipoles(cam1, cam2, T12)

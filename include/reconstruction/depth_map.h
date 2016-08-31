@@ -117,9 +117,15 @@ public:
         fill(costVec.begin(), costVec.end(), costVal);
     }
     
+    // X is a 3D point in the camera frame
     bool pushHypothesis(const Vector3d & X, const double sigma);
+    
+    // (x, y) are the depth coordinates
     bool pushHypothesis(const int x, const int y, const double depth, const double sigma);
 
+    // (u, v) are the image coordinates
+    bool pushImageHypothesis(const int u, const int v, const double depth, const double sigma);
+    
     bool filterPushHypothesis(const Vector3d & X, const double sigma);
     bool filterPushHypothesis(const int x, const int y, const double depth, const double sigma);
     
@@ -227,7 +233,9 @@ public:
     void filterNoise();
 
 private:
+    // Returns true if the two depths and sigmas are within an acceptable tolerance of each other
     static bool match(double v1, double s1, double v2, double s2);
+    // Performs a filtered merge on the input depths and sigmas
     static void filter(double & v1, double & s1, double v2, double s2);
 
     void pixelMedianFilter(const int x, const int y, const int h);
