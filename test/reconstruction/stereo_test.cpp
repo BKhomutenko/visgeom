@@ -102,6 +102,7 @@ int main(int argc, char** argv)
     SGMParameters stereoParams;
     stereoParams.flawCost = 5;
     stereoParams.verbosity = 1;
+    stereoParams.hypMax = 3;
     stereoParams.salientPoints = false;
     paramFile >> stereoParams.u0;
     paramFile >> stereoParams.v0;

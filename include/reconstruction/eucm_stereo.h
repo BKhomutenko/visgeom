@@ -88,6 +88,8 @@ public:
     
     vector<int> compareDescriptor(const vector<uint8_t> & desc, const vector<uint8_t> & sampleVec) const;
     
+    //FIXME potentially put into misc file
+    vector<int> findLocalMinima(const vector<int> & dataVec) const;
 protected:
     StereoParameters params;
     

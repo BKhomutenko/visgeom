@@ -84,7 +84,7 @@ bool EnhancedStereo::triangulate(double u1, double v1, double u2, double v2, Vec
     X = (p*l1 + t + q*l2)*0.5;
     return true;
 }
-    
+  
 //TODO replace distance by length coefficient
 // returns the distance between corresponding camera and the point
 double EnhancedStereo::triangulate(double u1, double v1, double u2, double v2,
@@ -185,4 +185,4 @@ vector<int> EnhancedStereo::compareDescriptor(const vector<uint8_t> & desc,
     rowC.back() += rowA.back() + params.flawCost;
     return rowC;
 } 
-    
+

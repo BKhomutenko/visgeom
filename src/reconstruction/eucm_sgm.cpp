@@ -150,11 +150,13 @@ void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap
                 if (not params.salientPoints or salientBuffer(y, x)) 
                 {
                     computeDepth(depth.at(x, y, h), depth.sigma(x, y, h), x, y, h);
+                    depth.cost(x, y, h) = 1; //FIXME
                 }
                 else 
                 {
                     depth.at(x, y, h) = OUT_OF_RANGE;
                     depth.sigma(x, y, h) = OUT_OF_RANGE;
+                    depth.cost(x, y, h) = 100; //FIXME
                 }
             }
         }
@@ -442,6 +444,8 @@ void EnhancedSGM::reconstructDisparity()
 {
     if (params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparity" << endl;
     const int hypShift = params.xMax*params.yMax;
+    int sizeAcc = 0;
+    int sizeCount = 0;
     for (int y = 0; y < params.yMax; y++)
     {
         int32_t* dynRow1 = (int32_t*)(tableauLeft.row(y).data);
@@ -461,25 +465,73 @@ void EnhancedSGM::reconstructDisparity()
             }
             int minCost = 0;
             int minCostDisp = -1;
+            
+            
+            //compute the cost vector
+//            vector<int> costVec;
+//            costVec.reserve(params.dispMax);
+//            int base = x * params.dispMax;
+//            for (int d = 0; d < params.dispMax; d++)
+//            {
+//                costVec.push_back(dynRow1[base + d] + dynRow2[base + d] 
+//                            + dynRow3[base + d] + dynRow4[base + d] - 2*errRow[base + d]);
+//            }
+            
+            
+           /* //compute the minima
+            vector<int> minIdxVec = findLocalMinima(costVec);
+            
+            //sort minima
+            vector<pair<int, int>> indexedCostVec;
+            indexedCostVec.reserve(minIdxVec.size());
+            for (auto & idx : minIdxVec)
+            {
+                indexedCostVec.emplace_back(costVec[idx], idx);
+            }
+//            sort(indexedCostVec.begin(), indexedCostVec.end());
+            sizeAcc += indexedCostVec.size();
+            sizeCount++;
+            partial_sort(indexedCostVec.begin(), indexedCostVec.begin() + params.hypMax, indexedCostVec.end());
+            for (int hypIdx = 0; hypIdx < minIdxVec.size(); hypIdx++)
+            {
+                smallDisparity(y, x * params.hypMax + hypIdx) = indexedCostVec[hypIdx].second;
+                finalErrorMat(y, x * params.hypMax + hypIdx) = indexedCostVec[hypIdx].first;
+            }*/
+            
             for (int hypIdx = 0; hypIdx < params.hypMax; hypIdx++)
             {
                 int32_t & bestDisp = smallDisparity(y, x * params.hypMax + hypIdx);
                 int32_t & bestErr = finalErrorMat(y, x * params.hypMax + hypIdx);
                 bestErr = INT32_MAX;
                 bestDisp = -1;
+                int acc1 = -1, acc2 = -1, acc3 = -1;
                 for (int d = 0; d < params.dispMax; d++)
                 {
                     int base = x * params.dispMax;
                     if (errRow[base + d] > params.maxError) continue;
-                    int acc = dynRow1[base + d] + dynRow2[base + d] 
+                    acc1 = acc2;
+                    acc2 = acc3;
+                    acc3 = dynRow1[base + d] + dynRow2[base + d] 
                             + dynRow3[base + d] + dynRow4[base + d] - 2*errRow[base + d];
                             
-                    if ( bestErr > acc and ( acc > minCost or 
-                            (acc == minCost and d != minCostDisp) ) )
+                    bool localMin = false;
+                    if ( acc2 == -1) continue;
+                    else if (acc1 == -1)
+                    { 
+                        localMin = (acc2 < acc3);
+                    }
+                    else
                     {
-                        if (hypIdx > 0 and acc > minCost + params.maxHypDiff) continue;
-                        bestDisp = d;
-                        bestErr = acc;
+                        localMin = (acc2 < acc3 and acc2 <= acc1);
+                    } 
+                    if (not localMin) continue;
+                    int d2 = d - 1;    
+                    if ( bestErr > acc2 and ( acc2 > minCost or 
+                            (acc2 == minCost and d2 != minCostDisp) ) )
+                    {
+                        if (hypIdx > 0 and acc2 > minCost + params.maxHypDiff) continue;
+                        bestDisp = d2;
+                        bestErr = acc2;
                     }
                 }
                 if (bestDisp == -1) break;
@@ -490,6 +542,7 @@ void EnhancedSGM::reconstructDisparity()
         }
         if (params.verbosity > 3) cout << "    y: " << y << endl;
     }
+    cout << "   AVG SIZE: " << sizeAcc / sizeCount << endl;
 }
 
 //TODO remove this function, depricated
