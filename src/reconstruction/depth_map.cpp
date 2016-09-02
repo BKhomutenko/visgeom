@@ -728,7 +728,7 @@ void DepthMap::filterNoise()
                 {
                     for (int x1 = max(0, x-1); x1 < min(xMax, x+1); ++x1 )
                     {
-                        for (int h1 = 0; h1 < hMax; ++h)
+                        for (int h1 = 0; h1 < hMax; ++h1)
                         {
                             if( match(d, s, at(x1,y1,h1), sigma(x1,y1,h1)) )
                             {
