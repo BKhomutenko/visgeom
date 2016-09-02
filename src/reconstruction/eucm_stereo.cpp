@@ -26,18 +26,13 @@ NOTE:
 #include "reconstruction/eucm_stereo.h"
 
 #include "std.h"
-#include "ocv.h"
+#include "io.h"
 #include "eigen.h"
 
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 
 #include "utils/scale_parameters.h"
-#include "reconstruction/curve_rasterizer.h"
-#include "reconstruction/depth_map.h"
-#include "reconstruction/eucm_epipolar.h"
-#include "reconstruction/epipolar_descriptor.h"
-#include "reconstruction/epipoles.h"
 
 
 bool EnhancedStereo::triangulate(double u1, double v1, double u2, double v2, Vector3d & X) const
@@ -100,7 +95,7 @@ double EnhancedStereo::triangulate(double u1, double v1, double u2, double v2,
             cout << "    not reconstructed " << Vector2d(u1, v1).transpose(); 
             cout << " # " << Vector2d(u2, v2).transpose() << endl;
         }
-        return -1;
+        return OUT_OF_RANGE;
     }
     Vector3d t = Transform12.trans();
     q = Transform12.rotMat() * q;
@@ -123,7 +118,7 @@ double EnhancedStereo::triangulate(double u1, double v1, double u2, double v2,
         {
             cout << "    not triangulated " << abs(delta) << " " << (abs(delta) < 1e-10) << endl;
         }
-        return -1;
+        return OUT_OF_RANGE;
     }
     if (camIdx == CAMERA_1) return sqrt(pp) * (-tp * qq + tq * pq)/delta;
     else return sqrt(qq) * (tq * pp - tp * pq)/delta;

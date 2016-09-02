@@ -131,7 +131,7 @@ public:
                 }
                 else
                 {
-                    //FIXME if some points are not reconstructed indexes are not matched
+//                    if (depth.at(x, y) >= MIN_DEPTH) continue;  //FIXME
                     descriptorVec.push_back(descriptor);
                     salientPack.imagePointVec.push_back(pt);
                 }
@@ -140,13 +140,14 @@ public:
         
         //TODO check that sigmaVec is reconstructed
         depth.reconstruct(flatPack, QUERY_POINTS | SIGMA_VALUE);
-        depth.reconstruct(salientPack, QUERY_POINTS /*| DEFAULT_VALUES*/  | MINMAX | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING);
+        depth.reconstruct(salientPack,
+                QUERY_POINTS /*| DEFAULT_VALUES*/  | MINMAX | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING);
         depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
         
         // for the flat pack project points and replace the hypotheses in depth
         
         T12.inverseTransform(flatPack.cloud, flatPack.cloud);
-//        cout << flatPack.cloud.size() << "  " << flatPack.sigmaVec.size() << endl;
+        cout << flatPack.cloud.size() << "  " << flatPack.sigmaVec.size() << endl;
         for (int idx = 0; idx < flatPack.cloud.size(); idx++)
         {
             depth.pushHypothesis(flatPack.cloud[idx], flatPack.sigmaVec[idx]);
@@ -206,30 +207,54 @@ public:
                 
                 vector<uint8_t> & descriptor = descriptorVec[salientPack.idxMapVec[idx]];
                 
-                int dBest = 0;
-                int eBest = LENGTH*65535;
-                int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
-                for (int d = 0; d < distance; d++)
-                {
-                    int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-                    int bias = 0; //min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
-                    int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
-                                        descriptor.begin(), sampleVec.begin() + d, bias, 1);
-                    if (eBest > acc)
+                vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+                
+//                int dBest = 0;
+//                int eBest = LENGTH*65535;
+//                int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
+//                for (int d = 0; d < distance; d++)
+//                {
+//                    int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
+//                    int bias = 0; //min(params.biasMax, max(-params.biasMax, (sum2 - sum1) / NORMALIZER));
+//                    int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
+//                                        descriptor.begin(), sampleVec.begin() + d, bias, 1);
+//                    if (eBest > acc)
+//                    {
+//                        eBest = acc;
+//                        dBest = d;
+//                    }
+//                }
+//                dispAcc += dBest;
+//                dispCount++;
+
+
+
+                    //FIXME
+                    int dBest = 0;
+                    int eBest = LENGTH*65535;
+                    for (int d = 0; d < distance; d++)
                     {
-                        eBest = acc;
-                        dBest = d;
+                        int acc = costVec[d + HALF_LENGTH];
+                        if (eBest > acc)
+                        {
+                            eBest = acc;
+                            dBest = d;
+                        }
                     }
-                }
-                dispAcc += dBest;
-                dispCount++;
+            
+            
+            
+
+
 //                auto poly1 = epipolarPtr->getSecond(salientPack.cloud[2*idx]);
 //                
 //                cout << "    curve : " << poly1(ptMin[0], ptMin[1]) << " " 
-//                    << poly1(ptMax[0], ptMax[1]) <<  " " << poly1(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH]) <<endl;
+//                    << poly1(ptMax[0], ptMax[1]) <<  " " 
+//<< poly1(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH]) <<endl;
                 
 //                cout << ptMax.transpose() << " / " << uVec[dBest + HALF_LENGTH] << " " 
-//                    << vVec[dBest + HALF_LENGTH] << " / " << ptMin.transpose() << " / " << dBest << " " << distance << endl;
+//                    << vVec[dBest + HALF_LENGTH] << " / " << ptMin.transpose() 
+//<< " / " << dBest << " " << distance << endl;
                 
                 // put the original depth to the new pixel
            
@@ -249,6 +274,32 @@ public:
                         uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], CAMERA_2);
                 double sigma1 = abs(d2 - d1)/2;
                 depth.pushImageHypothesis(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], d1, sigma1);
+                
+//                if ( depth.nearestSigma(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH]) > 0.5)
+//                {
+//                    cout << distance << endl;
+//                    cout << "depth: " << depth.nearest(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH])
+//                        << " +-" << depth.nearestSigma(uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH]) 
+//                        << endl;
+//                    cout << "samples:" << endl;
+//                    for (auto & x : sampleVec)
+//                    {
+//                        cout << " " << int(x);
+//                    }
+//                    cout << endl;
+//                    cout << "descriptor:" << endl;
+//                    for (auto & x : descriptor)
+//                    {
+//                        cout << " " << int(x);
+//                    }
+//                    cout << endl;
+//                    cout << "cost:" << endl;
+//                    for (auto & x : costVec)
+//                    {
+//                        cout << " " << int(x);
+//                    }
+//                    cout << endl<< endl;
+//                }
             }
             
         }     
@@ -257,6 +308,140 @@ public:
         delete epipolarPtr;
         epipolarPtr = NULL;
     }    
+    
+    //FIXME temporary function
+    void computeDepthMH(Transformation<double> T12,
+            const Mat8u & img2, DepthMap & depth)
+    {
+        if (params.verbosity > 0) cout << "MotionStereo::computeDepth" << endl;
+        epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
+        StereoEpipoles epipoles(camera1, camera2, T12);
+        Transform12 = T12;
+        
+        if (params.verbosity > 1) cout << "    descriptor kernel selection" << endl;
+        const int LENGTH = params.descLength;
+        const int HALF_LENGTH = LENGTH / 2;
+        
+        // compute the weights for matching cost
+        vector<int> kernelVec, waveVec;
+        const int NORMALIZER = initKernel(kernelVec, LENGTH);
+        const int WAVE_NORM = initWave(waveVec, LENGTH);
+        EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1});
+        
+        MHPack salientPack;
+        //TODO to optimize make a continuous vector<uint8_t>
+        vector<vector<uint8_t>> descriptorVec;
+        Vector2iVec depthPointVec;
+        vector<int> stepVec;
+        for (int y = 0; y < depth.yMax; y++)
+        {
+            for (int x = 0; x < depth.xMax; x++)
+            {
+                Vector2d pt(depth.uConv(x), depth.vConv(y));
+                Vector3d X;
+                if (not camera1->reconstructPoint(pt, X)) continue;
+                
+                CurveRasterizer<int, Polynomial2> descRaster(round(pt), epipoles.getFirstPx(),
+                                                epipolarPtr->getFirst(X));
+                if (epipoles.firstIsInverted()) descRaster.setStep(-1);
+                vector<uint8_t> descriptor;
+                const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
+                if (step < 1) continue;
+                
+                if (not epipolarDescriptor.goodResp()) continue;
+                descriptorVec.push_back(descriptor);
+                salientPack.imagePointVec.push_back(pt);
+                stepVec.push_back(step);
+                depthPointVec.emplace_back(x, y);
+            }
+        }
+        
+        depth.reconstruct(salientPack,
+             QUERY_POINTS | DEFAULT_VALUES  | MINMAX | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING); 
+        
+        depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
+        
+        Vector3dVec cloud2;
+        T12.inverseTransform(salientPack.cloud, cloud2);
+        
+        for (int idx = 0; idx < salientPack.imagePointVec.size(); idx++)
+        {
+            
+            // project min-max points
+            Vector2d ptMin, ptMax;
+            camera2->projectPoint(cloud2[2*idx], ptMin);
+            camera2->projectPoint(cloud2[2*idx + 1], ptMax);
+            
+//            cout << cloud2[2*idx].norm() << " " << cloud2[2*idx + 1].norm() << endl;
+            
+            // if distance is small push depth hyp with the same sigma
+            if ((ptMin - ptMax).squaredNorm() < 5)
+            {
+                depth.pushHypothesis(0.5*(cloud2[2*idx] + cloud2[2*idx + 1]),
+                            salientPack.sigmaVec[idx]);
+            }
+            else    //TODO make a separate function to compute stereo and merge it
+                    // call it from here and from computeDepth
+            {
+                // if distance is big enough
+                // search along epipolar curve
+                //TODO optimize fo Vector2i 
+                
+                // query 3D point must be projected into 1st frame
+                CurveRasterizer<int, Polynomial2> raster(round(ptMax), round(ptMin),
+                                                epipolarPtr->getSecond(salientPack.cloud[2*idx]));
+                
+                Vector2i diff = round(ptMax - ptMin);
+                const int distance = min(int(diff.norm()), params.dispMax);
+                
+                raster.steps(-HALF_LENGTH);
+                vector<uint8_t> sampleVec;
+                vector<int> uVec, vVec;
+                const int margin = LENGTH - 1;
+                uVec.reserve(distance + margin);
+                vVec.reserve(distance + margin);
+                sampleVec.reserve(distance + margin);
+                for (int d = 0; d < distance + margin; d++, raster.step())
+                {
+                    if (raster.v < 0 or raster.v >= img2.rows 
+                        or raster.u < 0 or raster.u >= img2.cols) sampleVec.push_back(0);
+                    else sampleVec.push_back(img2(raster.v, raster.u));
+                    uVec.push_back(raster.u);
+                    vVec.push_back(raster.v);
+                }
+                
+                vector<uint8_t> & descriptor = descriptorVec[salientPack.idxMapVec[idx]];
+                
+                vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+                
+                //TODO make it possible to detect multiple hypotheses if there is no prior
+                
+                int dBest = 0;
+                int eBest = LENGTH*65535;
+                for (int d = 0; d < distance; d++)
+                {
+                    int acc = costVec[d + HALF_LENGTH];
+                    if (eBest > acc)
+                    {
+                        eBest = acc;
+                        dBest = d;
+                    }
+                }
+       
+                // triangulate and improve sigma
+                double d1 = triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
+                        uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], CAMERA_1);
+                double d2 = triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
+                        uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], CAMERA_1);
+                double sigma1 = abs(d2 - d1) / 1.732; //variance of a uniform distribution
+                
+                //TODO make push by idx
+                Vector2i depthPt = depthPointVec[salientPack.idxMapVec[idx]];
+                depth.pushHypothesis(depthPt[0], depthPt[1], d1, sigma1);
+            }
+            
+        }
+    }
     
     //TODO split into functions
     void computeDepth(Transformation<double> T12,
@@ -275,7 +460,7 @@ public:
         vector<int> kernelVec, waveVec;
         const int NORMALIZER = initKernel(kernelVec, LENGTH);
         const int WAVE_NORM = initWave(waveVec, LENGTH);
-        EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1, 2, 3});
+        EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1});
         
         if (params.verbosity > 1) cout << "    computing the scan limits" << endl;
         // get uncertainty range reconstruction in the first frame

@@ -32,14 +32,9 @@ NOTE:
 #include "camera/generic_camera.h"
 #include "utils/scale_parameters.h"
 #include "utils/mh_pack.h"
+#include "reconstruction/stereo_misc.h"
 
-const double DEFAULT_DEPTH = 5;
-const double MIN_DEPTH = 0.1;
-const double DEFAULT_SIGMA_DEPTH = 30;
-const double DEFAULT_COST_DEPTH = 100;
-const double OUT_OF_RANGE = 0.0;
-
-
+//TODO move to mh_pack
 enum ReconstructionFlags : uint32_t
 {
     QUERY_POINTS = 1,
@@ -205,8 +200,10 @@ public:
     void toMat(Mat32f & out) const;
     void sigmaToMat(Mat32f & out) const;
     
+    // access methods
     int getWidth() const { return xMax; }
     int getHeight() const { return yMax; }
+    int getHypMax() const { return  hMax; }
     
     static DepthMap generatePlane(const ICamera * camera, const ScaleParameters & params, 
             Transformation<double> TcameraPlane, const Vector3dVec & polygonVec);

@@ -26,18 +26,13 @@ NOTE:
 #pragma once
 
 #include "std.h"
-#include "ocv.h"
 #include "eigen.h"
 
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 
 #include "utils/scale_parameters.h"
-#include "reconstruction/curve_rasterizer.h"
-#include "reconstruction/depth_map.h"
-#include "reconstruction/eucm_epipolar.h"
-#include "reconstruction/epipolar_descriptor.h"
-#include "reconstruction/epipoles.h"
+#include "reconstruction/stereo_misc.h"
 
 struct StereoParameters : public ScaleParameters
 {
@@ -80,7 +75,6 @@ public:
     
     void setTransformation(const Transformation<double> & T12) { Transform12 = T12; }
     
-    //// EPIPOLAR GEOMETRY
     bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X) const;
     
     // returns the distance between corresponding camera and the point

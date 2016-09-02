@@ -132,7 +132,7 @@ int main(int argc, char** argv)
     depth.setDefault();
     Mat32f res;
     timer.reset();
-    stereo.computeDepth(TleftRight, img2, depth);
+    stereo.computeDepthMH(TleftRight, img2, depth);
     cout << timer.elapsed() << endl;
     timer.reset();
 

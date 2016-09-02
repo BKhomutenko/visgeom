@@ -606,28 +606,21 @@ bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int 
     }
     
     
-    Vector3d X;
-    if (triangulate(pt1[0], pt1[1], u22, v22, X))
+    dist = triangulate(pt1[0], pt1[1], u21, v21);
+    if (dist > MIN_DEPTH)
     {
-        sigma = X.norm();
-        if (triangulate(pt1[0], pt1[1], u21, v21, X))
+        double d2 = triangulate(pt1[0], pt1[1], u22, v22);
+        if (d2 > MIN_DEPTH)
         {
-            dist = X.norm();
-            sigma = abs(sigma - dist) / 2;
-        }
-        else
-        {
-            dist = OUT_OF_RANGE;
-            sigma = OUT_OF_RANGE;
-            return false;
+            sigma = abs(d2 - dist) / 1.732;
+            return true;
         }
     }
-    else 
-    {
-        dist = OUT_OF_RANGE;
-        sigma = OUT_OF_RANGE;
-        return false;
-    }
+
+    //if any of triangulations is not computed
+    dist = OUT_OF_RANGE;
+    sigma = OUT_OF_RANGE;
+    return false;
 }
 
 double EnhancedSGM::computeDepth(int x, int y, int h)
@@ -661,15 +654,7 @@ double EnhancedSGM::computeDepth(int x, int y, int h)
     // point on the first image
     const auto & pt1 = pointVec1[idx];
     
-    Vector3d X;
-    if (triangulate(pt1[0], pt1[1], u2, v2, X))
-    {
-        return X.norm();
-    }
-    else 
-    {
-        return OUT_OF_RANGE;
-    }
+    return triangulate(pt1[0], pt1[1], u2, v2);
 }
 
 
