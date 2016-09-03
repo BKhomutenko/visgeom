@@ -24,6 +24,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "ceres.h"
 
 #include "camera/eucm.h"
+#include "utils/mh_pack.h"
 
 void ScalePhotometric::computeBaseScaleSpace(const Mat32f & img1)
 {
@@ -209,4 +210,29 @@ void ScalePhotometric::computePoseMI(int scaleIdx, Transformation<double> & T12)
 //    saveSurface("surf01.txt", costFunction, 2, 3, 0.0005, 50, pose.data());
 }
 
-
+void ScalePhotometric::wrapImage(const Mat32f & src, Mat32f & dst, const Transformation<double> T12) const
+{   
+    MHPack pack;
+    dst.create(src.size());
+    for (int i = 0; i < src.rows; i++)
+    {
+        for (int j = 0; j < src.cols; j++)
+        {
+            pack.imagePointVec.emplace_back(j, i);
+        }
+    }
+    depthMap.reconstruct(pack, QUERY_POINTS | INDEX_MAPPING);
+    T12.inverseTransform(pack.cloud, pack.cloud);
+    Vector2dVec ptVec;
+    depthMap.project(pack.cloud, ptVec);
+    for (int i = 0; i < pack.cloud.size(); i++)
+    {
+        int u = round(ptVec[i][0]);
+        int v = (ptVec[i][1]);
+        if (u < 0 or u > src.cols) continue;
+        if (v < 0 or v > src.rows) continue;
+        int v1 = pack.idxMapVec[i] / src.cols;
+        int u1 = pack.idxMapVec[i] % src.cols; // FIXME must be the other way around
+        dst(v1, u1) = src(v, u);
+    }
+}

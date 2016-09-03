@@ -75,6 +75,8 @@ public:
     
     void computePoseMI(const Mat32f & img2, Transformation<double> & T12);
 
+    //FIXME temporary function
+    void wrapImage(const Mat32f & src, Mat32f & dst, const Transformation<double> T12) const;
 private:
     // scaleSpace2 must be initialized
     void computePose(int scaleIdx, Transformation<double> & T12);

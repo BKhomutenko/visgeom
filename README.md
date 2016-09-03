@@ -59,7 +59,7 @@ Ex = 0.169697; Ey = 0.161184; Emax = 1.79888
 STEREO CALIBRATION
 To run stereo calibration three files are required. Example:
 ```
-$ ./calibration_stereo calibInfoStereo.txt calibInfoLeft.txt calibInfoRight.txt
+$ ./calibration_stereo calibInfoLeft.txt calibInfoRight.txt calibInfoStereo.txt
 ```
 calibInfoLeft.txt and calibInfoRight.txt are just the same as for the monocular calibration
 The former provides images just for the left camera, the latter just for the right.

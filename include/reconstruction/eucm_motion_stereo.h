@@ -415,7 +415,7 @@ public:
                 vector<int> costVec = compareDescriptor(descriptor, sampleVec);
                 
                 //TODO make it possible to detect multiple hypotheses if there is no prior
-                
+                //TODO mismatch detection based on cost
                 int dBest = 0;
                 int eBest = LENGTH*65535;
                 for (int d = 0; d < distance; d++)

@@ -15,40 +15,40 @@ INCLUDE_DIRECTORIES(${CERES_INCLUDE_DIRS})
 include_directories(include)
 
 ### CALIBRATION ###
-#add_executable( calibration
-#    test/calibration/calibration.cpp
-#)
+add_executable( calibration
+    test/calibration/calibration.cpp
+)
 
-#target_link_libraries( calibration ${OpenCV_LIBS} )
-#TARGET_LINK_LIBRARIES( calibration ${CERES_LIBRARIES})
+target_link_libraries( calibration ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( calibration ${CERES_LIBRARIES})
 
-#add_executable( calibration_mei
-#    test/calibration/calibration_mei.cpp
-#)
+add_executable( calibration_mei
+    test/calibration/calibration_mei.cpp
+)
 
-#target_link_libraries( calibration_mei ${OpenCV_LIBS} )
-#TARGET_LINK_LIBRARIES( calibration_mei ${CERES_LIBRARIES})
+target_link_libraries( calibration_mei ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( calibration_mei ${CERES_LIBRARIES})
 
-#add_executable( calibration_stereo
-#    test/calibration/calibration_stereo.cpp
-#)
+add_executable( calibration_stereo
+    test/calibration/calibration_stereo.cpp
+)
 
-#target_link_libraries( calibration_stereo ${OpenCV_LIBS} )
-#TARGET_LINK_LIBRARIES( calibration_stereo ${CERES_LIBRARIES})
+target_link_libraries( calibration_stereo ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( calibration_stereo ${CERES_LIBRARIES})
 
-#add_executable( calibration_robot
-#    test/calibration/calibration_robot.cpp
-#)
+add_executable( calibration_robot
+    test/calibration/calibration_robot.cpp
+)
 
-#target_link_libraries( calibration_robot ${OpenCV_LIBS} )
-#TARGET_LINK_LIBRARIES( calibration_robot ${CERES_LIBRARIES})
+target_link_libraries( calibration_robot ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( calibration_robot ${CERES_LIBRARIES})
 
-#add_executable( rectify
-#    test/calibration/rectify.cpp
-#)
+add_executable( rectify
+    test/calibration/rectify.cpp
+)
 
-#target_link_libraries( rectify ${OpenCV_LIBRARIES} )
-#TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
+target_link_libraries( rectify ${OpenCV_LIBRARIES} )
+TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
 
 ### RECONSTRUCTION ###
 
@@ -127,7 +127,7 @@ add_executable( motion_gradual
 
 target_link_libraries( motion_gradual ${OpenCV_LIBS} )
 
-### LOCALIZATION ###
+## LOCALIZATION ###
 
 #add_executable( photometric
 #    test/localization/photometric_test.cpp
@@ -140,6 +140,19 @@ target_link_libraries( motion_gradual ${OpenCV_LIBS} )
 
 #target_link_libraries( photometric ${OpenCV_LIBS} )
 #TARGET_LINK_LIBRARIES( photometric ${CERES_LIBRARIES})
+
+add_executable( odometry_photo
+    test/localization/photometric_odom.cpp
+    src/localization/photometric.cpp
+    src/localization/cost_functions.cpp
+    src/reconstruction/eucm_sgm.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+)
+
+target_link_libraries( odometry_photo ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( odometry_photo ${CERES_LIBRARIES})
 
 #add_executable( mi_test
 #    test/localization/mi_test.cpp

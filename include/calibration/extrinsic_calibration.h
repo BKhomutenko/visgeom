@@ -160,10 +160,6 @@ public:
             const string & infoFileNameStereo)
     {
         cout << "### Initialize calibration data ###" << endl;
-        for (auto & x : {"ololo", "trololo"})
-        {
-            cout << x << endl;
-        }
         if (not initializeIntrinsic(infoFileName1, monoCalibDataVec1))
         {
             return false;
@@ -174,8 +170,7 @@ public:
         }
         constructGrid();
         
-        vector<double>{1, 2, 1.2};
-        
+        cout << "### Initialize calibration data : stereo ###" << endl;
         if (not initializeExtrinsic(infoFileNameStereo)) return false;
         return true;
     } 

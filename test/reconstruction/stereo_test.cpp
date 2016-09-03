@@ -103,7 +103,7 @@ int main(int argc, char** argv)
     stereoParams.flawCost = 5;
     stereoParams.verbosity = 1;
     stereoParams.hypMax = 3;
-    stereoParams.salientPoints = false;
+    stereoParams.salientPoints = true;
     paramFile >> stereoParams.u0;
     paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
@@ -181,7 +181,7 @@ int main(int argc, char** argv)
     
     imshow("out1", out1);
     imshow("out2", out2);
-    imshow("res", depthMat/10);
+    imshow("res", depthMat/50);
     waitKey(); 
     return 0;
 }
