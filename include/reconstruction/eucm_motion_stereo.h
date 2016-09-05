@@ -374,25 +374,19 @@ public:
             
 //            cout << cloud2[2*idx].norm() << " " << cloud2[2*idx + 1].norm() << endl;
             
-            // if distance is small push depth hyp with the same sigma
-            if ((ptMin - ptMax).squaredNorm() < 5)
-            {
-                depth.pushHypothesis(0.5*(cloud2[2*idx] + cloud2[2*idx + 1]),
-                            salientPack.sigmaVec[idx]);
-            }
-            else    //TODO make a separate function to compute stereo and merge it
-                    // call it from here and from computeDepth
+            Vector2i diff = round(ptMax - ptMin);
+            const int diffLength = max(abs(diff[0]), abs(diff[1])) + 1;
+            if (diffLength > 3)
             {
                 // if distance is big enough
                 // search along epipolar curve
-                //TODO optimize fo Vector2i 
                 
                 // query 3D point must be projected into 1st frame
                 CurveRasterizer<int, Polynomial2> raster(round(ptMax), round(ptMin),
                                                 epipolarPtr->getSecond(salientPack.cloud[2*idx]));
                 
-                Vector2i diff = round(ptMax - ptMin);
-                const int distance = min(int(diff.norm()), params.dispMax);
+                
+                const int distance = min(diffLength, params.dispMax);
                 
                 raster.steps(-HALF_LENGTH);
                 vector<uint8_t> sampleVec;
@@ -415,19 +409,18 @@ public:
                 vector<int> costVec = compareDescriptor(descriptor, sampleVec);
                 
                 //TODO make it possible to detect multiple hypotheses if there is no prior
-                //TODO mismatch detection based on cost
-                int dBest = 0;
-                int eBest = LENGTH*65535;
+                int dBest = -1;
+                int eBest = LENGTH*5;
                 for (int d = 0; d < distance; d++)
                 {
-                    int acc = costVec[d + HALF_LENGTH];
+                    const int & acc = costVec[d + HALF_LENGTH];
                     if (eBest > acc)
                     {
                         eBest = acc;
                         dBest = d;
                     }
                 }
-       
+                if (dBest == -1) continue;
                 // triangulate and improve sigma
                 double d1 = triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
                         uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], CAMERA_1);
