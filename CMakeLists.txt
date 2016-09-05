@@ -43,6 +43,13 @@ add_executable( calibration_robot
 target_link_libraries( calibration_robot ${OpenCV_LIBS} )
 TARGET_LINK_LIBRARIES( calibration_robot ${CERES_LIBRARIES})
 
+add_executable( calibration_base
+    test/calibration/calibration_base.cpp
+)
+
+target_link_libraries( calibration_base ${OpenCV_LIBS} )
+TARGET_LINK_LIBRARIES( calibration_base ${CERES_LIBRARIES})
+
 add_executable( rectify
     test/calibration/rectify.cpp
 )

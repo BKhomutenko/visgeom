@@ -20,12 +20,67 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "generic_calibration.h"
 
 template<template<typename> class Projector>
-class ExtrinsicCameraCalibration : GenericCameraCalibration<Projector>
+struct BaseGridProjection 
+{
+    BaseGridProjection(const Vector2dVec & proj,
+            const Vector3dVec & grid, 
+            const Transformation<double> & TorigBase,
+            const vector<double> & intrinsicVec)
+    : _proj(proj), _grid(grid), _TbaseOrig(TorigBase.inverse()), _intrinsicVec(intrinsicVec) {}
+            
+    template <typename T>
+    bool operator()(const T * const* params,
+                    T* residual) const 
+    {
+        Transformation<T> TcameraBase(params[0]);
+        Transformation<T> TorigGrid(params[1]);
+        Transformation<T> TbaseOrig = _TbaseOrig.template cast<T>();
+        Vector3Vec<T> transformedPoints(_grid.size());
+        for (int i = 0; i < _grid.size(); i++)
+        {
+            transformedPoints[i] = _grid[i].template cast<T>();
+        }
+        Transformation<T> TcameraGrid = TcameraBase.compose(TbaseOrig).compose(TorigGrid);
+        TcameraGrid.transform(transformedPoints, transformedPoints);
+        
+        Projector<T> projector;
+        vector<T> intrinsicTVec;
+        intrinsicTVec.reserve(_intrinsicVec.size());
+        for (auto & x : _intrinsicVec)
+        {
+            intrinsicTVec.emplace_back(x);
+        }
+        for (unsigned int i = 0; i < transformedPoints.size(); i++)
+        {
+            Vector2<T> modProj;
+            if (projector(intrinsicTVec.data(), transformedPoints[i].data(), modProj.data())) 
+            {
+                Vector2<T> diff = _proj[i].template cast<T>() - modProj;
+                residual[2*i] = diff[0];
+                residual[2*i + 1] = diff[1];
+            }
+            else
+            {
+                residual[2*i] = T(0.);
+                residual[2*i + 1] = T(0.);
+            }
+        }
+        return true;
+    }
+    
+    const Transformation<double> _TbaseOrig;
+    const Vector2dVec _proj;
+    const Vector3dVec _grid;
+    const vector<double> _intrinsicVec;
+};
+
+template<template<typename> class Projector>
+class BaseTransformationCalibration : GenericCameraCalibration<Projector>
 {
 private:
     vector<double> intrinsicVec;
-    vector<CalibrationData> monoCalibDataVec;
-    
+    vector<CalibrationData> baseCalibDataVec;
+    array<double, 6> initialBaseCameraGuess; //FIXME make a transformation
     // methods
     using GenericCameraCalibration<Projector>::initializeIntrinsic;
     using GenericCameraCalibration<Projector>::extractGridProjection;
@@ -46,7 +101,7 @@ public:
     bool initialize(const string & infoFileName)
     {
         cout << "### Initialize calibration data ###" << endl;
-        if (not initializeExtrinsic(infoFileNameStereo)) return false;
+        if (not initializeExtrinsic(infoFileName)) return false;
         constructGrid();
         return true;
     } 
@@ -64,19 +119,28 @@ public:
         calibInfoFile >> Nx >> Ny >> sqSize >> outlierThresh >> checkExtraction;
         calibInfoFile.ignore();  // To get to the next line
         
-        int inrinsicSize;
-        paramFile >> inrinsicSize;
+        int intrinsicSize;
+        calibInfoFile >> intrinsicSize;
         intrinsicVec.resize(intrinsicSize);
         cout << "Camera model parameters :" << endl;
         for (auto & p: intrinsicVec) 
         {
-            paramFile >> p;
+            calibInfoFile >> p;
             cout << setw(10) << p;
         }
         cout << endl;
-        paramFile.ignore();
+        calibInfoFile.ignore();
     
-        stereoCalibDataVec.clear();
+        cout << "Initial extrinsic guess :" << endl;
+        for (auto & p: initialBaseCameraGuess) 
+        {
+            calibInfoFile >> p;
+            cout << setw(10) << p;
+        }
+        cout << endl;
+        calibInfoFile.ignore();
+        
+        baseCalibDataVec.clear();
         
         string imageFolder;
         string imageInfo;    
@@ -84,21 +148,20 @@ public:
         array<double, 6> robotPose;
         
         getline(calibInfoFile, imageFolder);
-        while (getline(calibInfoFile, imageName))
+        while (getline(calibInfoFile, imageInfo))
         {
             istringstream imageStream(imageInfo);
             
-            imageStream >> imageName;
-            for (auto & x : robotPose) imageStream >> x;
-            
             CalibrationData calibData;
-            Vector2dVec point1Vec, point2Vec;
             
-            calibData.fileName1 = imageFolder + imageName;
-            if (not extractGridProjection(calibData.fileName1,
-                    calibData.projection1, checkExtraction)) continue;
+            imageStream >> imageName;
+            for (auto & x : calibData.extrinsic) imageStream >> x;
             
-            calibDataVec.push_back(calibData);
+            calibData.fileName = imageFolder + imageName;
+            if (not extractGridProjection(calibData.fileName,
+                    calibData.projection, checkExtraction)) continue;
+            
+            baseCalibDataVec.push_back(calibData);
             
             cout << "." << flush;
         }
@@ -107,115 +170,63 @@ public:
     }
     
 
-    void addStereoResidual(Problem & problem, vector<double> & intrinsic, 
-            array<double, 6> & extrinsic,
-            const Vector2dVec & projection,
-            array<double, 6> & gridExtrinsic)
+    void addBaseResidual(Problem & problem, const vector<double> & intrinsic, 
+            const array<double, 6> & poseOrigBase, const Vector2dVec & projection,
+            array<double, 6> & poseCameraBase, array<double, 6> & poseOrigGrid)
     {
-        typedef DynamicAutoDiffCostFunction<StereoGridProjection<Projector>> stereoProjectionCF;
-        StereoGridProjection<Projector> * stereoProjection;
-        stereoProjection = new StereoGridProjection<Projector>(projection, grid);
-        stereoProjectionCF * costFunction = new stereoProjectionCF(stereoProjection);
-        costFunction->AddParameterBlock(intrinsic.size());
+        typedef DynamicAutoDiffCostFunction<BaseGridProjection<Projector>> gridProjectionCF;
+        BaseGridProjection<Projector> * gridProjection;
+        gridProjection = new BaseGridProjection<Projector>(projection, grid, 
+                                    Transformation<double>(poseOrigBase.data()), intrinsic);
+        gridProjectionCF * costFunction = new gridProjectionCF(gridProjection);
         costFunction->AddParameterBlock(6);
         costFunction->AddParameterBlock(6);
         costFunction->SetNumResiduals(2 * Nx * Ny);
-        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), intrinsic.data(),
-                gridExtrinsic.data(), extrinsic.data());
+        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                poseCameraBase.data(), poseOrigGrid.data());
     }
     
-    void estimateInitialExtrinsic(const vector<double> & intrinsic, array<double, 6> & extrinsic,
-            vector<StereoCalibrationData> & calibDataVec)
+    void estimateInitialGrid(const vector<double> & intrinsic, array<double, 6> & poseOrigGrid,
+            const vector<CalibrationData> & calibDataVec)
     {
-        Problem problem;
-        for (int i = 0; i < calibDataVec.size(); i++)
-        {
-            
-            typedef DynamicAutoDiffCostFunction<StereoEstimate<Projector>> dynamicProjectionCF;
-
-            StereoEstimate<Projector> * stereoEstimate;
-            stereoEstimate = new StereoEstimate<Projector>(calibDataVec[i].projection2, grid,
-                                                intrinsic, calibDataVec[i].extrinsic);
-            dynamicProjectionCF * costFunction = new dynamicProjectionCF(stereoEstimate);
-            costFunction->AddParameterBlock(6);
-            costFunction->SetNumResiduals(2 * Nx * Ny);
-            problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), extrinsic.data());   
-            
-            //run the solver
-            
-        }
-        Solver::Options options;
-        Solver::Summary summary;
-        Solve(options, &problem, &summary);
+        auto const & item = calibDataVec[0];
+        array<double, 6> poseCamGrid;
+        estimateInitialGrid(intrinsic, item.projection, poseCamGrid);
+        Transformation<double> TcamGrid(poseCamGrid.data());
+        Transformation<double> TbaseCam(initialBaseCameraGuess.data());
+        Transformation<double> TorigBase(item.extrinsic.data());
+        Transformation<double> TorigGrid = TorigBase.compose(TbaseCam).compose(TcamGrid);
+        
+        TorigGrid.toArray(poseOrigGrid.data());
     }
 
-    bool estimateExtrinsic(const vector<double> & intrinsic1, 
-            const vector<double> & intrinsic2,
-            array<double, 6> & extrinsic)
-    {
-        for (auto & item : monoCalibDataVec1)
-        {
-            estimateInitialGrid(intrinsic1, item.projection, item.extrinsic);
-        }
-        for (auto & item : monoCalibDataVec2)
-        {
-            estimateInitialGrid(intrinsic1, item.projection, item.extrinsic);
-        }
-        for (auto & item : stereoCalibDataVec)
-        {
-            estimateInitialGrid(intrinsic1, item.projection1, item.extrinsic);
-        }
-        estimateInitialExtrinsic(intrinsic2, extrinsic, stereoCalibDataVec);
-    }
-    
-    bool compute(vector<double> & intrinsic1,
-            vector<double> & intrinsic2,
-            Transformation<double> & transfo)
+    //TODO compare to robot calibration
+    bool compute(Transformation<double> & TbaseCam, Transformation<double> & TorigGrid)
     {
 
-        array<double, 6> extrinsic = transfo.toArray();
-        
-        
         cout << "### Extrinsic parameters calibration ###" << endl;
-        if (monoCalibDataVec1.size() == 0)
-        {
-            cout << "ERROR : none of images were accepted" << endl;
-            return false;
-        } 
-           
-        if (monoCalibDataVec2.size() == 0)
+        if (baseCalibDataVec.size() == 0)
         {
             cout << "ERROR : none of images were accepted" << endl;
             return false;
         } 
         
-        if (stereoCalibDataVec.size() == 0)
-        {
-            cout << "ERROR : none of images were accepted" << endl;
-            return false;
-        } 
+        array<double, 6> poseOrigGrid;
+        estimateInitialGrid(intrinsicVec, poseOrigGrid, baseCalibDataVec);
         
-        cout << "Initial board poses estimation " << endl;
-        estimateExtrinsic(intrinsic1, intrinsic1, extrinsic);
+        array<double, 6> poseCamBase = 
+                Transformation<double>(initialBaseCameraGuess.data()).inverse().toArray();
         
         cout << "Global optimization" << endl;
         Problem problem;
+        
         // Intrinsic init
-        for (auto & item : monoCalibDataVec1)
+        for (auto & item : baseCalibDataVec)
         {
-            addIntrinsicResidual(problem, intrinsic1, item.projection, item.extrinsic);
+            addBaseResidual(problem, intrinsicVec, item.extrinsic, item.projection,
+                    poseCamBase, poseOrigGrid);
         }
-        for (auto & item : monoCalibDataVec2)
-        {
-            addIntrinsicResidual(problem, intrinsic2, item.projection, item.extrinsic);
-        }
-            
-        // Extrinsic init
-        for (auto & item : stereoCalibDataVec)
-        {
-            addIntrinsicResidual(problem, intrinsic1, item.projection1, item.extrinsic);
-            addStereoResidual(problem, intrinsic2, extrinsic, item.projection2, item.extrinsic);
-        }
+        
         
         Solver::Options options;
         options.max_num_iterations = 500;
@@ -228,23 +239,24 @@ public:
         Solve(options, &problem, &summary);
 //        cout << summary.BriefReport() << endl;
         
-        transfo = Transformation<double>(extrinsic.data());
+        TbaseCam = Transformation<double>(poseCamBase.data()).inverse();
+        TorigGrid = Transformation<double>(poseOrigGrid.data());
     } 
     
-    bool residualAnalysis(const vector<double> & intrinsic1, 
-            const vector<double> & intrinsic2,
-            const Transformation<double> & TleftRight)
-    {
-        residualAnalysis(intrinsic1, monoCalibDataVec1);
-        residualAnalysis(intrinsic2, monoCalibDataVec2);
-        vector<CalibrationData> stereoLeftData, stereoRightData;
-        for (auto & x : stereoCalibDataVec)
-        {
-            stereoLeftData.push_back(x.getLeftMono());
-            stereoRightData.push_back(x.getRightMono(TleftRight));
-        }
-        residualAnalysis(intrinsic1, stereoLeftData);
-        residualAnalysis(intrinsic2, stereoRightData);
-    }
+//    bool residualAnalysis(const vector<double> & intrinsic1, 
+//            const vector<double> & intrinsic2,
+//            const Transformation<double> & TleftRight)
+//    {
+//        residualAnalysis(intrinsic1, monoCalibDataVec1);
+//        residualAnalysis(intrinsic2, monoCalibDataVec2);
+//        vector<CalibrationData> stereoLeftData, stereoRightData;
+//        for (auto & x : stereoCalibDataVec)
+//        {
+//            stereoLeftData.push_back(x.getLeftMono());
+//            stereoRightData.push_back(x.getRightMono(TleftRight));
+//        }
+//        residualAnalysis(intrinsic1, stereoLeftData);
+//        residualAnalysis(intrinsic2, stereoRightData);
+//    }
 };
 
