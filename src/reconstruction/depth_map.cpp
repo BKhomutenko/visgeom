@@ -74,7 +74,7 @@ bool DepthMap::pushHypothesis(const int x, const int y, const double d, const do
     int h = 0;
     while (h < hMax)
     {
-        if ( (at(x, y, h) >= MIN_DEPTH) and (sigma(x, y, h) <= sigmaVal) ) h++;
+        if ( (at(x, y, h) >= MIN_DEPTH) and (cost(x, y, h) <= DEFAULT_COST_DEPTH) ) h++;
         else break;
     }
     if (h == hMax) return false;    
@@ -139,6 +139,7 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
         if( match(d1, sigma1, d, sigmaVal) )
         {
             filter(d1, sigma1, d, sigmaVal);
+            cost(x, y, h) -= 1;
             return true;
         }
     }
