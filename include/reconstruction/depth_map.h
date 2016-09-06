@@ -36,7 +36,7 @@ NOTE:
 const double DEFAULT_DEPTH = 1;
 const double MIN_DEPTH = 0.1;
 const double DEFAULT_SIGMA_DEPTH = 100;
-const double DEFAULT_COST_DEPTH = 100;
+const double DEFAULT_COST_DEPTH = 3;
 const double OUT_OF_RANGE = 0.0;
 
 

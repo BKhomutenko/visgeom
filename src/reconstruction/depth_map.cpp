@@ -82,14 +82,21 @@ bool DepthMap::pushHypothesis(const int x, const int y, const double d, const do
     //Insert element into stack, so that stack is always sorted in sigma ascending order
     double temp_d = d;
     double temp_sigma = sigmaVal;
+    double temp_cost = DEFAULT_COST_DEPTH;
     double temp2_d;
     double temp2_sigma;
+    double temp2_cost;
     while (h < hMax)
     {
         temp2_d = at(x, y, h);
         temp2_sigma = sigma(x, y, h);
+        temp2_cost = cost(x, y, h);
         at(x, y, h) = temp_d;
         sigma(x, y, h) = temp_sigma;
+        cost(x, y, h) = temp_cost;
+        temp_d = temp2_d;
+        temp_sigma = temp2_sigma;
+        temp_cost = temp2_cost;
         h++;
     }
     return true;
