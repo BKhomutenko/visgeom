@@ -5,7 +5,7 @@ add_definitions(-std=c++11)
 project( calibration )
 
 find_package( OpenCV REQUIRED )
-FIND_PACKAGE(Ceres REQUIRED)
+FIND_PACKAGE( Ceres REQUIRED )
 
 #find_package( Eigen3 REQUIRED )
 
@@ -120,6 +120,18 @@ add_executable( motion_gradual
 )
 
 target_link_libraries( motion_gradual ${OpenCV_LIBS} )
+
+add_executable( odometry_test
+    test/reconstruction/odometry_test.cpp
+    src/reconstruction/eucm_stereo.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+    src/reconstruction/depth_merge.cpp
+    src/localization/cost_functions.cpp
+    src/localization/photometric.cpp
+)
+
+target_link_libraries( odometry_test ${OpenCV_LIBS} ${CERES_LIBRARIES})
 
 ### LOCALIZATION ###
 
