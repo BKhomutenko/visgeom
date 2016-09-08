@@ -20,8 +20,10 @@ array<double, N> readValues(std::ifstream& file)
 	for (double & p: values)
 	{
 		file >> p;
+		std::cout << " " << p;
 	}
-	file.ignore(65536, '\n'); //skip line
+	file.ignore(5, '\n'); //skip line
+	std::cout << std::endl;
 	return values;
 }
 
@@ -56,31 +58,38 @@ int main(int argc, char** argv)
 	foldername2 = datasetFoldername + "/" + foldername2;
 
 	//Get first stereo pair (Mat8u) and store as keyframe
-	std::string img1name, img2name;
-	img1File >> img1name;
-	img2File >> img2name;
-	Mat8u keyframe1 = imread(datasetFoldername + "/" + img1name, 0);
-	Mat8u keyframe2 = imread(datasetFoldername + "/" + img2name, 0);
+	std::string keyimg1name, keyimg2name;
+	img1File >> keyimg1name;
+	img2File >> keyimg2name;
+	Mat8u keyframe1 = imread(datasetFoldername + "/" + keyimg1name, 0);
+	Mat8u keyframe2 = imread(datasetFoldername + "/" + keyimg2name, 0);
+	std::cout << "Keyframe1 robot pose:" << std::endl;
 	array<double, 6> prevPose1 = readValues<6>(img1File);
-	array<double, 6> prevPose2 = readValues<6>(img1File);
+	std::cout << "Keyframe2 robot pose:" << std::endl;
+	array<double, 6> prevPose2 = readValues<6>(img2File); //Unused
 	Transformation<double> T0key (prevPose1.data());
-	std::cerr << "Attempting to open file:" << datasetFoldername << "/" << img1name << std::endl;
+	std::cerr << "Attempting to open image:" << datasetFoldername << "/" << keyimg1name << std::endl;
+	std::cerr << "Attempting to open image:" << datasetFoldername << "/" << keyimg2name << std::endl;
 	if ( (keyframe1.data == NULL) or (keyframe2.data == NULL) )
 	{
 		std::cerr << "ERROR : Could not load first image pair" << std::endl;
-		std::cerr << "Attempted to open file:" << datasetFoldername << "/" << img1name << std::endl;
+		std::cerr << "Attempted to open image:" << datasetFoldername << "/" << keyimg1name << std::endl;
+		std::cerr << "Attempted to open image:" << datasetFoldername << "/" << keyimg2name << std::endl;
 		return 1;
 	}
 
 	//Accept EUCM params for first (left) camera, and create EnhancedCamera
+	std::cout << "EUCM Camera 1 Intrinsic parameters:" << std::endl;
 	array<double, 6> cam1Params = readValues<6>(paramFile);
 	EnhancedCamera camera1( cam1Params.data() );
 
 	//Accept EUCM params for second (right) camera, and create Enhanced Camera
+	std::cout << "EUCM Camera 2 Intrinsic parameters:" << std::endl;
 	array<double, 6> cam2Params = readValues<6>(paramFile);
 	EnhancedCamera camera2( cam2Params.data() );
 
 	//Accept pose transformation between stereo cameras
+	std::cout << "EUCM Stereo Camera Extrinsic parameters:" << std::endl;
 	array<double, 6> stereoPose = readValues<6>(paramFile);
 	Transformation<double> T12( stereoPose.data() );
 
@@ -99,7 +108,7 @@ int main(int argc, char** argv)
 	EnhancedStereo stereoSGM(T12, &camera1, &camera2, stereoParams);
 
 	MotionStereoParameters mstereoParams;
-	mstereoParams.verbosity = 0;
+	mstereoParams.verbosity = 5;
 	mstereoParams.scale = stereoParams.scale;
 	MotionStereo stereoMotion(&camera1, &camera2, mstereoParams);
 
@@ -113,6 +122,7 @@ int main(int argc, char** argv)
 	scaleParams.setEqualMargin();
 
 	//Accept camera pose wrt the robot, and create transformation from base to camera frame
+	std::cout << "Pose between robot and camera1:" << std::endl;
 	array<double, 6> cameraPose = readValues<6>(paramFile);
 	Transformation<double> Tbase1(cameraPose.data());
 
@@ -133,19 +143,24 @@ int main(int argc, char** argv)
 	while(1)
 	{
 		//Get next image pair to evaluate
+		std::string img1name, img2name;
 		img1File >> img1name;
 		img2File >> img2name;
 		Mat8u newframe1 = imread(datasetFoldername + "/" + img1name, 0);
 		Mat8u newframe2 = imread(datasetFoldername + "/" + img2name, 0);
+		std::cout << "New frame pose (cam1):" << std::endl;
 		array<double, 6> newPose1 = readValues<6>(img1File);
+		std::cout << "New frame pose (cam2):" << std::endl;
 		array<double, 6> newPose2 = readValues<6>(img2File);
 		Transformation<double> T0new (newPose1.data());
 
-		std::cout << "Attempting to open image: " << datasetFoldername << "/" << img1name << std::endl;
+		std::cout << "Attempting to open image:" << datasetFoldername << "/" << img1name << std::endl;
+		std::cout << "Attempting to open image:" << datasetFoldername << "/" << img2name << std::endl;
 		if( (newframe1.data == NULL) or (newframe2.data == NULL) )
 		{
 			std::cout << "Next image could not be loaded. Terminating program." << std::endl;
-			std::cout << "Attempted to open image: " << datasetFoldername << "/" << img1name << std::endl;
+			std::cout << "Attempted to open image:" << datasetFoldername << "/" << img1name << std::endl;
+			std::cout << "Attempted to open image:" << datasetFoldername << "/" << img2name << std::endl;
 			return 0;
 		}
 
@@ -156,6 +171,8 @@ int main(int argc, char** argv)
 		//Localization ~ after 5 refinements
 		if (refinement > 5)
 		{
+			cout << "Calculating photometric localization..." << endl;
+
 			//Set depthmap for localizer
 			photometricLocalizer.depth() = keyDepth;
 
@@ -166,12 +183,15 @@ int main(int argc, char** argv)
 		
 		//Step: Use motion stereo to refine depthmap
 		//Seed new depth estimation as equal to keyframe depthmap
+		cout << "Wrapping depthmap ..." << endl;
 		DepthMap newDepth = keyDepth.wrapDepth(Tmotion, scaleParams);
 
 		//Compute new depth using computeDepth() of MotionStereo
-		stereoMotion.reprojectDepth(Tmotion, newframe1, newDepth);
+		cout << "Calculating stereo from motion ..." << endl;
+		stereoMotion.computeDepth(Tmotion, newframe1, newDepth);
 
 		//Merge the new depthmap into the keyframe depthmap
+		cout << "Merging depthmaps ..." << endl;
 		keyDepth.merge(newDepth);
 
 		//Output region
