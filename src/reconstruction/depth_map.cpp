@@ -74,7 +74,7 @@ bool DepthMap::pushHypothesis(const int x, const int y, const double d, const do
     int h = 0;
     while (h < hMax)
     {
-        if ( (at(x, y, h) >= MIN_DEPTH) and (sigma(x, y, h) <= sigmaVal) ) h++;
+        if ( (at(x, y, h) >= MIN_DEPTH) and (cost(x, y, h) <= DEFAULT_COST_DEPTH) ) h++;
         else break;
     }
     if (h == hMax) return false;    
@@ -82,14 +82,21 @@ bool DepthMap::pushHypothesis(const int x, const int y, const double d, const do
     //Insert element into stack, so that stack is always sorted in sigma ascending order
     double temp_d = d;
     double temp_sigma = sigmaVal;
+    double temp_cost = DEFAULT_COST_DEPTH;
     double temp2_d;
     double temp2_sigma;
+    double temp2_cost;
     while (h < hMax)
     {
         temp2_d = at(x, y, h);
         temp2_sigma = sigma(x, y, h);
+        temp2_cost = cost(x, y, h);
         at(x, y, h) = temp_d;
         sigma(x, y, h) = temp_sigma;
+        cost(x, y, h) = temp_cost;
+        temp_d = temp2_d;
+        temp_sigma = temp2_sigma;
+        temp_cost = temp2_cost;
         h++;
     }
     return true;
@@ -135,6 +142,7 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
         if( match(d1, sigma1, d, sigmaVal) )
         {
             filter(d1, sigma1, d, sigmaVal);
+            cost(x, y, h) -= 1;
             return true;
         }
     }
@@ -737,7 +745,7 @@ void DepthMap::filterNoise()
                 {
                     for (int x1 = max(0, x-1); x1 < min(xMax, x+1); ++x1 )
                     {
-                        for (int h1 = 0; h1 < hMax; ++h)
+                        for (int h1 = 0; h1 < hMax; ++h1)
                         {
                             if( match(d, s, at(x1,y1,h1), sigma(x1,y1,h1)) )
                             {

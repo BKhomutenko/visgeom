@@ -153,7 +153,8 @@ int main(int argc, char** argv)
 //    img2lap.copyTo(img2);
 ////    
     
-    Timer timer;
+    Timer timer, timer1;
+    timer1.reset();
     EnhancedCamera camera1(params1.data()), camera2(params2.data());
     EnhancedSGM stereo1(TleftRight1, &camera1, &camera2, stereoParams);
     EnhancedSGM stereo3(TleftRight3, &camera1, &camera2, stereoParams);
@@ -189,10 +190,15 @@ int main(int argc, char** argv)
     
     cout << "    second stereo : " << timer.elapsed() << endl;
     
+    timer.reset();
     depth3.merge(depth1);
+    cout << "    merge : " << timer.elapsed() << endl;
     depth3.toMat(depth3Mat);
+
 //    depth3.filterNoise();
 //    depth3.toMat(depth3FilteredMat);
+
+
     //TODO compare to the ground truth
 //    
 //    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
@@ -213,6 +219,7 @@ int main(int argc, char** argv)
     imshow("out2", depth2Mat / 3);
     imshow("out3", depth3Mat / 3);
 //    imshow("out3", depth3FilteredMat / 3);
+
     waitKey(); 
     return 0;
 }
