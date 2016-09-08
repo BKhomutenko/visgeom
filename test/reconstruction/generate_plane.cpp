@@ -4,7 +4,7 @@
 
 #include "camera/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
-#include "reconstruction/eucm_stereo.h"
+#include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 
 using namespace std;
@@ -89,7 +89,7 @@ int main(int argc, char** argv)
     paramFile.ignore();
     Transformation<double> TbasePlane(cameraPose.data());
     
-    StereoParameters stereoParams;
+    SGMParameters stereoParams;
     stereoParams.verbosity = 2;
     stereoParams.salientPoints = false;
     stereoParams.maxBias = 8;
@@ -128,7 +128,7 @@ int main(int argc, char** argv)
         Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         
         Mat8u img2 = imread(imageDir + imageName, 0);
-        EnhancedStereo stereo(TleftRight, &camera, &camera, stereoParams);
+        EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
 
         Mat32f distMat;
         auto t2 = clock();

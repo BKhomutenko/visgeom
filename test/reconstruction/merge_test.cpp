@@ -3,7 +3,7 @@
 #include "eigen.h"
 #include "timer.h"
 #include "reconstruction/curve_rasterizer.h"
-#include "reconstruction/eucm_stereo.h"
+#include "reconstruction/eucm_sgm.h"
 #include "reconstruction/eucm_motion_stereo.h"
 
 int main(int argc, char** argv)
@@ -115,7 +115,7 @@ int main(int argc, char** argv)
     Transformation<double> T03(robotPose3.data()), T04(robotPose4.data());
     Transformation<double> TleftRight1 = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
     Transformation<double> TleftRight3 = T03.compose(TbaseCamera).inverseCompose(T04.compose(TbaseCamera));
-    StereoParameters stereoParams;
+    SGMParameters stereoParams;
     stereoParams.verbosity = 1;
     stereoParams.hypMax = 1;
     paramFile >> stereoParams.u0;
@@ -156,14 +156,14 @@ int main(int argc, char** argv)
     Timer timer, timer1;
     timer1.reset();
     EnhancedCamera camera1(params1.data()), camera2(params2.data());
-    EnhancedStereo stereo1(TleftRight1, &camera1, &camera2, stereoParams);
-    EnhancedStereo stereo3(TleftRight3, &camera1, &camera2, stereoParams);
+    EnhancedSGM stereo1(TleftRight1, &camera1, &camera2, stereoParams);
+    EnhancedSGM stereo3(TleftRight3, &camera1, &camera2, stereoParams);
     cout << "    initialization time : " << timer.elapsed() << endl;
     
     DepthMap depth1, depth3;
     
     MotionStereoParameters motionParams;
-    motionParams.dispMax = 16;
+    motionParams.dispMax = 96;
     MotionStereo motionStereo(&camera1, &camera2, motionParams);
     
     timer.reset();
@@ -195,11 +195,10 @@ int main(int argc, char** argv)
     cout << "    merge : " << timer.elapsed() << endl;
     depth3.toMat(depth3Mat);
 
-    timer.reset();
-    depth3.filterNoise();
-    cout << "    filterNoise : " << timer.elapsed() << endl;
-    depth3.toMat(depth3FilteredMat);
-    cout << "  total time : " << timer1.elapsed() << endl;
+//    depth3.filterNoise();
+//    depth3.toMat(depth3FilteredMat);
+
+
     //TODO compare to the ground truth
 //    
 //    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
@@ -219,7 +218,8 @@ int main(int argc, char** argv)
     imshow("out1", depth1Mat / 3);
     imshow("out2", depth2Mat / 3);
     imshow("out3", depth3Mat / 3);
-    imshow("out4", depth3FilteredMat / 3);
+//    imshow("out3", depth3FilteredMat / 3);
+
     waitKey(); 
     return 0;
 }

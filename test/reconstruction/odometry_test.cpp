@@ -5,7 +5,7 @@
 #include "ocv.h"
 #include "timer.h"
 
-#include "reconstruction/eucm_stereo.h"
+#include "reconstruction/eucm_sgm.h"
 #include "reconstruction/eucm_motion_stereo.h"
 #include "localization/photometric.h"
 
@@ -94,27 +94,29 @@ int main(int argc, char** argv)
 	Transformation<double> T12( stereoPose.data() );
 
 	//Accept parameters for stereo, and create StereoParameters, and then EnhancedStereo and MotionStereo
-	StereoParameters stereoParams;
-	stereoParams.verbosity = 0;
-	stereoParams.salientPoints = false;
-	paramFile >> stereoParams.u0;
-	paramFile >> stereoParams.v0;
-	paramFile >> stereoParams.dispMax;
-	paramFile >> stereoParams.scale;
+	SGMParameters stereoSgmParams;
+	stereoSgmParams.salientPoints = false;
+	stereoSgmParams.verbosity = 0;
+	paramFile >> stereoSgmParams.u0;
+	paramFile >> stereoSgmParams.v0;
+	paramFile >> stereoSgmParams.dispMax;
+	paramFile >> stereoSgmParams.scale;
 	paramFile.ignore();
-	stereoParams.uMax = keyframe1.cols;
-	stereoParams.vMax = keyframe1.rows;
-	stereoParams.setEqualMargin();
-	EnhancedStereo stereoSGM(T12, &camera1, &camera2, stereoParams);
+	stereoSgmParams.uMax = keyframe1.cols;
+	stereoSgmParams.vMax = keyframe1.rows;
+	stereoSgmParams.setEqualMargin();
+	EnhancedSGM stereoSGM(T12, &camera1, &camera2, stereoSgmParams);
 
 	MotionStereoParameters mstereoParams;
 	mstereoParams.verbosity = 5;
-	mstereoParams.scale = stereoParams.scale;
+	mstereoParams.descLength = (stereoSgmParams.scale / 2 + 1) * 2 + 1;
+	// mstereoParams.scale = stereoSgmParams.scale;
+	mstereoParams.dispMax = 6;
 	MotionStereo stereoMotion(&camera1, &camera2, mstereoParams);
 
 	//Create ScaleParameters object for depthmap
 	ScaleParameters scaleParams;
-	scaleParams.scale = stereoParams.scale;
+	scaleParams.scale = stereoSgmParams.scale;
 	scaleParams.u0 = 25;
 	scaleParams.v0 = 25;
 	scaleParams.uMax = keyframe1.cols;

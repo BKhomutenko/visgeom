@@ -3,7 +3,7 @@
 #include "eigen.h"
 #include "timer.h"
 #include "reconstruction/curve_rasterizer.h"
-#include "reconstruction/eucm_stereo.h"
+#include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 
 int main(int argc, char** argv)
@@ -99,9 +99,11 @@ int main(int argc, char** argv)
     
     Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
     
-    StereoParameters stereoParams;
+    SGMParameters stereoParams;
+    stereoParams.flawCost = 5;
     stereoParams.verbosity = 1;
-    stereoParams.salientPoints = false;
+    stereoParams.hypMax = 3;
+    stereoParams.salientPoints = true;
     paramFile >> stereoParams.u0;
     paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
@@ -135,7 +137,7 @@ int main(int argc, char** argv)
     
     Timer timer;
     EnhancedCamera camera1(params1.data()), camera2(params2.data());
-    EnhancedStereo stereo(TleftRight, &camera1, &camera2, stereoParams);
+    EnhancedSGM stereo(TleftRight, &camera1, &camera2, stereoParams);
     cout << "    initialization time : " << timer.elapsed() << endl;
     Mat8u out1, out2;
     
@@ -179,7 +181,7 @@ int main(int argc, char** argv)
     
     imshow("out1", out1);
     imshow("out2", out2);
-    imshow("res", depthMat/10);
+    imshow("res", depthMat/50);
     waitKey(); 
     return 0;
 }

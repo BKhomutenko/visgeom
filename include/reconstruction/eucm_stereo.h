@@ -26,69 +26,43 @@ NOTE:
 #pragma once
 
 #include "std.h"
-#include "ocv.h"
 #include "eigen.h"
 
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 
-#include "curve_rasterizer.h"
-#include "depth_map.h"
-#include "eucm_epipolar.h"
-#include "epipolar_descriptor.h"
 #include "utils/scale_parameters.h"
-#include "epipoles.h"
+#include "reconstruction/stereo_misc.h"
 
 struct StereoParameters : public ScaleParameters
 {
     int dispMax = 48;
-    
-    // cost parameters
-    int lambdaStep = 5;
-    int lambdaJump = 32;
-    
-    bool imageBasedCost = true;
-    
-    //TODO get a meaningful threshold/ method to discard
-    //temporarily descriptor step must be 1
-    //all non-salient points are discarded
-    bool salientPoints = true;
-    
-    //TODO try to discard dull points completely
-    
+  
     int maxError = 150;
     int maxBias = 10;
     
     int verbosity = 0;
-    int maxDepth = 100;
-    
-    bool useUVCache = true;
-    
+
     //multi-hypoteses
     int hypMax = 1;
     int maxHypDiff = 10;
+    
+    //for descriptor matching
+    int flawCost = 10;
 };
 
 class EnhancedStereo
 {
 public:
     
-    EnhancedStereo(Transformation<double> T12, const EnhancedCamera * cam1,
-            const EnhancedCamera * cam2, const StereoParameters & stereoParams) :
+    EnhancedStereo(const EnhancedCamera * cam1, const EnhancedCamera * cam2,
+            const StereoParameters & parameters) :
             // initialize members
-            Transform12(T12), 
+            params(parameters),
             camera1(cam1->clone()),
             camera2(cam2->clone()),
-            params(stereoParams),
-            epipolar(T12, cam1, cam2, 2500),
-            epipoles(cam1, cam2, T12)
+            Transform12(1, 0, 0, 0, 0, 0)
     { 
-        assert(params.dispMax % 2 == 0);
-        createBuffer();
-        computeReconstructed();
-        computeRotated();
-        computePinf();
-        if (params.useUVCache) computeUVCache();
     }
     
     ~EnhancedStereo()
@@ -99,94 +73,21 @@ public:
         camera2 = NULL;
     }
     
-    // precompute coordinates for different disparities to speedup the computation
-    void computeUVCache();
+    void setTransformation(const Transformation<double> & T12) { Transform12 = T12; }
     
-    // An interface function
-    void computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depthMap);
+    bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X) const;
     
-    // An interface function
-    void computeStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat);
+    // returns the distance between corresponding camera and the point
+    double triangulate(double u1, double v1, double u2, double v2, CameraIdx camIdx = CAMERA_1) const;
     
-    //// EPIPOLAR GEOMETRY
+    vector<int> compareDescriptor(const vector<uint8_t> & desc, const vector<uint8_t> & sampleVec) const;
     
-    // computes reconstVec -- reconstruction of every pixel of the first image
-    void computeReconstructed();
-    
-    // computes reconstRotVec -- reconstVec rotated into the second frame
-    void computeRotated();
-       
-    // computes pinfVec -- projections of all the reconstructed points from the first image
-    // onto the second image as if they were at infinity
-    void computePinf();
-    
-    // calculate the coefficients of the polynomials for all the 
-    void computeEpipolarIndices();
-    
-    //// DYNAMIC PROGRAMMING
-    void createBuffer();
-       
-    // fill up the error buffer using 2*S-1 pixs along epipolar lines as local desctiprtors
-    void computeCurveCost(const Mat8u & img1, const Mat8u & img2);
-    
-    void computeDynamicProgramming();
-    
-    void computeDynamicStep(const int* inCost, const uint8_t * error, int * outCost);
-    
-    void reconstructDisparity();  // using the result of the dynamic programming
-    
-    //// MISCELLANEOUS
-    
-    // index of an object in a linear array corresponding to pixel [row, col] 
-    int getLinearIndex(int x, int y) { return params.xMax*y + x; }
-      
-    CurveRasterizer<int, Polynomial2> getCurveRasteriser1(int idx);
-    CurveRasterizer<int, Polynomial2> getCurveRasteriser2(int idx);
-    
-    // reconstruction
-    //TODO move elsewhere (e.g. create a class stereo system with two cameras and a transformation)
-    bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X);
-    void computeDepth(Mat32f & distanceMat);
-            
-    double computeDepth(int x, int y, int h = 0);
-    bool computeDepth(double & dist, double & sigma, int x, int y, int h = 0);
-    
-    void fillGaps(uint8_t * const data, const int step);
-    
-    int getHalfLength() { return min(4, max(params.scale - 1, 1)); }
-    
-    Mat32s & disparity() { return smallDisparity; }
-private:
-    EnhancedEpipolar epipolar;
-    StereoEpipoles epipoles;
+    //FIXME potentially put into misc file
+    vector<int> findLocalMinima(const vector<int> & dataVec) const;
+protected:
+    StereoParameters params;
     
     Transformation<double> Transform12;  // pose of camera 2 wrt camera 1
     EnhancedCamera *camera1, *camera2;
-   
-    std::vector<bool> maskVec;
-    
-    Vector2dVec pointVec1;  // the depth points on the image 1
-    Vector3dVec reconstVec;  // reconstruction of every pixel by cam1
-    Vector3dVec reconstRotVec;  // reconstVec rotated into the second frame
-    Vector2dVec pinfVec;  // projection of reconstRotVec by cam2
-    
-    // discretized version
-    Vector2iVec pointPxVec1;
-    Vector2iVec pinfPxVec;
-    
-    // to be able to change the jump cost
-    int jumpCost;
-    
-    const int DISPARITY_MARGIN = 20;
-    Mat32s uCache, vCache;
-    Mat8u errorBuffer;
-    Mat8u costBuffer; //TODO maybe merge with salientBuffer
-    Mat8u salientBuffer; 
-    Mat32s tableauLeft, tableauRight; //FIXME check the type through the code
-    Mat32s tableauTop, tableauBottom;
-    Mat32s smallDisparity;
-    Mat32s finalErrorMat;
-    
-    const StereoParameters params;
 };
 

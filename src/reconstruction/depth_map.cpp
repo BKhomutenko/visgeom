@@ -102,14 +102,17 @@ bool DepthMap::pushHypothesis(const int x, const int y, const double d, const do
     return true;
 }
 
-// Returns true if the two depths and sigmas are within an acceptable tolerance of each other
+bool DepthMap::pushImageHypothesis(const int u, const int v, const double d, const double sigmaVal)
+{
+    return pushHypothesis(xConv(u), yConv(v), d, sigmaVal);
+}
+
 bool DepthMap::match(double v1, double s1, double v2, double s2)
 {
     double delta = abs(v1 - v2);
     return delta < 2 * s1 or delta < 2 * s2;
 }
 
-// Performs a filtered merge on the input depths and sigmas
 void DepthMap::filter(double & v1, double & s1, double v2, double s2)
 {
     double denom = s1 + s2;
@@ -529,6 +532,12 @@ void DepthMap::toMat(Mat32f & out) const
 {
     out.create(yMax, xMax);
     copy(valVec.begin(), valVec.begin() + hStep, (float*)out.data);
+}
+
+void DepthMap::sigmaToMat(Mat32f & out) const
+{
+    out.create(yMax, xMax);
+    copy(sigmaVec.begin(), sigmaVec.begin() + hStep, (float*)out.data);
 }
 
 //TODO do not reconstruct all the points but a selected subset

@@ -31,15 +31,11 @@ NOTE:
 
 #include "camera/generic_camera.h"
 #include "utils/scale_parameters.h"
-#include "utils/MHPack.h"
-
-const double DEFAULT_DEPTH = 1;
-const double MIN_DEPTH = 0.1;
-const double DEFAULT_SIGMA_DEPTH = 100;
-const double DEFAULT_COST_DEPTH = 3;
-const double OUT_OF_RANGE = 0.0;
+#include "utils/mh_pack.h"
+#include "reconstruction/stereo_misc.h"
 
 
+//TODO move to mh_pack
 enum ReconstructionFlags : uint32_t
 {
     QUERY_POINTS = 1,
@@ -117,9 +113,15 @@ public:
         fill(costVec.begin(), costVec.end(), costVal);
     }
     
+    // X is a 3D point in the camera frame
     bool pushHypothesis(const Vector3d & X, const double sigma);
+    
+    // (x, y) are the depth coordinates
     bool pushHypothesis(const int x, const int y, const double depth, const double sigma);
 
+    // (u, v) are the image coordinates
+    bool pushImageHypothesis(const int u, const int v, const double depth, const double sigma);
+    
     bool filterPushHypothesis(const Vector3d & X, const double sigma);
     bool filterPushHypothesis(const int x, const int y, const double depth, const double sigma);
     
@@ -197,9 +199,12 @@ public:
     
     //TODO make a wrap method
     void toMat(Mat32f & out) const;
+    void sigmaToMat(Mat32f & out) const;
     
+    // access methods
     int getWidth() const { return xMax; }
     int getHeight() const { return yMax; }
+    int getHypMax() const { return  hMax; }
     
     static DepthMap generatePlane(const ICamera * camera, const ScaleParameters & params, 
             Transformation<double> TcameraPlane, const Vector3dVec & polygonVec);
@@ -226,7 +231,9 @@ public:
     void filterNoise();
 
 private:
+    // Returns true if the two depths and sigmas are within an acceptable tolerance of each other
     static bool match(double v1, double s1, double v2, double s2);
+    // Performs a filtered merge on the input depths and sigmas
     static void filter(double & v1, double & s1, double v2, double s2);
 
     void pixelMedianFilter(const int x, const int y, const int h);

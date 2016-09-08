@@ -43,6 +43,24 @@ struct ScaleParameters
         }
     }
     
+    void setXMargin(int val)
+    {
+        xMax = (uMax - u0 - val) / scale + 1;
+        if (xMax < 1)
+        {
+            throw std::runtime_error("The scaled image is empty: xMax < 1");
+        }
+    }
+    
+    void setYMargin(int val)
+    {
+        yMax = (vMax - v0 - val) / scale + 1;
+        if (yMax < 1)
+        {
+            throw std::runtime_error("The scaled image is empty: yMax < 1");
+        }
+    }
+    
     // from image to small disparity coordiante transform
     int xConv(double u) const { return round((u - u0) / scale); }
     int yConv(double v) const { return round((v - v0) / scale); }

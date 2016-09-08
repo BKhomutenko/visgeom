@@ -61,8 +61,8 @@ public:
     const Vector2i & getFirstPx() const { return epipolePx1; }
     const Vector2d & getSecond() const { return epipole2; }
     const Vector2i & getSecondPx() const { return epipolePx2; }
-    bool firstIsInverted() { return epipoleInverted1; }
-    bool secondIsInverted() { return epipoleInverted2; }
+    bool firstIsInverted() const { return epipoleInverted1; } 
+    bool secondIsInverted() const { return epipoleInverted2; }
     
 private:
     bool epipoleInverted1, epipoleInverted2;

@@ -91,12 +91,16 @@ public:
     {
         Size patternSize(Nx, Ny);
         Mat frame = imread(fileName, 0);
-
+        if (frame.empty())
+        {
+            cout << fileName << " : ERROR, file not found" << endl;
+            return false;
+        }
         vector<cv::Point2f> centers;
-        bool patternIsFound = findChessboardCorners(frame, patternSize, centers);
+        bool patternIsFound = findChessboardCorners(frame, patternSize, centers, CV_CALIB_CB_ADAPTIVE_THRESH);
         if (not patternIsFound)
         {
-            cout << fileName << " : ERROR, pattern is not found" << endl;
+            cout << fileName << " : ERROR, pattern not found" << endl;
             return false;
         }
 
@@ -107,7 +111,7 @@ public:
             char key = waitKey();
             if (key == 'n' or key == 'N')
             {
-                cout << fileName << " : ERROR, pattern is not accepted" << endl;
+                cout << fileName << " : ERROR, pattern not accepted" << endl;
                 return false;
             }
         }
@@ -157,6 +161,7 @@ public:
         options.max_num_iterations = 250;
         Solver::Summary summary;
         Solve(options, &problem, &summary);
+        cout << summary.FullReport() << endl;
     }
 
     void addIntrinsicResidual(Problem & problem, vector<double> & intrinsic,
