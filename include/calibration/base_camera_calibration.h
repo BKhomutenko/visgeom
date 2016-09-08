@@ -75,6 +75,60 @@ struct BaseGridProjection
 };
 
 template<template<typename> class Projector>
+struct BaseGridFullProjection 
+{
+    BaseGridFullProjection(const Vector2dVec & proj,
+            const Vector3dVec & grid,
+            const vector<double> & intrinsicVec)
+    : _proj(proj), _grid(grid), _intrinsicVec(intrinsicVec) {}
+            
+    template <typename T>
+    bool operator()(const T * const* params,
+                    T* residual) const 
+    {
+        Transformation<T> TcameraBase(params[0]);
+        Transformation<T> TorigGrid(params[1]);
+        Transformation<T> TbaseOrig(params[2][0], params[2][1], T(0.), T(0.), T(0.), params[2][2]);
+        Vector3Vec<T> transformedPoints(_grid.size());
+        for (int i = 0; i < _grid.size(); i++)
+        {
+            transformedPoints[i] = _grid[i].template cast<T>();
+        }
+        Transformation<T> TcameraGrid = TcameraBase.compose(TbaseOrig).compose(TorigGrid);
+        TcameraGrid.transform(transformedPoints, transformedPoints);
+        
+        Projector<T> projector;
+        vector<T> intrinsicTVec;
+        intrinsicTVec.reserve(_intrinsicVec.size());
+        for (auto & x : _intrinsicVec)
+        {
+            intrinsicTVec.emplace_back(x);
+        }
+        for (unsigned int i = 0; i < transformedPoints.size(); i++)
+        {
+            Vector2<T> modProj;
+            if (projector(intrinsicTVec.data(), transformedPoints[i].data(), modProj.data())) 
+            {
+                Vector2<T> diff = _proj[i].template cast<T>() - modProj;
+                residual[2*i] = diff[0];
+                residual[2*i + 1] = diff[1];
+            }
+            else
+            {
+                residual[2*i] = T(0.);
+                residual[2*i + 1] = T(0.);
+            }
+        }
+        return true;
+    }
+    
+    const Transformation<double> _TbaseOrig;
+    const Vector2dVec _proj;
+    const Vector3dVec _grid;
+    const vector<double> _intrinsicVec;
+};
+
+template<template<typename> class Projector>
 class BaseTransformationCalibration : GenericCameraCalibration<Projector>
 {
 private:
@@ -155,8 +209,16 @@ public:
             CalibrationData calibData;
             
             imageStream >> imageName;
-            for (auto & x : calibData.extrinsic) imageStream >> x;
-            
+            for (auto & x : calibData.extrinsic)
+            {
+                imageStream >> x;
+            }
+            Transformation<double> TorigBase(calibData.extrinsic.data());
+            calibData.extrinsic = TorigBase.inverse().toArray();
+            calibData.extrinsic[2] = calibData.extrinsic[5];
+            calibData.extrinsic[3] = 0;
+            calibData.extrinsic[4] = 0;
+            calibData.extrinsic[5] = 0;
             calibData.fileName = imageFolder + imageName;
             if (not extractGridProjection(calibData.fileName,
                     calibData.projection, checkExtraction)) continue;
@@ -169,33 +231,51 @@ public:
         return true;
     }
     
-
     void addBaseResidual(Problem & problem, const vector<double> & intrinsic, 
-            const array<double, 6> & poseOrigBase, const Vector2dVec & projection,
+            array<double, 6> & poseOrigBase, const Vector2dVec & projection,
             array<double, 6> & poseCameraBase, array<double, 6> & poseOrigGrid)
     {
-        typedef DynamicAutoDiffCostFunction<BaseGridProjection<Projector>> gridProjectionCF;
-        BaseGridProjection<Projector> * gridProjection;
-        gridProjection = new BaseGridProjection<Projector>(projection, grid, 
-                                    Transformation<double>(poseOrigBase.data()), intrinsic);
+        typedef DynamicAutoDiffCostFunction<BaseGridFullProjection<Projector>> gridProjectionCF;
+        BaseGridFullProjection<Projector> * gridProjection;
+        gridProjection = new BaseGridFullProjection<Projector>(projection, grid, intrinsic);
         gridProjectionCF * costFunction = new gridProjectionCF(gridProjection);
         costFunction->AddParameterBlock(6);
         costFunction->AddParameterBlock(6);
+        costFunction->AddParameterBlock(3);
         costFunction->SetNumResiduals(2 * Nx * Ny);
         problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                poseCameraBase.data(), poseOrigGrid.data());
+                poseCameraBase.data(), poseOrigGrid.data(), poseOrigBase.data());
     }
+    
+//    void addBaseResidual(Problem & problem, const vector<double> & intrinsic, 
+//            const array<double, 6> & poseOrigBase, const Vector2dVec & projection,
+//            array<double, 6> & poseCameraBase, array<double, 6> & poseOrigGrid)
+//    {
+//        typedef DynamicAutoDiffCostFunction<BaseGridProjection<Projector>> gridProjectionCF;
+//        BaseGridProjection<Projector> * gridProjection;
+//        gridProjection = new BaseGridProjection<Projector>(projection, grid, 
+//                                    Transformation<double>(poseOrigBase.data()), intrinsic);
+//        gridProjectionCF * costFunction = new gridProjectionCF(gridProjection);
+//        costFunction->AddParameterBlock(6);
+//        costFunction->AddParameterBlock(6);
+//        costFunction->AddParameterBlock(3);
+//        costFunction->SetNumResiduals(2 * Nx * Ny);
+//        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+//                poseCameraBase.data(), poseOrigGrid.data());
+//    }
     
     void estimateInitialGrid(const vector<double> & intrinsic, array<double, 6> & poseOrigGrid,
             const vector<CalibrationData> & calibDataVec)
     {
         auto const & item = calibDataVec[0];
-        array<double, 6> poseCamGrid;
+        array<double, 6> poseCamGrid{-0.5, -0.5, 1, 0, 0, 0};
+//        array<double, 6> poseCamGrid;
         estimateInitialGrid(intrinsic, item.projection, poseCamGrid);
         Transformation<double> TcamGrid(poseCamGrid.data());
+        const auto & pose = item.extrinsic; 
+        Transformation<double> TbaseOrig(pose[0], pose[1], 0, 0, 0, pose[2]);
         Transformation<double> TbaseCam(initialBaseCameraGuess.data());
-        Transformation<double> TorigBase(item.extrinsic.data());
-        Transformation<double> TorigGrid = TorigBase.compose(TbaseCam).compose(TcamGrid);
+        Transformation<double> TorigGrid = TbaseOrig.inverseCompose(TbaseCam).compose(TcamGrid);
         
         TorigGrid.toArray(poseOrigGrid.data());
     }
@@ -237,26 +317,28 @@ public:
 //        options.minimizer_progress_to_stdout = true;
         Solver::Summary summary;
         Solve(options, &problem, &summary);
-//        cout << summary.BriefReport() << endl;
+        cout << summary.FullReport() << endl;
         
         TbaseCam = Transformation<double>(poseCamBase.data()).inverse();
         TorigGrid = Transformation<double>(poseOrigGrid.data());
     } 
     
-//    bool residualAnalysis(const vector<double> & intrinsic1, 
-//            const vector<double> & intrinsic2,
-//            const Transformation<double> & TleftRight)
-//    {
-//        residualAnalysis(intrinsic1, monoCalibDataVec1);
-//        residualAnalysis(intrinsic2, monoCalibDataVec2);
-//        vector<CalibrationData> stereoLeftData, stereoRightData;
-//        for (auto & x : stereoCalibDataVec)
-//        {
-//            stereoLeftData.push_back(x.getLeftMono());
-//            stereoRightData.push_back(x.getRightMono(TleftRight));
-//        }
-//        residualAnalysis(intrinsic1, stereoLeftData);
-//        residualAnalysis(intrinsic2, stereoRightData);
-//    }
+    void residualAnalysis(Transformation<double> & TbaseCam, Transformation<double> & TorigGrid)
+    {
+        vector<CalibrationData> monoCalibDataVec;
+        for (auto & item : baseCalibDataVec)
+        {
+            const auto & pose = item.extrinsic; 
+            Transformation<double> TbaseOrig(pose[0], pose[1], 0, 0, 0, pose[2]);
+            Transformation<double> TcamGrid = 
+                TbaseCam.inverseCompose(TbaseOrig).compose(TorigGrid);
+            CalibrationData calibData;
+            calibData.fileName = item.fileName;
+            calibData.extrinsic = TcamGrid.toArray();
+            calibData.projection = item.projection;
+            monoCalibDataVec.push_back(calibData);
+        }
+        residualAnalysis(intrinsicVec, monoCalibDataVec);
+    }
 };
 

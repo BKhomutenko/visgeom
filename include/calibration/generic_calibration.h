@@ -97,7 +97,7 @@ public:
             return false;
         }
         vector<cv::Point2f> centers;
-        bool patternIsFound = findChessboardCorners(frame, patternSize, centers);
+        bool patternIsFound = findChessboardCorners(frame, patternSize, centers, CV_CALIB_CB_ADAPTIVE_THRESH);
         if (not patternIsFound)
         {
             cout << fileName << " : ERROR, pattern not found" << endl;
@@ -161,6 +161,7 @@ public:
         options.max_num_iterations = 250;
         Solver::Summary summary;
         Solve(options, &problem, &summary);
+        cout << summary.FullReport() << endl;
     }
 
     void addIntrinsicResidual(Problem & problem, vector<double> & intrinsic,
