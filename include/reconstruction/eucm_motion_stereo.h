@@ -411,8 +411,9 @@ public:
                 vector<int> costVec = compareDescriptor(descriptor, sampleVec);
                 
                 //TODO make it possible to detect multiple hypotheses if there is no prior
+                //TODO make this a parameter
                 int dBest = -1;
-                int eBest = LENGTH*5;
+                int eBest = LENGTH*15;
                 for (int d = 0; d < distance; d++)
                 {
                     const int & acc = costVec[d + HALF_LENGTH];

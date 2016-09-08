@@ -58,6 +58,14 @@ int main(int argc, char** argv)
 	foldername2 = datasetFoldername + "/" + foldername2;
 
 	//Get first stereo pair (Mat8u) and store as keyframe
+	int skiprows;
+	paramFile >> skiprows; paramFile.ignore();
+	for(int i=1; i<=skiprows; i++)
+	{
+		std::string dump;
+		getline(img1File, dump);
+		getline(img2File, dump);
+	}
 	std::string keyimg1name, keyimg2name;
 	img1File >> keyimg1name;
 	img2File >> keyimg2name;
@@ -111,7 +119,7 @@ int main(int argc, char** argv)
 	mstereoParams.verbosity = 0;
 	mstereoParams.descLength = (stereoSgmParams.scale / 2 + 1) * 2 + 1;
 	// mstereoParams.scale = stereoSgmParams.scale;
-	mstereoParams.dispMax = 6;
+	mstereoParams.dispMax = 32;
 	MotionStereo stereoMotion(&camera1, &camera2, mstereoParams);
 
 	//Create ScaleParameters object for depthmap
@@ -174,6 +182,7 @@ int main(int argc, char** argv)
 		//Transformation between camera locations from camera at keyframe to camera right now
 		Transformation<double> Tmotion = T0key.compose(Tbase1).inverseCompose(T0new.compose(Tbase1));
 		if(Tmotion.trans().squaredNorm() < 0.0001) continue;
+		cout << "Motion:" << Tmotion << endl;
 
 
 		//Localization ~ after 5 refinements
@@ -207,9 +216,9 @@ int main(int argc, char** argv)
 		newDepth.toMat(newDepthMat);
 		keyDepth.toMat(keyDepthMat);
 		cv::imshow("Current image", newframe1);
-		cv::imshow("Motion stereo depthmap", newDepthMat);
+		cv::imshow("Motion stereo depthmap", newDepthMat/20);
 		cv::imshow("Merged keyframe depthmap", keyDepthMat/20);
-		cout << cv::waitKey(0) <<endl;
+		if(cv::waitKey(0)==1048603) break; // Break on ESC key
 
 		refinement++; //increase the level of refinement of the keyframe depthmap
 	}
