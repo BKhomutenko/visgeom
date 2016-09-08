@@ -542,7 +542,7 @@ void EnhancedSGM::reconstructDisparity()
         }
         if (params.verbosity > 3) cout << "    y: " << y << endl;
     }
-    cout << "   AVG SIZE: " << sizeAcc / sizeCount << endl;
+    // cout << "   AVG SIZE: " << sizeAcc / sizeCount << endl;
 }
 
 //TODO remove this function, depricated

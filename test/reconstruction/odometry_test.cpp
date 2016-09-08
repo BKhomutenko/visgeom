@@ -95,7 +95,7 @@ int main(int argc, char** argv)
 
 	//Accept parameters for stereo, and create StereoParameters, and then EnhancedStereo and MotionStereo
 	SGMParameters stereoSgmParams;
-	stereoSgmParams.salientPoints = false;
+	stereoSgmParams.salientPoints = true;
 	stereoSgmParams.verbosity = 0;
 	paramFile >> stereoSgmParams.u0;
 	paramFile >> stereoSgmParams.v0;
@@ -108,7 +108,7 @@ int main(int argc, char** argv)
 	EnhancedSGM stereoSGM(T12, &camera1, &camera2, stereoSgmParams);
 
 	MotionStereoParameters mstereoParams;
-	mstereoParams.verbosity = 5;
+	mstereoParams.verbosity = 0;
 	mstereoParams.descLength = (stereoSgmParams.scale / 2 + 1) * 2 + 1;
 	// mstereoParams.scale = stereoSgmParams.scale;
 	mstereoParams.dispMax = 6;
@@ -140,6 +140,11 @@ int main(int argc, char** argv)
 	DepthMap keyDepth(&camera1, scaleParams);
 	stereoSGM.computeStereo(keyframe1, keyframe2, keyDepth);
 
+	Mat32f keyDepthMap;
+	keyDepth.toMat(keyDepthMap);
+	cv::imshow("SGM Depthmap", keyDepthMap/20);
+	cv::waitKey(0);
+
 	int refinement = 0;
 
 	while(1)
@@ -168,6 +173,7 @@ int main(int argc, char** argv)
 
 		//Transformation between camera locations from camera at keyframe to camera right now
 		Transformation<double> Tmotion = T0key.compose(Tbase1).inverseCompose(T0new.compose(Tbase1));
+		if(Tmotion.trans().squaredNorm() < 0.0001) continue;
 
 
 		//Localization ~ after 5 refinements
@@ -186,7 +192,7 @@ int main(int argc, char** argv)
 		//Step: Use motion stereo to refine depthmap
 		//Seed new depth estimation as equal to keyframe depthmap
 		cout << "Wrapping depthmap ..." << endl;
-		DepthMap newDepth = keyDepth.wrapDepth(Tmotion, scaleParams);
+		DepthMap newDepth = keyDepth;
 
 		//Compute new depth using computeDepth() of MotionStereo
 		cout << "Calculating stereo from motion ..." << endl;
@@ -202,9 +208,8 @@ int main(int argc, char** argv)
 		keyDepth.toMat(keyDepthMat);
 		cv::imshow("Current image", newframe1);
 		cv::imshow("Motion stereo depthmap", newDepthMat);
-		cv::imshow("Merged keyframe depthmap", keyDepthMat);
-		std::cout << "Transformation: " << Tmotion << std::endl;
-		cv::waitKey(1);
+		cv::imshow("Merged keyframe depthmap", keyDepthMat/20);
+		cout << cv::waitKey(0) <<endl;
 
 		refinement++; //increase the level of refinement of the keyframe depthmap
 	}
