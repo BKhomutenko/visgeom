@@ -782,6 +782,7 @@ void DepthMap::regularize()
                     at(x, y, h) = at(x, y, h2);
                     sigma(x, y, h) = sigma(x, y, h2);
                     cost(x, y, h) = cost(x, y, h2);
+                    at(x, y, h2) = OUT_OF_RANGE;
                 }             
             }
         }
