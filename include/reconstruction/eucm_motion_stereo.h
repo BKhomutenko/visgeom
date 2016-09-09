@@ -490,7 +490,8 @@ public:
         depth.reconstruct(salientPack,
              QUERY_POINTS | MINMAX | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING); 
         
-        depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
+        //TODO make an option of emptying nonsalient points in the depth map
+//        depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
         
         Vector3dVec cloud2;
         T12.inverseTransform(salientPack.cloud, cloud2);
@@ -553,7 +554,14 @@ public:
                         dBest = d;
                     }
                 }
-                if (dBest == -1) continue;
+                if (dBest == -1)
+                {
+                    Vector2i depthPt = depthPointVec[salientPack.idxMapVec[idx]];
+                    //discard the hypothesis
+                    depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = OUT_OF_RANGE;
+                    depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = OUT_OF_RANGE;
+                    continue;
+                }
                 // triangulate and improve sigma
                 double d1 = triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
                         uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], CAMERA_1);
@@ -564,8 +572,11 @@ public:
                 //TODO make push by idx
                 Vector2i depthPt = depthPointVec[salientPack.idxMapVec[idx]];
                 
-                depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = d1;
-                depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = sigma1;
+                DepthMap::filter(depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]), 
+                        depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]), d1, sigma1);
+                
+//                depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = d1;
+//                depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = sigma1;
             }
             
         }

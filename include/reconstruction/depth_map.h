@@ -233,11 +233,12 @@ public:
     // make sure that hypotheses are like h1 h2 0 rhather than h1 0 h2
     void regularize();
 
-private:
     // Returns true if the two depths and sigmas are within an acceptable tolerance of each other
     static bool match(double v1, double s1, double v2, double s2);
     // Performs a filtered merge on the input depths and sigmas
     static void filter(double & v1, double & s1, double v2, double s2);
+    
+private:
 
     void pixelMedianFilter(const int x, const int y, const int h);
     void pixelAverageFilter(const Vector3iVec & matches);

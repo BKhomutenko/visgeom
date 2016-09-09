@@ -79,7 +79,7 @@ int main(int argc, char** argv)
     stereoParams.descLength = 5;
     
     SGMParameters stereoParams2;
-    stereoParams2.salientPoints = false;
+    stereoParams2.salientPoints = true;
     stereoParams2.verbosity = 3;
     stereoParams2.hypMax = 3;
 //    stereoParams.salientPoints = false;
@@ -157,11 +157,11 @@ int main(int argc, char** argv)
 
 //        depth.setDefault();
         timer.reset();
-        DepthMap depth2 = depth;
-        stereo.computeDepth(TleftRight, img2, depth2);
+//        DepthMap depth2 = depth;
+        stereo.computeDepth(TleftRight, img2, depth);
         cout << timer.elapsed() << endl; 
-        depth2.toMat(res);
-        depth2.sigmaToMat(sigmaRes);
+        depth.toMat(res);
+        depth.sigmaToMat(sigmaRes);
 //        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
         imshow("res " + to_string(counter), res / 3);
         imshow("sigma " + to_string(counter), sigmaRes*5);
