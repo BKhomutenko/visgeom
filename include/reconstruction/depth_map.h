@@ -230,11 +230,15 @@ public:
     // average filter, depending on the number of matching neighbour hypotheses
     void filterNoise();
 
-private:
+    // make sure that hypotheses are like h1 h2 0 rhather than h1 0 h2
+    void regularize();
+
     // Returns true if the two depths and sigmas are within an acceptable tolerance of each other
     static bool match(const double v1, const double s1, const double v2, const double s2);
     // Performs a filtered merge on the input depths and sigmas
     static void filter(double & v1, double & s1, const double v2, const double s2);
+  
+private:
 
     void pixelMedianFilter(const int x, const int y, const int h);
     void pixelAverageFilter(const Vector3iVec & matches);

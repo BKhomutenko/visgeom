@@ -79,8 +79,9 @@ int main(int argc, char** argv)
     stereoParams.descLength = 5;
     
     SGMParameters stereoParams2;
-    stereoParams2.salientPoints = false;
+    stereoParams2.salientPoints = true;
     stereoParams2.verbosity = 3;
+    stereoParams2.hypMax = 3;
 //    stereoParams.salientPoints = false;
     paramFile >> stereoParams2.u0;
     paramFile >> stereoParams2.v0;
@@ -156,6 +157,7 @@ int main(int argc, char** argv)
 
 //        depth.setDefault();
         timer.reset();
+//        DepthMap depth2 = depth;
         stereo.computeDepth(TleftRight, img2, depth);
         cout << timer.elapsed() << endl; 
         depth.toMat(res);

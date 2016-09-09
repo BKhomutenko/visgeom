@@ -786,7 +786,6 @@ void DepthMap::filterNoise()
     }
 }
 
-
 void DepthMap::merge(const DepthMap & depth2)
 {
     assert((ScaleParameters)(*this) == (ScaleParameters)depth2);
@@ -804,6 +803,31 @@ void DepthMap::merge(const DepthMap & depth2)
                 const double d2 = depth2.at(x, y, h2);
                 const double sigma2 = depth2.sigma(x, y, h2);
                 filterPushHypothesis(x, y, d2, sigma2);
+            }
+        }
+    }
+}
+
+void DepthMap::regularize()
+{
+    const int minMatches = 2;
+    // Three loops to loop through every hypothesis
+    for (int h = 0; h < hMax - 1; ++h)
+    {
+        for (int y = 0; y < yMax; ++y)
+        {
+            for (int x = 0; x < xMax; ++x)
+            {
+                if (at(x, y, h) < MIN_DEPTH)
+                {
+                    int h2 = h + 1;
+                    while (h2 < hMax and at(x, y, h2) < MIN_DEPTH) h2++;
+                    if (h2 == hMax) continue;
+                    at(x, y, h) = at(x, y, h2);
+                    sigma(x, y, h) = sigma(x, y, h2);
+                    cost(x, y, h) = cost(x, y, h2);
+                    at(x, y, h2) = OUT_OF_RANGE;
+                }             
             }
         }
     }
