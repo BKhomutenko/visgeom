@@ -160,9 +160,6 @@ target_link_libraries( odometry_test ${OpenCV_LIBS} ${CERES_LIBRARIES})
 #target_link_libraries( photometric ${OpenCV_LIBS} )
 #TARGET_LINK_LIBRARIES( photometric ${CERES_LIBRARIES})
 
-target_link_libraries( odometry_photo ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( odometry_photo ${CERES_LIBRARIES})
-
 #add_executable( mi_test
 #    test/localization/mi_test.cpp
 #    src/localization/photometric.cpp

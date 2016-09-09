@@ -230,6 +230,9 @@ public:
     // average filter, depending on the number of matching neighbour hypotheses
     void filterNoise();
 
+    // make sure that hypotheses are like h1 h2 0 rhather than h1 0 h2
+    void regularize();
+
 private:
     // Returns true if the two depths and sigmas are within an acceptable tolerance of each other
     static bool match(double v1, double s1, double v2, double s2);

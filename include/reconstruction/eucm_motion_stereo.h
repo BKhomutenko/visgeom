@@ -309,7 +309,7 @@ public:
         epipolarPtr = NULL;
     }    
     
-    void computeDepth(Transformation<double> T12,
+    void computeDepthOld(Transformation<double> T12,
             const Mat8u & img2, DepthMap & depth)
     {
         if (params.verbosity > 0) cout << "MotionStereo::computeDepth" << endl;
@@ -438,7 +438,140 @@ public:
             
         }
     }
-
+    
+    void computeDepth(Transformation<double> T12,
+            const Mat8u & img2, DepthMap & depth)
+    {
+        if (params.verbosity > 0) cout << "MotionStereo::computeDepth" << endl;
+        epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
+        StereoEpipoles epipoles(camera1, camera2, T12);
+        Transform12 = T12;
+        
+        if (params.verbosity > 1) cout << "    descriptor kernel selection" << endl;
+        const int LENGTH = params.descLength;
+        const int HALF_LENGTH = LENGTH / 2;
+        
+        // compute the weights for matching cost
+        vector<int> kernelVec, waveVec;
+        const int NORMALIZER = initKernel(kernelVec, LENGTH);
+        const int WAVE_NORM = initWave(waveVec, LENGTH);
+        EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1});
+        
+        MHPack salientPack;
+        //TODO to optimize make a continuous vector<uint8_t>
+        vector<vector<uint8_t>> descriptorVec;
+        Vector2iVec depthPointVec;
+        vector<int> stepVec;
+        if (params.verbosity > 1) cout << "    beginning loop" << endl;
+        for (int y = 0; y < depth.yMax; y++)
+        {
+            for (int x = 0; x < depth.xMax; x++)
+            {
+                Vector2d pt(depth.uConv(x), depth.vConv(y));
+                Vector3d X;
+                if (not camera1->reconstructPoint(pt, X)) continue;
+                
+                CurveRasterizer<int, Polynomial2> descRaster(round(pt), epipoles.getFirstPx(),
+                                                epipolarPtr->getFirst(X));
+                if (epipoles.firstIsInverted()) descRaster.setStep(-1);
+                vector<uint8_t> descriptor;
+                const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
+                if (step < 1) continue;
+                
+                if (not epipolarDescriptor.goodResp()) continue;
+                descriptorVec.push_back(descriptor);
+                salientPack.imagePointVec.push_back(pt);
+                stepVec.push_back(step);
+                depthPointVec.emplace_back(x, y);
+            }
+        }
+        
+        if (params.verbosity > 1) cout << "    reconstructing salient points" << endl;
+        depth.reconstruct(salientPack,
+             QUERY_POINTS | MINMAX | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING); 
+        
+        depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
+        
+        Vector3dVec cloud2;
+        T12.inverseTransform(salientPack.cloud, cloud2);
+        
+        if (params.verbosity > 1) cout << "    searching for correspondences" << endl;
+        for (int idx = 0; idx < salientPack.imagePointVec.size(); idx++)
+        {
+            
+            // project min-max points
+            Vector2d ptMin, ptMax;
+            camera2->projectPoint(cloud2[2*idx], ptMin);
+            camera2->projectPoint(cloud2[2*idx + 1], ptMax);
+            
+//            cout << cloud2[2*idx].norm() << " " << cloud2[2*idx + 1].norm() << endl;
+            
+            Vector2i diff = round(ptMax - ptMin);
+            const int diffLength = max(abs(diff[0]), abs(diff[1])) + 1;
+            if (diffLength > 3)
+            {
+                // if distance is big enough
+                // search along epipolar curve
+                
+                // query 3D point must be projected into 1st frame
+                CurveRasterizer<int, Polynomial2> raster(round(ptMax), round(ptMin),
+                                                epipolarPtr->getSecond(salientPack.cloud[2*idx]));
+                
+                
+                const int distance = diffLength;
+                
+                raster.steps(-HALF_LENGTH);
+                vector<uint8_t> sampleVec;
+                vector<int> uVec, vVec;
+                const int margin = LENGTH - 1;
+                uVec.reserve(distance + margin);
+                vVec.reserve(distance + margin);
+                sampleVec.reserve(distance + margin);
+                for (int d = 0; d < distance + margin; d++, raster.step())
+                {
+                    if (raster.v < 0 or raster.v >= img2.rows 
+                        or raster.u < 0 or raster.u >= img2.cols) sampleVec.push_back(0);
+                    else sampleVec.push_back(img2(raster.v, raster.u));
+                    uVec.push_back(raster.u);
+                    vVec.push_back(raster.v);
+                }
+                
+                vector<uint8_t> & descriptor = descriptorVec[salientPack.idxMapVec[idx]];
+                
+                vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+                
+                //TODO make it possible to detect multiple hypotheses if there is no prior
+                //TODO make this a parameter
+                int dBest = -1;
+                int eBest = LENGTH*15;
+                for (int d = 0; d < distance; d++)
+                {
+                    const int & acc = costVec[d + HALF_LENGTH];
+                    if (eBest > acc)
+                    {
+                        eBest = acc;
+                        dBest = d;
+                    }
+                }
+                if (dBest == -1) continue;
+                // triangulate and improve sigma
+                double d1 = triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
+                        uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], CAMERA_1);
+                double d2 = triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
+                        uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], CAMERA_1);
+                double sigma1 = abs(d2 - d1) / 1.732; //variance of a uniform distribution
+                
+                //TODO make push by idx
+                Vector2i depthPt = depthPointVec[salientPack.idxMapVec[idx]];
+                
+                depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = d1;
+                depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = sigma1;
+            }
+            
+        }
+        depth.regularize();
+    }
+    
 private:
     
     EnhancedEpipolar * epipolarPtr;
