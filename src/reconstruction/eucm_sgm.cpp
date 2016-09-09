@@ -444,8 +444,8 @@ void EnhancedSGM::reconstructDisparity()
 {
     if (params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparity" << endl;
     const int hypShift = params.xMax*params.yMax;
-    int sizeAcc = 0;
-    int sizeCount = 0;
+//    int sizeAcc = 0;
+//    int sizeCount = 0;
     for (int y = 0; y < params.yMax; y++)
     {
         int32_t* dynRow1 = (int32_t*)(tableauLeft.row(y).data);
@@ -542,7 +542,6 @@ void EnhancedSGM::reconstructDisparity()
         }
         if (params.verbosity > 3) cout << "    y: " << y << endl;
     }
-    cout << "   AVG SIZE: " << sizeAcc / sizeCount << endl;
 }
 
 //TODO remove this function, depricated

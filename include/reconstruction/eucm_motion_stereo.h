@@ -332,6 +332,7 @@ public:
         vector<vector<uint8_t>> descriptorVec;
         Vector2iVec depthPointVec;
         vector<int> stepVec;
+        if (params.verbosity > 1) cout << "    beginning loop" << endl;
         for (int y = 0; y < depth.yMax; y++)
         {
             for (int x = 0; x < depth.xMax; x++)
@@ -355,6 +356,7 @@ public:
             }
         }
         
+        if (params.verbosity > 1) cout << "    reconstructing salient points" << endl;
         depth.reconstruct(salientPack,
              QUERY_POINTS | DEFAULT_VALUES  | MINMAX | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING); 
         
@@ -363,6 +365,7 @@ public:
         Vector3dVec cloud2;
         T12.inverseTransform(salientPack.cloud, cloud2);
         
+        if (params.verbosity > 1) cout << "    searching for correspondences" << endl;
         for (int idx = 0; idx < salientPack.imagePointVec.size(); idx++)
         {
             
@@ -408,8 +411,9 @@ public:
                 vector<int> costVec = compareDescriptor(descriptor, sampleVec);
                 
                 //TODO make it possible to detect multiple hypotheses if there is no prior
+                //TODO make this a parameter
                 int dBest = -1;
-                int eBest = LENGTH*5;
+                int eBest = LENGTH*15;
                 for (int d = 0; d < distance; d++)
                 {
                     const int & acc = costVec[d + HALF_LENGTH];

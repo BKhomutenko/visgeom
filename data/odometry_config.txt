@@ -1,0 +1,28 @@
+/home/user/data/20160831_fluence/test-15-22
+100
+0.570972     1.18689     377.157     376.818     645.312     515.132
+0.570835     1.18415     373.476     373.767     665.282     460.195
+0.199297 0.000655974 -0.00184191 -0.00310792  0.00354213   0.0061044
+50 50 32 2
+-0.1 1.57 1.23 -1.59278 -0.00402834 -0.00411788
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Template:
+1 [foldername] - foldername of the dataset
+2 [1 int] - number of rows to skip
+2 [6 double] - camera 1 intrinsic calibration
+3 [6 double] - camera 2 intrinsic calibration
+4 [6 double] - pose transformation between stereo pair (stereo extrinsic calibration)
+5 [double] [double] [double] [double] - u0, v0, dispMax, scale - of the stereo camera calibration
+6 [6 double] - camera pose with respect to the robot base (where ground truth is calculated)

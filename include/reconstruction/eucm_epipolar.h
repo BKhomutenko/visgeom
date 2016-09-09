@@ -47,6 +47,7 @@ public:
         nSteps(numberSteps),
         verbosity(verbosity)
     {
+        assert(T12.trans().squaredNorm() > 1e-10);
         initialize();
     }
     
