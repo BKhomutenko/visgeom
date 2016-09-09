@@ -136,7 +136,7 @@ target_link_libraries( motion_gradual ${OpenCV_LIBS} )
 
 ## LOCALIZATION ###
 add_executable( odometry_test
-    test/reconstruction/odometry_test.cpp
+    test/localization/odometry_test.cpp
     src/reconstruction/eucm_stereo.cpp
     src/reconstruction/eucm_sgm.cpp
     src/reconstruction/eucm_epipolar.cpp
