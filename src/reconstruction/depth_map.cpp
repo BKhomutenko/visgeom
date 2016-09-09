@@ -692,7 +692,7 @@ DepthMap DepthMap::generatePlane(const ICamera * camera, const ScaleParameters &
     return depth;
 }
 
-void DepthMap::pixelMedianFilter(const int x, const int y, const int h)
+void DepthMap::pixelMedianFilter(const int x, const int y, const int h, DepthMap & dst)
 {
     vector<double> depths;
     vector<double> sigmas;
@@ -730,12 +730,17 @@ void DepthMap::pixelMedianFilter(const int x, const int y, const int h)
     }
     //Choose median element and assign it to point
     const int median = depths.size() / 2;
-    at(x, y, h) = depths[median];
-    sigma(x, y, h) = depths[median];
+    dst.at(x, y, h) = depths[median];
+    dst.sigma(x, y, h) = depths[median];
 }
 
-void DepthMap::pixelAverageFilter(const Vector3iVec & matches)
+void DepthMap::pixelAverageFilter(const Vector3iVec & matches, DepthMap & dst)
 {
+    if (matches.size() == 0)
+    {
+        std::cerr << "ERROR: Attempted to use pixelAverageFilter with zero matches." << std::endl;
+        return; // return to parent function, don't crash program
+    }
     double sum_d = 0, sum_s = 0;
     for (int i = 0; i < matches.size(); ++i)
     {
@@ -744,13 +749,17 @@ void DepthMap::pixelAverageFilter(const Vector3iVec & matches)
         sum_s += sigma(point[0], point[1], point[2]);
     }
     const Vector3i & base = matches[0];
-    at(base[0], base[1], base[2]) = sum_d / matches.size();
-    sigma(base[0], base[1], base[2]) = sum_s / matches.size();
+    dst.at(base[0], base[1], base[2]) = sum_d / matches.size();
+    dst.sigma(base[0], base[1], base[2]) = sum_s / matches.size();
 }
 
 void DepthMap::filterNoise()
 {
     const int minMatches = 2;
+
+    // Create copy of current depthmap, to avoid flow
+    DepthMap newDepth = *this;
+
     // Three loops to loop through every hypothesis
     for (int y = 0; y < yMax; ++y)
     {
@@ -778,12 +787,14 @@ void DepthMap::filterNoise()
                     }
                 }
                 // If does not match minimum requirement, then median filter
-                if (matches.size() < minMatches + 1) pixelMedianFilter(x,y,h);
+                if (matches.size() < minMatches + 1) pixelMedianFilter(x, y, h, newDepth);
                 // If it does match at least 2, then average
-                else pixelAverageFilter(matches);
+                else pixelAverageFilter(matches, newDepth);
             }
         }
     }
+
+    *this = newDepth;
 }
 
 void DepthMap::merge(const DepthMap & depth2)

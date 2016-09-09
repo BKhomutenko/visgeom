@@ -240,8 +240,8 @@ public:
   
 private:
 
-    void pixelMedianFilter(const int x, const int y, const int h);
-    void pixelAverageFilter(const Vector3iVec & matches);
+    void pixelMedianFilter(const int x, const int y, const int h, DepthMap & dst);
+    void pixelAverageFilter(const Vector3iVec & matches, DepthMap & dst);
 
     // Increases all the costs, then rejects hypotheses above the threshold
     void costRejection(const double costChange = 0.5, const double rejectionThreshold = DEFAULT_COST_DEPTH + 15);
