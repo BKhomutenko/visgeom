@@ -119,7 +119,6 @@ add_executable( merge_test
     src/reconstruction/eucm_stereo.cpp
     src/reconstruction/eucm_epipolar.cpp
     src/reconstruction/depth_map.cpp
-    src/reconstruction/depth_merge.cpp
 )
 
 target_link_libraries( merge_test ${OpenCV_LIBS} )
@@ -141,7 +140,6 @@ add_executable( odometry_test
     src/reconstruction/eucm_sgm.cpp
     src/reconstruction/eucm_epipolar.cpp
     src/reconstruction/depth_map.cpp
-    src/reconstruction/depth_merge.cpp
     src/localization/cost_functions.cpp
     src/localization/photometric.cpp
 )
@@ -160,8 +158,8 @@ target_link_libraries( odometry_test ${OpenCV_LIBS} ${CERES_LIBRARIES})
 #target_link_libraries( photometric ${OpenCV_LIBS} )
 #TARGET_LINK_LIBRARIES( photometric ${CERES_LIBRARIES})
 
-target_link_libraries( odometry_photo ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( odometry_photo ${CERES_LIBRARIES})
+# target_link_libraries( odometry_photo ${OpenCV_LIBS} )
+# TARGET_LINK_LIBRARIES( odometry_photo ${CERES_LIBRARIES})
 
 #add_executable( mi_test
 #    test/localization/mi_test.cpp

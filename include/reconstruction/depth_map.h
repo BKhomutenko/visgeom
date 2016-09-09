@@ -232,12 +232,15 @@ public:
 
 private:
     // Returns true if the two depths and sigmas are within an acceptable tolerance of each other
-    static bool match(double v1, double s1, double v2, double s2);
+    static bool match(const double v1, const double s1, const double v2, const double s2);
     // Performs a filtered merge on the input depths and sigmas
-    static void filter(double & v1, double & s1, double v2, double s2);
+    static void filter(double & v1, double & s1, const double v2, const double s2);
 
     void pixelMedianFilter(const int x, const int y, const int h);
     void pixelAverageFilter(const Vector3iVec & matches);
+
+    // Increases all the costs, then rejects hypotheses above the threshold
+    void costRejection(const double costChange = 0.5, const double rejectionThreshold = DEFAULT_COST_DEPTH + 15);
 
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty

@@ -107,13 +107,13 @@ bool DepthMap::pushImageHypothesis(const int u, const int v, const double d, con
     return pushHypothesis(xConv(u), yConv(v), d, sigmaVal);
 }
 
-bool DepthMap::match(double v1, double s1, double v2, double s2)
+bool DepthMap::match(const double v1, const double s1, const double v2, const double s2)
 {
     double delta = abs(v1 - v2);
     return delta < 2 * s1 or delta < 2 * s2;
 }
 
-void DepthMap::filter(double & v1, double & s1, double v2, double s2)
+void DepthMap::filter(double & v1, double & s1, const double v2, const double s2)
 {
     double denom = s1 + s2;
     v1 = (v1 * s2 + v2 * s1) / denom;
@@ -139,15 +139,37 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
     {
         double & d1 = at(x, y, h);
         double & sigma1 = sigma(x, y, h);
+        double & cost1 = cost(x, y, h);
         if( match(d1, sigma1, d, sigmaVal) )
         {
             filter(d1, sigma1, d, sigmaVal);
-            cost(x, y, h) -= 1;
+            cost1 = max(cost1 - 1.0, 0.0);
             return true;
         }
     }
     //The program reaches this area if no matches were found
     return pushHypothesis(x, y, d, sigmaVal);
+}
+
+void DepthMap::costRejection(const double costChange, const double rejectionThreshold)
+{
+    for (int h = 0; h < hMax; ++h)
+    {
+        for (int y = 0; y < yMax; ++y)
+        {
+            for (int x = 0; x < xMax; ++x)
+            {
+                double & c = cost(x, y, h);
+                c += costChange;
+                if( c > rejectionThreshold )
+                {
+                    at(x, y, h) = DEFAULT_DEPTH;
+                    sigma(x, y, h) = DEFAULT_SIGMA_DEPTH;
+                    c = DEFAULT_COST_DEPTH;
+                }
+            }
+        }
+    }
 }
 
 // nearest neighbor interpolation
@@ -764,3 +786,25 @@ void DepthMap::filterNoise()
     }
 }
 
+
+void DepthMap::merge(const DepthMap & depth2)
+{
+    assert((ScaleParameters)(*this) == (ScaleParameters)depth2);
+    
+    // cost increase for every hypothesis
+    costRejection();
+
+    // Filter merge all new hypotheses
+    for (int y = 0; y < yMax; y++)
+    {
+        for (int x = 0; x < xMax; x++)
+        {
+            for (int h2 = 0; h2 < depth2.hMax; h2++)
+            {
+                const double d2 = depth2.at(x, y, h2);
+                const double sigma2 = depth2.sigma(x, y, h2);
+                filterPushHypothesis(x, y, d2, sigma2);
+            }
+        }
+    }
+}

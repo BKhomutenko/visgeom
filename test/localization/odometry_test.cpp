@@ -145,7 +145,7 @@ int main(int argc, char** argv)
 	stereoMotion.setBaseImage(keyframe1);
 
 	//Get initial SGM depthmap
-	DepthMap keyDepth(&camera1, scaleParams);
+	DepthMap keyDepth(&camera1, scaleParams, 3); // Use 3-hypothesis depthmap
 	stereoSGM.computeStereo(keyframe1, keyframe2, keyDepth);
 
 	Mat32f keyDepthMap;
