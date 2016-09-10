@@ -143,7 +143,8 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
         if( match(d1, sigma1, d, sigmaVal) )
         {
             filter(d1, sigma1, d, sigmaVal);
-            cost1 = max(cost1 - 1.0, 0.0);
+            // cost1 = max(cost1 - 1.0, 0.0);
+            cost1 = DEFAULT_COST_DEPTH;
             return true;
         }
     }
@@ -787,7 +788,13 @@ void DepthMap::filterNoise()
                     }
                 }
                 // If does not match minimum requirement, then median filter
-                if (matches.size() < minMatches + 1) pixelMedianFilter(x, y, h, newDepth);
+                if (matches.size() < minMatches + 1)
+                {
+                    at(x, y, h) = OUT_OF_RANGE;
+                    sigma(x, y, h) = OUT_OF_RANGE;
+                    cost(x, y, h) = DEFAULT_COST_DEPTH;
+                    // pixelMedianFilter(x, y, h, newDepth);
+                }
                 // If it does match at least 2, then average
                 else pixelAverageFilter(matches, newDepth);
             }

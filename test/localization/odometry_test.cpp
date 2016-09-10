@@ -9,21 +9,22 @@
 #include "reconstruction/eucm_motion_stereo.h"
 #include "localization/photometric.h"
 
+
 using namespace std;
 
 
 // Helper function to read values from a file
 template <int N>
-array<double, N> readValues(std::ifstream& file)
+array<double, N> readValues(std::ifstream& file, bool output = false)
 {
 	array<double, N> values;
 	for (double & p: values)
 	{
 		file >> p;
-		std::cout << " " << p;
+		if(output) std::cout << " " << p;
 	}
 	file.ignore(5, '\n'); //skip line
-	std::cout << std::endl;
+	if(output) std::cout << std::endl;
 	return values;
 }
 
@@ -37,6 +38,8 @@ int main(int argc, char** argv)
 		std::cerr << argv[1] << " : ERROR - file not found" << std::endl;
 		return 1;
 	}
+
+	Timer timer;
 
 	//Accept filename for images for left and right camera
 	std::string datasetFoldername;
@@ -56,8 +59,10 @@ int main(int argc, char** argv)
 	getline(img2File, foldername2);
 	foldername1 = datasetFoldername + "/" + foldername1;
 	foldername2 = datasetFoldername + "/" + foldername2;
+	std::cout << "Folder for camera1 : " << foldername1 << std::endl;
+	std::cout << "Folder for camera2 : " << foldername2 << std::endl;
 
-	//Get first stereo pair (Mat8u) and store as keyframe
+	//Skip the first few images of the dataset
 	int skiprows;
 	paramFile >> skiprows; paramFile.ignore();
 	for(int i=1; i<=skiprows; i++)
@@ -66,18 +71,20 @@ int main(int argc, char** argv)
 		getline(img1File, dump);
 		getline(img2File, dump);
 	}
+
+	//Get first stereo pair (Mat8u) and store as keyframe
 	std::string keyimg1name, keyimg2name;
 	img1File >> keyimg1name;
 	img2File >> keyimg2name;
 	Mat8u keyframe1 = imread(datasetFoldername + "/" + keyimg1name, 0);
 	Mat8u keyframe2 = imread(datasetFoldername + "/" + keyimg2name, 0);
 	std::cout << "Keyframe1 robot pose:" << std::endl;
-	array<double, 6> prevPose1 = readValues<6>(img1File);
+	array<double, 6> prevPose1 = readValues<6>(img1File, true);
 	std::cout << "Keyframe2 robot pose:" << std::endl;
-	array<double, 6> prevPose2 = readValues<6>(img2File); //Unused
+	array<double, 6> prevPose2 = readValues<6>(img2File, true); //Unused
 	Transformation<double> T0key (prevPose1.data());
-	std::cerr << "Attempting to open image:" << datasetFoldername << "/" << keyimg1name << std::endl;
-	std::cerr << "Attempting to open image:" << datasetFoldername << "/" << keyimg2name << std::endl;
+	std::cout << "Attempting to open image:" << datasetFoldername << "/" << keyimg1name << std::endl;
+	std::cout << "Attempting to open image:" << datasetFoldername << "/" << keyimg2name << std::endl;
 	if ( (keyframe1.data == NULL) or (keyframe2.data == NULL) )
 	{
 		std::cerr << "ERROR : Could not load first image pair" << std::endl;
@@ -85,20 +92,21 @@ int main(int argc, char** argv)
 		std::cerr << "Attempted to open image:" << datasetFoldername << "/" << keyimg2name << std::endl;
 		return 1;
 	}
+	cv::imshow("Keyframe", keyframe1);
 
 	//Accept EUCM params for first (left) camera, and create EnhancedCamera
 	std::cout << "EUCM Camera 1 Intrinsic parameters:" << std::endl;
-	array<double, 6> cam1Params = readValues<6>(paramFile);
+	array<double, 6> cam1Params = readValues<6>(paramFile, true);
 	EnhancedCamera camera1( cam1Params.data() );
 
 	//Accept EUCM params for second (right) camera, and create Enhanced Camera
 	std::cout << "EUCM Camera 2 Intrinsic parameters:" << std::endl;
-	array<double, 6> cam2Params = readValues<6>(paramFile);
+	array<double, 6> cam2Params = readValues<6>(paramFile, true);
 	EnhancedCamera camera2( cam2Params.data() );
 
 	//Accept pose transformation between stereo cameras
 	std::cout << "EUCM Stereo Camera Extrinsic parameters:" << std::endl;
-	array<double, 6> stereoPose = readValues<6>(paramFile);
+	array<double, 6> stereoPose = readValues<6>(paramFile, true);
 	Transformation<double> T12( stereoPose.data() );
 
 	//Accept parameters for stereo, and create StereoParameters, and then EnhancedStereo and MotionStereo
@@ -112,7 +120,10 @@ int main(int argc, char** argv)
 	paramFile.ignore();
 	stereoSgmParams.uMax = keyframe1.cols;
 	stereoSgmParams.vMax = keyframe1.rows;
-	stereoSgmParams.setEqualMargin();
+	// stereoSgmParams.setEqualMargin();
+	stereoSgmParams.setXMargin(stereoSgmParams.u0);
+	stereoSgmParams.setYMargin(330);
+	stereoSgmParams.hypMax = 3;
 	EnhancedSGM stereoSGM(T12, &camera1, &camera2, stereoSgmParams);
 
 	MotionStereoParameters mstereoParams;
@@ -123,17 +134,19 @@ int main(int argc, char** argv)
 	MotionStereo stereoMotion(&camera1, &camera2, mstereoParams);
 
 	//Create ScaleParameters object for depthmap
-	ScaleParameters scaleParams;
-	scaleParams.scale = stereoSgmParams.scale;
-	scaleParams.u0 = 25;
-	scaleParams.v0 = 25;
-	scaleParams.uMax = keyframe1.cols;
-	scaleParams.vMax = keyframe1.rows;
-	scaleParams.setEqualMargin();
+	// ScaleParameters scaleParams;
+	// scaleParams.scale = stereoSgmParams.scale;
+	// scaleParams.u0 = 25;
+	// scaleParams.v0 = 25;
+	// scaleParams.uMax = keyframe1.cols;
+	// scaleParams.vMax = keyframe1.rows;
+	// // scaleParams.setEqualMargin();
+	// scaleParams.setXMargin(25);
+	// scaleParams.setYMargin(300);
 
 	//Accept camera pose wrt the robot, and create transformation from base to camera frame
 	std::cout << "Pose between robot and camera1:" << std::endl;
-	array<double, 6> cameraPose = readValues<6>(paramFile);
+	array<double, 6> cameraPose = readValues<6>(paramFile, true);
 	Transformation<double> Tbase1(cameraPose.data());
 
 	//Create ScalePhotometric object
@@ -145,12 +158,13 @@ int main(int argc, char** argv)
 	stereoMotion.setBaseImage(keyframe1);
 
 	//Get initial SGM depthmap
-	DepthMap keyDepth(&camera1, scaleParams, 3); // Use 3-hypothesis depthmap
+	DepthMap keyDepth; // Use 3-hypothesis depthmap
 	stereoSGM.computeStereo(keyframe1, keyframe2, keyDepth);
 
 	Mat32f keyDepthMap;
 	keyDepth.toMat(keyDepthMap);
-	cv::imshow("SGM Depthmap", keyDepthMap/20);
+	cv::namedWindow("SGM Depthmap", 1);
+	cv::imshow("SGM Depthmap", keyDepthMap/50);
 	cv::waitKey(0);
 
 	int refinement = 0;
@@ -163,10 +177,10 @@ int main(int argc, char** argv)
 		img2File >> img2name;
 		Mat8u newframe1 = imread(datasetFoldername + "/" + img1name, 0);
 		Mat8u newframe2 = imread(datasetFoldername + "/" + img2name, 0);
-		std::cout << "New frame pose (cam1):" << std::endl;
-		array<double, 6> newPose1 = readValues<6>(img1File);
-		std::cout << "New frame pose (cam2):" << std::endl;
-		array<double, 6> newPose2 = readValues<6>(img2File);
+		// std::cout << "New frame pose (cam1):" << std::endl;
+		array<double, 6> newPose1 = readValues<6>(img1File, false);
+		// std::cout << "New frame pose (cam2):" << std::endl;
+		array<double, 6> newPose2 = readValues<6>(img2File, false);
 		Transformation<double> T0new (newPose1.data());
 
 		std::cout << "Attempting to open image:" << datasetFoldername << "/" << img1name << std::endl;
@@ -182,45 +196,68 @@ int main(int argc, char** argv)
 		//Transformation between camera locations from camera at keyframe to camera right now
 		Transformation<double> Tmotion = T0key.compose(Tbase1).inverseCompose(T0new.compose(Tbase1));
 		if(Tmotion.trans().squaredNorm() < 0.0001) continue;
-		cout << "Motion:" << Tmotion << endl;
+		cout << "Motion (input):" << Tmotion << endl;
 
 
+		//Images for photometric residual
+		Mat32f wrappedImg;
 		//Localization ~ after 5 refinements
-		if (refinement > 5)
+		if (refinement >= 1)
 		{
-			cout << "Calculating photometric localization..." << endl;
+			// cout << "Calculating photometric localization..." << endl;
 
 			//Set depthmap for localizer
 			photometricLocalizer.depth() = keyDepth;
 
+			//Calculate photometric residual
+			Mat32f keyImg_2, residualImg2;
+			keyframe1.copyTo(keyImg_2);
+			photometricLocalizer.wrapImage(newframe1, wrappedImg, Tmotion);
+			residualImg2 = keyImg_2 - wrappedImg + 128;
+			cv::threshold(wrappedImg, wrappedImg, 0, 1/255.0, cv::THRESH_BINARY);
+			cv::imshow("Photometric Residual prev", residualImg2.mul(wrappedImg) );
+
 			//Use photometric localization to refine pose estimation
 			photometricLocalizer.computePose(newframe1, Tmotion);
+			cout << "Motion (photo):" << Tmotion << endl;
+
+			//Calculate photometric residual
+			Mat32f keyImg_1, residualImg;
+			keyframe1.copyTo(keyImg_1);
+			photometricLocalizer.wrapImage(newframe1, wrappedImg, Tmotion);
+
+			residualImg = keyImg_1 - wrappedImg + 128;
+			cv::threshold(wrappedImg, wrappedImg, 0, 1/255.0, cv::THRESH_BINARY);
+			cv::imshow("Photometric Residual", residualImg.mul(wrappedImg) );
 		}
 
 		
 		//Step: Use motion stereo to refine depthmap
 		//Seed new depth estimation as equal to keyframe depthmap
-		cout << "Wrapping depthmap ..." << endl;
 		DepthMap newDepth = keyDepth;
 
 		//Compute new depth using computeDepth() of MotionStereo
-		cout << "Calculating stereo from motion ..." << endl;
+		// cout << "Calculating stereo from motion ..." << endl;
 		stereoMotion.computeDepth(Tmotion, newframe1, newDepth);
 
 		//Merge the new depthmap into the keyframe depthmap
-		cout << "Merging depthmaps ..." << endl;
+		// cout << "Merging depthmaps ..." << endl;
 		keyDepth.merge(newDepth);
+		keyDepth.filterNoise();
 
 		//Output region
 		Mat32f newDepthMat, keyDepthMat;
 		newDepth.toMat(newDepthMat);
 		keyDepth.toMat(keyDepthMat);
 		cv::imshow("Current image", newframe1);
-		cv::imshow("Motion stereo depthmap", newDepthMat/20);
-		cv::imshow("Merged keyframe depthmap", keyDepthMat/20);
-		if(cv::waitKey(0)==1048603) break; // Break on ESC key
+		cv::imshow("Motion stereo depthmap", newDepthMat/50);
+		cv::imshow("Merged keyframe depthmap", keyDepthMat/50);
+		int pressedKey = cv::waitKey(0);
+		cout << "Pressed key: " << pressedKey << endl;
+		if( pressedKey == 1048603 or pressedKey == 27 ) break; // Break on ESC key
 
 		refinement++; //increase the level of refinement of the keyframe depthmap
 	}
+	while( cv::waitKey(500)!=27 ) break;
 	return 0;
 }
