@@ -27,7 +27,7 @@ Type definitions
 
 // Eigen
 #include <Eigen/Eigen>
-
+#include <Eigen/Eigenvalues>
 
 // Eigen data structures
 template<typename T>
@@ -47,6 +47,7 @@ using Eigen::Matrix;
 using Eigen::Vector2d;
 using Eigen::Vector3d;
 using Eigen::Matrix3d;
+using Eigen::MatrixXd;
 using Eigen::Vector2i;
 using Eigen::Vector3i;
 using Eigen::Map;

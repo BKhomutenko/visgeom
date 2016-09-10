@@ -75,6 +75,10 @@ public:
     
     void computePoseMI(const Mat32f & img2, Transformation<double> & T12);
 
+    //TODO make enum for ochosing the camera
+    array<double, 6> covarianceEigenValues(const int scaleIdx, 
+            const Transformation<double> T12, bool baseValues);
+
     //FIXME temporary function
     void wrapImage(const Mat32f & src, Mat32f & dst, const Transformation<double> T12) const;
 private:

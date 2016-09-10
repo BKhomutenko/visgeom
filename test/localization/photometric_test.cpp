@@ -132,13 +132,20 @@ int main (int argc, char const* argv[])
         Mat32f img11, img12;
 //        localizer.wrapImage(img2, img11, T12);
         cout << T12 << endl;
+        cout << "compute covariance" << endl;
+        Timer timer;
+        array<double, 6> evArr = localizer.covarianceEigenValues(2, Transformation<double>(), true);
+        cout << " time: " << timer.elapsed() << endl;
         for (int iter = 0; iter < 1; iter++)
         {
-            Timer timer;
+            timer.reset();
             localizer.computePose(img2, T12);
             cout << timer.elapsed() << endl;
             cout << T12 << endl;
             
+            timer.reset();
+            array<double, 6> evArr = localizer.covarianceEigenValues(2, T12, false);
+            cout << timer.elapsed() << endl;
 //            localizer.wrapImage(img2, img12, T12);
 //            imshow("img11", img11/256);
 //            imshow("img12", img12/256);

@@ -519,7 +519,7 @@ public:
                                                 epipolarPtr->getSecond(salientPack.cloud[2*idx]));
                 
                 
-                const int distance = diffLength;
+                const int distance = min(diffLength, params.dispMax);
                 
                 raster.steps(-HALF_LENGTH);
                 vector<uint8_t> sampleVec;
@@ -572,11 +572,13 @@ public:
                 //TODO make push by idx
                 Vector2i depthPt = depthPointVec[salientPack.idxMapVec[idx]];
                 
-                DepthMap::filter(depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]), 
-                        depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]), d1, sigma1);
+//                DepthMap::filter(depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]), 
+//                        depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]), d1, sigma1);
                 
-//                depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = d1;
-//                depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = sigma1;
+                //TODO make the choise of strategy parametric 
+                // and divide this function into blocks
+                depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = d1;
+                depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = sigma1;
             }
             
         }
