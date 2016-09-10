@@ -118,7 +118,7 @@ double EnhancedStereo::triangulate(double u1, double v1, double u2, double v2,
         {
             cout << "    not triangulated " << abs(delta) << " " << (abs(delta) < 1e-10) << endl;
         }
-        return OUT_OF_RANGE;
+        return MAX_DEPTH;
     }
     if (camIdx == CAMERA_1) return sqrt(pp) * (-tp * qq + tq * pq)/delta;
     else return sqrt(qq) * (tq * pp - tp * pq)/delta;
