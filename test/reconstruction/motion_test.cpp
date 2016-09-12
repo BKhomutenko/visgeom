@@ -83,7 +83,7 @@ int main(int argc, char** argv)
     
     Mat8u img1 = imread(fileName1, 0);
     Mat8u img2 = imread(fileName2, 0);
-    img1 /= 0.96;
+//    img1 /= 0.96;
 //    
 //    Laplacian(img1, img1lap, CV_16S, 3);
 //    Laplacian(img2, img2lap, CV_16S, 3);
@@ -124,15 +124,15 @@ int main(int argc, char** argv)
     scaleParams.vMax = img1.rows;
     scaleParams.setEqualMargin();
     scaleParams.setYMargin(330);
-//    scaleParams.u0 = 432;
-//    scaleParams.v0 = 100;
-//    scaleParams.uMax = 1012;
-//    scaleParams.vMax = 324;
+//    scaleParams.u0 = 800;
+//    scaleParams.v0 = 300;
+//    scaleParams.uMax = 850;
+//    scaleParams.vMax = 315;
 //    scaleParams.setXMargin(0);
 //    scaleParams.setYMargin(0);
     
     DepthMap depth(&camera1, scaleParams);
-    depth.setDefault();
+    depth.setTo(100, 1000);
     Mat32f res;
     timer.reset();
     stereo.computeDepth(TleftRight, img2, depth);

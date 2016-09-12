@@ -64,18 +64,16 @@ bool EnhancedStereo::triangulate(double u1, double v1, double u2, double v2, Vec
     double qq = q.dot(q);
     double tp = t.dot(p);
     double tq = t.dot(q);
+    double ppqq = pp * qq;
     double delta = -pp * qq + pq * pq;
-    if (abs(delta) < 1e-10) // TODO the constant to be revised
+    if (abs(delta) < ppqq * 1e-3) // TODO the constant to be revised
     {
-        if (params.verbosity > 2) 
-        {
-            cout << "    not triangulated " << abs(delta) << " " << (abs(delta) < 1e-10) << endl;
-        }
-        X = Vector3d(0, 0, 0);
-        return false;
+        X = p * MAX_DEPTH;
+        return true;
     }
-    double l1 = (-tp * qq + tq * pq)/delta;
-    double l2 = (tq * pp - tp * pq)/delta;
+    double deltainv = 1/delta;
+    double l1 = (-tp * qq + tq * pq) * deltainv;
+    double l2 = (tq * pp - tp * pq) * deltainv;
     X = (p*l1 + t + q*l2)*0.5;
     return true;
 }
@@ -99,7 +97,7 @@ double EnhancedStereo::triangulate(double u1, double v1, double u2, double v2,
     }
     Vector3d t = Transform12.trans();
     q = Transform12.rotMat() * q;
-    if (params.verbosity > 3) 
+    if (params.verbosity > 4) 
     {
         cout << "    pt1: " << u1 << " " << v1 << endl;
         cout << "    p: " << p.transpose() << endl;
@@ -111,13 +109,10 @@ double EnhancedStereo::triangulate(double u1, double v1, double u2, double v2,
     double qq = q.dot(q);
     double tp = t.dot(p);
     double tq = t.dot(q);
+    double ppqq = pp * qq;
     double delta = -pp * qq + pq * pq;
-    if (abs(delta) < 1e-10) // TODO the constant to be revised
+    if (abs(delta) < ppqq * 1e-6) // max 100m for 10cm base
     {
-        if (params.verbosity > 2) 
-        {
-            cout << "    not triangulated " << abs(delta) << " " << (abs(delta) < 1e-10) << endl;
-        }
         return MAX_DEPTH;
     }
     if (camIdx == CAMERA_1) return sqrt(pp) * (-tp * qq + tq * pq)/delta;
@@ -134,17 +129,17 @@ vector<int> EnhancedStereo::compareDescriptor(const vector<uint8_t> & desc,
     //match the first half
     for (int i = 0; i < sampleVec.size(); i++)
     {
-        rowA[i] = (abs(sampleVec[i] - desc[0]));
+        rowA[i] = abs(int(sampleVec[i]) - int(desc[0]));
     }
     for (int i = 1; i <= HALF_LENGTH; i++)
     {
-        rowB[0] = (rowA[0] + params.flawCost + abs(sampleVec[0] - desc[i]));
+        rowB[0] = rowA[0] + params.flawCost + abs(int(sampleVec[0]) - int(desc[i]));
         int cost = min(rowA[i] + params.flawCost, rowA[0]);
-        rowB[1] = (cost + abs(sampleVec[i] - desc[i]));
+        rowB[1] = cost + abs(int(sampleVec[1]) - int(desc[i]));
         for (int j = 2; j < sampleVec.size(); j++)
         {
             cost = min(min(rowA[j] + params.flawCost, rowA[j - 1]), rowA[j - 2] + params.flawCost);
-            rowB[j] = (cost+ abs(sampleVec[j] - desc[i]));
+            rowB[j] = cost + abs(int(sampleVec[j]) - int(desc[i]));
         }
         swap(rowA, rowB);
     }
@@ -154,19 +149,19 @@ vector<int> EnhancedStereo::compareDescriptor(const vector<uint8_t> & desc,
     //match the second half (from the last pixel to first)
     for (int i = 0; i < sampleVec.size(); i++)
     {
-        rowA[i] = (abs(sampleVec[i] - desc.back()));
+        rowA[i] = abs(sampleVec[i] - desc.back());
     }
-    for (int i = desc.size() - 1; i > HALF_LENGTH + 1; i--)
+    for (int i = desc.size() - 2; i > HALF_LENGTH; i--)
     {
         for (int j = 0; j < sampleVec.size() - 2; j++)
         {
             int cost = min(min(rowA[j] + params.flawCost, rowA[j + 1]), rowA[j + 2] + params.flawCost);
-            rowB[j] = (cost + abs(sampleVec[j] - desc[i]));
+            rowB[j] = cost + abs(int(sampleVec[j]) - int(desc[i]));
         }
         int j = sampleVec.size() - 2;
         int cost = min(rowA[j] + params.flawCost, rowA[j + 1]);
-        rowB[j] = (cost + abs(sampleVec[j] - desc[i]));
-        rowB.back() = (rowA.back() + params.flawCost + abs(sampleVec.back() - desc[i]));
+        rowB[j] = cost + abs(int(sampleVec[j]) - int(desc[i]));
+        rowB.back() = rowA.back() + params.flawCost + abs(int(sampleVec.back()) - int(desc[i]));
         swap(rowA, rowB);
     }
     

@@ -40,7 +40,7 @@ Depth-from-motion class for semidense depth estimation
 //TODO add errorMax threshold
 struct MotionStereoParameters : StereoParameters
 {
-    int descLength = 7;
+    int descLength = 5;
     int gradientThresh = 3;
 };
 
@@ -455,7 +455,7 @@ public:
         vector<int> kernelVec, waveVec;
         const int NORMALIZER = initKernel(kernelVec, LENGTH);
         const int WAVE_NORM = initWave(waveVec, LENGTH);
-        EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM * 3, waveVec.data(), {1});
+        EpipolarDescriptor epipolarDescriptor(LENGTH, LENGTH * 5, waveVec.data(), {1, 2, 3});
         
         MHPack salientPack;
         //TODO to optimize make a continuous vector<uint8_t>
@@ -492,7 +492,7 @@ public:
              QUERY_POINTS | MINMAX | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING); 
         
         //TODO make an option of emptying nonsalient points in the depth map
-//        depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
+        depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
         
         Vector3dVec cloud2;
         T12.inverseTransform(salientPack.cloud, cloud2);
@@ -514,7 +514,8 @@ public:
             
             Vector2i diff = round(ptMax - ptMin);
             const int diffLength = max(abs(diff[0]), abs(diff[1])) + 1;
-            if (diffLength > 3)
+            const int step = stepVec[salientPack.idxMapVec[idx]];
+            if (diffLength > 2*step)
             {
                 // if distance is big enough
                 // search along epipolar curve
@@ -523,9 +524,9 @@ public:
                 CurveRasterizer<int, Polynomial2> raster(round(ptMax), round(ptMin),
                                                 epipolarPtr->getSecond(salientPack.cloud[2*idx]));
                 
-                //FIXME tmp
-                const int distance = min(diffLength, params.dispMax);
                 
+                const int distance = min(diffLength, params.dispMax) / step;
+                raster.setStep(step);
                 raster.steps(-HALF_LENGTH);
                 vector<uint8_t> sampleVec;
                 vector<int> uVec, vVec;

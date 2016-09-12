@@ -125,3 +125,18 @@ Tdata biasedAbsDiff(Titer1 kernelIter, Titer1 kernelEnd, Titer2 data1Iter,
     return res;
 }
 
+template<typename Titer1, typename Tdata>
+Tdata totalVariation(Titer1 dataIter, Titer1 dataEnd, Tdata bias)
+{
+    Tdata res = Tdata(0);
+    Tdata sample1 = *dataIter;
+    dataIter++;
+    for (; dataIter != dataEnd; ++dataIter)
+    {
+        Tdata sample2 = *dataIter;
+        res += abs(sample1 - sample2);
+        sample1  = sample2;
+    }
+    return res;
+}
+

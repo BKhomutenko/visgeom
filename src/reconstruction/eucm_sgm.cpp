@@ -150,15 +150,15 @@ void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap
                 if (not params.salientPoints or salientBuffer(y, x)) 
                 {
                     //FIXME temporary 
-                    depth.at(x, y, h) =  smallDisparity(y, x*params.hypMax + h);
-//                    computeDepth(depth.at(x, y, h), depth.sigma(x, y, h), x, y, h);
+//                    depth.at(x, y, h) =  smallDisparity(y, x*params.hypMax + h);
+                    computeDepth(depth.at(x, y, h), depth.sigma(x, y, h), x, y, h);
 //                    depth.cost(x, y, h) = 1; //FIXME
                 }
                 else 
                 {
-                    depth.at(x, y, h) = OUT_OF_RANGE;
-                    depth.sigma(x, y, h) = OUT_OF_RANGE;
-                    depth.cost(x, y, h) = 100; //FIXME
+//                    depth.at(x, y, h) = OUT_OF_RANGE;
+//                    depth.sigma(x, y, h) = OUT_OF_RANGE;
+//                    depth.cost(x, y, h) = 100; //FIXME
                 }
             }
         }
@@ -185,7 +185,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     vector<int> kernelVec, waveVec;
     const int NORMALIZER = initKernel(kernelVec, LENGTH);
     const int WAVE_NORM = initWave(waveVec, LENGTH);
-    EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM*4, waveVec.data(), {1, 2, 3, 5});
+    EpipolarDescriptor epipolarDescriptor(LENGTH, 3*LENGTH, waveVec.data(), {1, 2, 3, 5});
     
     if (params.salientPoints) salientBuffer.setTo(0);
     
@@ -242,7 +242,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 salientBuffer(y, x) = 1;
             }
             
-            const int nSteps = (params.dispMax  + step - 1 ) / step; 
+            const int nSteps = ( params.dispMax  + step - 1 ) / step; 
                
             //sample the curve 
             vector<uint8_t> sampleVec(nSteps + LENGTH - 1, 0);
@@ -499,7 +499,7 @@ void EnhancedSGM::reconstructDisparity()
                 smallDisparity(y, x * params.hypMax + hypIdx) = indexedCostVec[hypIdx].second;
                 finalErrorMat(y, x * params.hypMax + hypIdx) = indexedCostVec[hypIdx].first;
             }*/
-            
+            bool verbose = (y == 0 and x == 24);
             for (int hypIdx = 0; hypIdx < params.hypMax; hypIdx++)
             {
                 int32_t & bestDisp = smallDisparity(y, x * params.hypMax + hypIdx);
@@ -536,7 +536,14 @@ void EnhancedSGM::reconstructDisparity()
                         bestErr = acc2;
                     }
                 }
-                if (bestDisp == -1) break;
+                if (bestDisp == -1)
+                {
+                    for (int h2Idx = hypIdx + 1; h2Idx < params.hypMax; h2Idx++)
+                    {
+                        smallDisparity(y, x * params.hypMax + h2Idx) = -1;
+                    } 
+                    break;
+                }
                 minCost = bestErr;
                 minCostDisp = bestDisp;
             }
@@ -562,8 +569,11 @@ void EnhancedSGM::computeDepth(Mat32f & distance)
 
 bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int h)
 {
-    if (params.verbosity > 3) cout << "EnhancedSGM::computeDepth(int *)" << endl;
-    assert(not (params.hypMax == 1 and h > 0));
+    if (params.verbosity > 3) 
+    {
+        cout << "EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int h)" << endl;
+    }
+    assert(h < params.hypMax);
     
     int idx = getLinearIndex(x, y);
     if (not maskVec[idx])
@@ -574,13 +584,19 @@ bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int 
     
     }
     int disparity = smallDisparity(y, x*params.hypMax + h);
+    
     if (disparity < 0) 
     {
         dist = OUT_OF_RANGE;
         sigma = OUT_OF_RANGE;
         return true;
     }
-    
+    else if (disparity == 0)
+    {
+        dist = MAX_DEPTH;
+        sigma = MAX_DEPTH / 7; //FIXME
+        return true;
+    }
     // point on the first image
     const auto & pt1 = pointVec1[idx];
     
@@ -596,7 +612,7 @@ bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int 
         v22 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity + 1);
     }
     else
-    {            
+    {       
         CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
         raster.steps(disparity);
         u21 = raster.u;
@@ -606,18 +622,21 @@ bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int 
         v22 = raster.v;
     }
     
-    
     dist = triangulate(pt1[0], pt1[1], u21, v21);
+    if (dist < 0)
+    {
+        cout << y << " " << x << "    " << dist << " " << disparity << endl;
+    }
     if (dist > MIN_DEPTH)
     {
         double d2 = triangulate(pt1[0], pt1[1], u22, v22);
+        
         if (d2 > MIN_DEPTH)
         {
             sigma = abs(d2 - dist) / 1.732;
             return true;
         }
     }
-
     //if any of triangulations is not computed
     dist = OUT_OF_RANGE;
     sigma = OUT_OF_RANGE;
@@ -626,7 +645,7 @@ bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int 
 
 double EnhancedSGM::computeDepth(int x, int y, int h)
 {
-    if (params.verbosity > 3) cout << "EnhancedSGM::computeDepth(int *)" << endl;
+    if (params.verbosity > 3) cout << "EnhancedSGM::computeDepth(int x, int y, int h)" << endl;
     assert(not (params.hypMax == 1 and h > 0));
     
     int idx = getLinearIndex(x, y);
@@ -641,12 +660,14 @@ double EnhancedSGM::computeDepth(int x, int y, int h)
     int u2, v2;
     if (params.useUVCache)
     {
+        cout << "uvcache" << endl;
         const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
         u2 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
         v2 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
     }
     else
-    {            
+    {    
+        cout << "raster" << endl;
         CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
         raster.steps(disparity);
         u2 = raster.u;
