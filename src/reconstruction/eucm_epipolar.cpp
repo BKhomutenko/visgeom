@@ -200,25 +200,29 @@ void EnhancedEpipolar::traceEpipolarLine(int u, int v, Mat & out, CameraIdx camI
     if (verbosity > 0) cout << "EnhancedStereo::traceEpipolarLine" << endl;
     
     CurveRasterizer<int, Polynomial2> * raster1 = NULL;
-    Vector2i pt(u, v);
-    Vector3d X;
+    Vector3d X1, X2;
+    Vector2d pt;
     if (camIdx == CAMERA_1)
     { 
-        if (not camera1->reconstructPoint(Vector2d(u, v), X)) return;
-        raster1 = new CurveRasterizer<int, Polynomial2>(pt, epipoles.getFirstPx(), getFirst(X));
+        if (not camera1->reconstructPoint(Vector2d(u, v), X1)) return;
+        X2 = Transform12.rotMatInv() * X1;
+        if (not camera2->projectPoint(X2, pt)) return;
+        raster1 = new CurveRasterizer<int, Polynomial2>(round(pt), epipoles.getSecondPx(), getSecond(X1));
     }
     else if (camIdx == CAMERA_2)
     {
-        if (not camera2->reconstructPoint(Vector2d(u, v), X)) return;
-        raster1 = new CurveRasterizer<int, Polynomial2>(pt, epipoles.getSecondPx(), getSecond(X));
+        if (not camera2->reconstructPoint(Vector2d(u, v), X2)) return;
+        X1 = Transform12.rotMat() * X2;
+        if (not camera1->projectPoint(X1, pt)) return;
+        raster1 = new CurveRasterizer<int, Polynomial2>(round(pt), epipoles.getFirstPx(), getFirst(X1));
     }
     CurveRasterizer<int, Polynomial2> * raster2 = new CurveRasterizer<int, Polynomial2>(*raster1);
     for (int i = 0; i < count; i++)
     {
-        cv::circle(out, Point(raster1->u, raster1->v), 2, Scalar(0), -1);
-        cv::circle(out, Point(raster2->u, raster2->v), 2, Scalar(0), -1);
+        cv::circle(out, Point(raster1->u, raster1->v), 0, Scalar(0), -1);
+//        cv::circle(out, Point(raster2->u, raster2->v), 2, Scalar(0), -1);
         raster1->step();
-        raster2->unstep();
+//        raster2->unstep();
     }
     delete raster1;
     delete raster2;

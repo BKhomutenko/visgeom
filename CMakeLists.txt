@@ -69,6 +69,14 @@ add_executable( stereo
 
 target_link_libraries( stereo ${OpenCV_LIBS} )
 
+add_executable( epipolar 
+    test/reconstruction/epipolar_trace.cpp
+    src/reconstruction/eucm_epipolar.cpp
+    src/reconstruction/depth_map.cpp
+)
+
+target_link_libraries( epipolar ${OpenCV_LIBS} )
+
 add_executable( multistereo 
     test/reconstruction/stereo_multibase.cpp
     src/reconstruction/eucm_sgm.cpp

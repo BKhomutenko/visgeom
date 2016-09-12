@@ -70,7 +70,7 @@ int main(int argc, char** argv)
     Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
     
     MotionStereoParameters stereoParams;
-    stereoParams.verbosity = 1;
+    stereoParams.verbosity = 0;
     int foo;
     paramFile >> foo;
     paramFile >> foo;
@@ -83,7 +83,7 @@ int main(int argc, char** argv)
     
     Mat8u img1 = imread(fileName1, 0);
     Mat8u img2 = imread(fileName2, 0);
-
+    img1 /= 0.96;
 //    
 //    Laplacian(img1, img1lap, CV_16S, 3);
 //    Laplacian(img2, img2lap, CV_16S, 3);
@@ -99,14 +99,10 @@ int main(int argc, char** argv)
     
     Timer timer;
     EnhancedCamera camera1(params1.data()), camera2(params2.data());
-    stereoParams.verbosity = 0;
     MotionStereo stereo(&camera1, &camera2, stereoParams);
     stereo.setBaseImage(img1);
     cout << "    initialization time : " << timer.elapsed() << endl;
-    Mat8u out1, out2;
     
-    img1.copyTo(out1);
-    img2.copyTo(out2);
     
 //    
 //    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
@@ -122,11 +118,18 @@ int main(int argc, char** argv)
     
     ScaleParameters scaleParams;
     scaleParams.scale = stereoParams.scale;
-    scaleParams.u0 = 25;
-    scaleParams.v0 = 25;
+    scaleParams.u0 = 50;
+    scaleParams.v0 = 150;
     scaleParams.uMax = img1.cols;
     scaleParams.vMax = img1.rows;
     scaleParams.setEqualMargin();
+    scaleParams.setYMargin(330);
+//    scaleParams.u0 = 432;
+//    scaleParams.v0 = 100;
+//    scaleParams.uMax = 1012;
+//    scaleParams.vMax = 324;
+//    scaleParams.setXMargin(0);
+//    scaleParams.setYMargin(0);
     
     DepthMap depth(&camera1, scaleParams);
     depth.setDefault();
@@ -138,9 +141,9 @@ int main(int argc, char** argv)
 
     depth.toMat(res);    
     
-    imshow("out1", out1);
-    imshow("out2", out2);
-    imshow("res", res/10);
+    imshow("out1", img1);
+    imshow("out2", img2);
+    imshow("res", res/100);
     waitKey(); 
     return 0;
 }

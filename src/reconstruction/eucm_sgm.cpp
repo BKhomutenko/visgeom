@@ -149,8 +149,10 @@ void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap
             {
                 if (not params.salientPoints or salientBuffer(y, x)) 
                 {
-                    computeDepth(depth.at(x, y, h), depth.sigma(x, y, h), x, y, h);
-                    depth.cost(x, y, h) = 1; //FIXME
+                    //FIXME temporary 
+                    depth.at(x, y, h) =  smallDisparity(y, x*params.hypMax + h);
+//                    computeDepth(depth.at(x, y, h), depth.sigma(x, y, h), x, y, h);
+//                    depth.cost(x, y, h) = 1; //FIXME
                 }
                 else 
                 {
@@ -183,7 +185,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     vector<int> kernelVec, waveVec;
     const int NORMALIZER = initKernel(kernelVec, LENGTH);
     const int WAVE_NORM = initWave(waveVec, LENGTH);
-    EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM*3/2, waveVec.data(), {1, 2, 3, 5});
+    EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM*4, waveVec.data(), {1, 2, 3, 5});
     
     if (params.salientPoints) salientBuffer.setTo(0);
     

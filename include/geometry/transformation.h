@@ -154,12 +154,19 @@ public:
         inverseRotate(dst, dst);
     }
 
+    void transform(const Vector3<T> & src, Vector3<T> & dst) const
+    {
+        Matrix3<T> R = rotMat();
+        dst = R * src + mtrans;
+    }
+    
     void inverseTransform(const Vector3<T> & src, Vector3<T> & dst) const
     {
         dst = src - mtrans;
-        inverseRotate(dst, dst);
+        Matrix3<T> R = rotMatInv();
+        dst = R * dst;
     }
-
+    
     void rotate(const Vector3Vec<T> & src, Vector3Vec<T> & dst) const
     {
         dst.resize(src.size());
@@ -178,12 +185,6 @@ public:
         {
             dst[i] = R * src[i];
         }
-    }
-
-    void inverseRotate(const Vector3<T> & src, Vector3<T> & dst) const
-    {
-        Matrix3<T> R = rotMatInv();
-        dst = R * src;
     }
 
     std::array<T, 6> toArray() const
