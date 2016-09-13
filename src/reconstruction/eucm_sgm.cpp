@@ -660,14 +660,12 @@ double EnhancedSGM::computeDepth(int x, int y, int h)
     int u2, v2;
     if (params.useUVCache)
     {
-        cout << "uvcache" << endl;
         const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
         u2 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
         v2 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
     }
     else
     {    
-        cout << "raster" << endl;
         CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
         raster.steps(disparity);
         u2 = raster.u;
