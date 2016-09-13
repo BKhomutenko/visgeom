@@ -185,7 +185,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     vector<int> kernelVec, waveVec;
     const int NORMALIZER = initKernel(kernelVec, LENGTH);
     const int WAVE_NORM = initWave(waveVec, LENGTH);
-    EpipolarDescriptor epipolarDescriptor(LENGTH, 3*LENGTH, waveVec.data(), {1, 2, 3, 5});
+    EpipolarDescriptor epipolarDescriptor(LENGTH, 3*LENGTH, waveVec.data(), {1, 2, 4});
     
     if (params.salientPoints) salientBuffer.setTo(0);
     
@@ -594,6 +594,7 @@ bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int 
     else if (disparity == 0)
     {
         dist = MAX_DEPTH;
+//        dist = 1 /MAX_DEPTH; //FIXME
         sigma = MAX_DEPTH / 7; //FIXME
         return true;
     }
@@ -634,6 +635,7 @@ bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int 
         if (d2 > MIN_DEPTH)
         {
             sigma = abs(d2 - dist) / 1.732;
+//            dist = 1 / dist; //FIXME
             return true;
         }
     }
