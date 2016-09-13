@@ -199,6 +199,7 @@ public:
     
     //TODO make a wrap method
     void toMat(Mat32f & out) const;
+    void toInverseMat(Mat32f & out) const;
     void sigmaToMat(Mat32f & out) const;
     
     // access methods
@@ -243,8 +244,8 @@ private:
     void pixelMedianFilter(const int x, const int y, const int h, DepthMap & dst);
     void pixelAverageFilter(const Vector3iVec & matches, DepthMap & dst);
 
-    // Increases all the costs, then rejects hypotheses above the threshold
-    void costRejection(const double costChange = 1, const double rejectionThreshold = DEFAULT_COST_DEPTH + 4);
+    // Rejects hypotheses above the threshold
+    void costRejection(const double rejectionThreshold = DEFAULT_COST_DEPTH + 8);
 
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty

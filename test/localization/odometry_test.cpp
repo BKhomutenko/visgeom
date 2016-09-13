@@ -250,8 +250,8 @@ int main(int argc, char** argv)
 		newDepth.toMat(newDepthMat);
 		keyDepth.toMat(keyDepthMat);
 		cv::imshow("Current image", newframe1);
-		cv::imshow("Motion stereo depthmap", newDepthMat/50);
-		cv::imshow("Merged keyframe depthmap", keyDepthMat/50);
+		cv::imshow("Motion stereo depthmap", newDepthMat/1);
+		cv::imshow("Merged keyframe depthmap", keyDepthMat/1);
 		int pressedKey = cv::waitKey(0);
 		cout << "Pressed key: " << pressedKey << endl;
 		if( pressedKey == 1048603 or pressedKey == 27 ) break; // Break on ESC key

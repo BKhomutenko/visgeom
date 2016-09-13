@@ -135,6 +135,7 @@ bool DepthMap::filterPushHypothesis(const Vector3d & X, const double sigmaVal)
 bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, const double sigmaVal)
 {
     if (not isValid(x, y)) return false;
+    bool matchFound = false;
     for(int h = 0; h < hMax; ++h)
     {
         double & d1 = at(x, y, h);
@@ -145,14 +146,19 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
             filter(d1, sigma1, d, sigmaVal);
             // cost1 = max(cost1 - 1.0, 0.0);
             cost1 = DEFAULT_COST_DEPTH;
-            return true;
+            matchFound = true;
+        }
+        else
+        {
+            cost1 += COST_CHANGE; // increase cost for all hypotheses that did not match
         }
     }
+    if (matchFound) return true;
     //The program reaches this area if no matches were found
-    return pushHypothesis(x, y, d, sigmaVal);
+    else return pushHypothesis(x, y, d, sigmaVal);
 }
 
-void DepthMap::costRejection(const double costChange, const double rejectionThreshold)
+void DepthMap::costRejection(const double rejectionThreshold)
 {
     for (int h = 0; h < hMax; ++h)
     {
@@ -161,7 +167,7 @@ void DepthMap::costRejection(const double costChange, const double rejectionThre
             for (int x = 0; x < xMax; ++x)
             {
                 double & c = cost(x, y, h);
-                c += costChange;
+                // c += costChange;
                 if( c > rejectionThreshold )
                 {
                     at(x, y, h) = DEFAULT_DEPTH;
@@ -557,6 +563,17 @@ void DepthMap::toMat(Mat32f & out) const
     copy(valVec.begin(), valVec.begin() + hStep, (float*)out.data);
 }
 
+void DepthMap::toInverseMat(Mat32f & out) const
+{
+    out.create(yMax, xMax);
+    const double* pInData = &valVec[0];
+    float* pOutData = (float*)out.data;
+    for (int i = 0; i < hStep; ++i)
+    {
+        *pOutData = 1 / (*pInData);
+    }
+}
+
 void DepthMap::sigmaToMat(Mat32f & out) const
 {
     out.create(yMax, xMax);
@@ -807,9 +824,6 @@ void DepthMap::filterNoise()
 void DepthMap::merge(const DepthMap & depth2)
 {
     assert((ScaleParameters)(*this) == (ScaleParameters)depth2);
-    
-    // cost increase for every hypothesis
-    costRejection();
 
     // Filter merge all new hypotheses
     for (int y = 0; y < yMax; y++)
@@ -824,6 +838,9 @@ void DepthMap::merge(const DepthMap & depth2)
             }
         }
     }
+
+    // Remove bad hypotheses
+    costRejection();
 }
 
 void DepthMap::regularize()
