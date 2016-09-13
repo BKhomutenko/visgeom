@@ -455,7 +455,7 @@ public:
         vector<int> kernelVec, waveVec;
         const int NORMALIZER = initKernel(kernelVec, LENGTH);
         const int WAVE_NORM = initWave(waveVec, LENGTH);
-        EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1});
+        EpipolarDescriptor epipolarDescriptor(LENGTH, LENGTH * 5, waveVec.data(), {1, 2, 3});
         
         MHPack salientPack;
         //TODO to optimize make a continuous vector<uint8_t>
@@ -463,6 +463,7 @@ public:
         Vector2iVec depthPointVec;
         vector<int> stepVec;
         if (params.verbosity > 1) cout << "    beginning loop" << endl;
+        
         for (int y = 0; y < depth.yMax; y++)
         {
             for (int x = 0; x < depth.xMax; x++)
@@ -491,10 +492,14 @@ public:
              QUERY_POINTS | MINMAX | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING); 
         
         //TODO make an option of emptying nonsalient points in the depth map
-//        depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
+        depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
         
         Vector3dVec cloud2;
         T12.inverseTransform(salientPack.cloud, cloud2);
+        
+//        int count = 0;
+//        double diffAbs = 0;
+//        double diffRel = 0;
         
         if (params.verbosity > 1) cout << "    searching for correspondences" << endl;
         for (int idx = 0; idx < salientPack.imagePointVec.size(); idx++)
@@ -509,7 +514,8 @@ public:
             
             Vector2i diff = round(ptMax - ptMin);
             const int diffLength = max(abs(diff[0]), abs(diff[1])) + 1;
-            if (diffLength > 3)
+            const int step = stepVec[salientPack.idxMapVec[idx]];
+            if (diffLength > 2*step)
             {
                 // if distance is big enough
                 // search along epipolar curve
@@ -519,8 +525,8 @@ public:
                                                 epipolarPtr->getSecond(salientPack.cloud[2*idx]));
                 
                 
-                const int distance = diffLength;
-                
+                const int distance = min(diffLength, params.dispMax) / step;
+                raster.setStep(step);
                 raster.steps(-HALF_LENGTH);
                 vector<uint8_t> sampleVec;
                 vector<int> uVec, vVec;
@@ -539,8 +545,53 @@ public:
                 
                 vector<uint8_t> & descriptor = descriptorVec[salientPack.idxMapVec[idx]];
                 
+                //FIXME tmp
+//                double tmpAbs = 0, tmpRel = 0;
+//                for (int i = 0; i < descriptor.size(); i++)
+//                {
+//                    tmpAbs += int(descriptor[i]) - int(sampleVec[i]);
+//                    tmpRel += descriptor[i] / double(sampleVec[i] + 1);
+//                    if (sampleVec[i] == 0)
+//                    {
+//                        cout << "NULL : " << uVec[i] << "  " << vVec[i] << endl;
+//                    }
+//                    if (uVec[i] < 0 or vVec[i] < 0)
+//                    {
+//                        cout << "out of image : " << round(ptMax).transpose() << endl;
+//                    }
+//                }
+//                if (tmpRel > LENGTH * 5) cout << setw(10)  << int(descriptor[HALF_LENGTH]) << setw(10) 
+//                        << int(sampleVec[HALF_LENGTH]) << setw(10)
+//                        << tmpAbs/ LENGTH << setw(10) << tmpRel/ LENGTH << endl;
+//                diffAbs += tmpAbs / LENGTH;
+//                diffRel += tmpRel / LENGTH;
+//                count++;
+//                continue;
+                
                 vector<int> costVec = compareDescriptor(descriptor, sampleVec);
                 
+                if (params.verbosity > 2)
+                {
+                    cout << "Point : " << salientPack.imagePointVec[idx].transpose() << endl;
+                    cout << "samples :" << endl;
+                    for (auto & x : sampleVec)
+                    {
+                        cout << setw(6) << int(x);
+                    }
+                    cout << endl;
+                    cout << "cost :" << endl;
+                    for (auto & x : costVec)
+                    {
+                        cout << setw(6) << int(x);
+                    }
+                    cout << endl;
+                    cout << "descriptor :" << endl;
+                    for (auto & x : descriptor)
+                    {
+                        cout << setw(6) << int(x);
+                    }
+                    cout << endl;
+                }
                 //TODO make it possible to detect multiple hypotheses if there is no prior
                 //TODO make this a parameter
                 int dBest = -1;
@@ -572,14 +623,18 @@ public:
                 //TODO make push by idx
                 Vector2i depthPt = depthPointVec[salientPack.idxMapVec[idx]];
                 
-                DepthMap::filter(depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]), 
-                        depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]), d1, sigma1);
+//                DepthMap::filter(depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]), 
+//                        depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]), d1, sigma1);
                 
-//                depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = d1;
-//                depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = sigma1;
+                //TODO make the choise of strategy parametric 
+                // and divide this function into blocks
+                depth.at(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = d1;
+                depth.sigma(depthPt[0], depthPt[1], salientPack.hypIdxVec[idx]) = sigma1;
             }
             
         }
+//        cout << "diffAbs : " << diffAbs  / count << endl;
+//                cout << "diffRel : " << diffRel / count << endl;
         depth.regularize();
     }
     

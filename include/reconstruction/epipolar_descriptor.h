@@ -48,6 +48,7 @@ public:
     {
         descVec.resize(LENGTH);
         bool imageBorder = false;
+        bool saturated = false;
         for (int step : samplingStepVec)
         {
             CurveRasterizer<int, Polynomial2> descRaster(descRasterRef);
@@ -62,9 +63,16 @@ public:
                     break;
                 }
                 descVec[i] = img1(descRaster.v, descRaster.u);
+//                if (descVec[i] == 255)
+//                {
+//                    saturated = true;
+//                    break;
+//                }
             }
-            if (imageBorder) return -1;
-            descResp = filter(wavePtr, wavePtr + LENGTH, descVec.begin(), 0);
+            if (imageBorder /*or saturated*/) return -1;
+            descResp = totalVariation(descVec.begin(), descVec.end(), int(0));
+            descResp = (descResp * 255) / (descVec[HALF_LENGTH] + 255);
+//            descResp = filter(wavePtr, wavePtr + LENGTH, descVec.begin(), 0);
             if (goodResp()) return step;
         }
         return samplingStepVec.back();

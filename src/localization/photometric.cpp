@@ -96,11 +96,10 @@ void ScalePhotometric::computePose(int scaleIdx, Transformation<double> & T12)
     }
     PhotometricPack dataPack = initPhotometricData(scaleIdx);
     scaleSpace2.setActiveScale(scaleIdx);
-    const Mat32f & img2 = scaleSpace2.get();
     array<double, 6> pose = T12.toArray();
     Problem problem;
     PhotometricCostFunction * costFunction = new PhotometricCostFunction(camPtr2, dataPack,
-                                                        img2, scaleSpace2.getActiveScale());
+                                            scaleSpace2.get(), scaleSpace2.getActiveScale());
     problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), pose.data());
     
     
@@ -152,6 +151,40 @@ void saveSurface(string fileName, FirstOrderFunction * func,
     surfaceFile.close();
 }
 
+array<double, 6> ScalePhotometric::covarianceEigenValues(const int scaleIdx,
+        const Transformation<double> T12, bool baseValues)
+{
+    PhotometricPack dataPack = initPhotometricData(scaleIdx);
+    PhotometricCostFunction * costFunction;
+    if (baseValues)
+    {
+        //FIXME must be camPtr1
+        costFunction = new PhotometricCostFunction(camPtr2, dataPack,
+                                scaleSpace1.get(), scaleSpace1.getActiveScale());
+    }
+    else
+    {
+        scaleSpace2.setActiveScale(scaleIdx);
+        costFunction = new PhotometricCostFunction(camPtr2, dataPack,
+                                scaleSpace2.get(), scaleSpace2.getActiveScale());
+    }
+    cout << "Cost function is created" << endl;
+    Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> J(dataPack.valVec.size(), 6);
+    //TODO fix this mess
+    array<double, 6> residual;
+    array<double, 6> pose = T12.toArray();
+    double * jacPtr = J.data();
+    double * paramPtr = pose.data();
+    costFunction->Evaluate(&paramPtr, residual.data(), &jacPtr);
+    cout << "Jacobian is evaluated" << endl;
+    MatrixXd JtJ = J.transpose() * J;
+    Eigen::SelfAdjointEigenSolver<MatrixXd> es(JtJ);
+    const double * evPtr = es.eigenvalues().data();
+    array<double, 6> res;
+    copy(evPtr, evPtr + 6, res.data());
+    delete costFunction;
+    return res;    
+}
 
 void ScalePhotometric::computePoseMI(int scaleIdx, Transformation<double> & T12)
 {
@@ -161,10 +194,9 @@ void ScalePhotometric::computePoseMI(int scaleIdx, Transformation<double> & T12)
     }
     PhotometricPack dataPack = initPhotometricData(scaleIdx);
     scaleSpace2.setActiveScale(scaleIdx);
-    const Mat32f & img2 = scaleSpace2.get();
     array<double, 6> pose = T12.toArray();
     MutualInformation * costFunction = new MutualInformation(camPtr2, dataPack,
-                                                        img2, scaleSpace2.getActiveScale(), 8, 255);
+                                scaleSpace2.get(), scaleSpace2.getActiveScale(), 8, 255);
     
     //TODO put to a separate file                                                    
 //    array<double, 6> grad;

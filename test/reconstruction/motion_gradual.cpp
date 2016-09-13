@@ -164,7 +164,7 @@ int main(int argc, char** argv)
         depth.sigmaToMat(sigmaRes);
 //        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
         imshow("res " + to_string(counter), res / 3);
-        imshow("sigma " + to_string(counter), sigmaRes*5);
+        imshow("sigma " + to_string(counter), sigmaRes*20);
         counter++; 
     }
     waitKey();

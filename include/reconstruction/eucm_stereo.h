@@ -48,7 +48,7 @@ struct StereoParameters : public ScaleParameters
     int maxHypDiff = 10;
     
     //for descriptor matching
-    int flawCost = 10;
+    int flawCost = 7;
 };
 
 class EnhancedStereo

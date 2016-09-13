@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
 
     BaseTransformationCalibration<EnhancedProjector> calibRobot;
 
-    if (true or calibRobot.initialize(argv[1]))
+    if (/*true or */calibRobot.initialize(argv[1]))
     {
         calibRobot.compute(TbaseCam, TorigGrid);
         cout << "TbaseCam : " << endl;
@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
         cout << TorigGrid << endl;
         calibRobot.residualAnalysis(TbaseCam, TorigGrid);
        
-        
+//        
 //        TbaseCam = Transformation<double>(0, 0, 0, -1.5927, -0.0164123, 0.00799701);
 //        auto R = TbaseCam.rotMat();
 //        double thx = atan2(R(2, 1), R(2, 2));
@@ -50,8 +50,9 @@ int main(int argc, char** argv) {
 //        cout << thx << " " << thy << endl;
 //        Transformation<double> RotX(0, 0, 0, thx, 0, 0);
 //        Transformation<double> RotY(0, 0, 0, 0, thy, 0);
-//        cout << RotY.compose(RotX) << endl;
-//        cout << TbaseCam.compose(RotY.compose(RotX).inverse()) << endl;
+//        Transformation<double> RotZ(0, 0, 0, 0, 0, -0.0032735);
+//        cout << RotZ.compose(RotY).compose(RotX) << endl;
+//        cout << TbaseCam.compose(RotZ.compose(RotY).compose(RotX).inverse()) << endl;
     }
 
     return 0;
