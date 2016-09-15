@@ -71,7 +71,7 @@ public:
             }
             if (imageBorder /*or saturated*/) return -1;
             descResp = totalVariation(descVec.begin(), descVec.end(), int(0));
-            descResp = (descResp * 255) / (descVec[HALF_LENGTH] + 255);
+            descResp = (descResp * /*255*/100) / (descVec[HALF_LENGTH] + /*255*/100);
 //            descResp = filter(wavePtr, wavePtr + LENGTH, descVec.begin(), 0);
             if (goodResp()) return step;
         }

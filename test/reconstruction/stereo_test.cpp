@@ -103,7 +103,7 @@ int main(int argc, char** argv)
     stereoParams.flawCost = 5;
     stereoParams.verbosity = 0;
     stereoParams.hypMax = 1;
-    stereoParams.salientPoints = true;
+    stereoParams.salientPoints = false;
     paramFile >> stereoParams.u0;
     paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
@@ -178,11 +178,11 @@ int main(int argc, char** argv)
         stereo.computeStereo(img1, img2, depth);
         cout << "    stereo total time : " << timer.elapsed() << endl;
         
-        depth.toMat(depthMat);
+        depth.toInverseMat(depthMat);
         
         imshow("out1", out1);
         imshow("out2", out2);
-        imshow("res", depthMat*2);
+        imshow("res", depthMat*5);
         waitKey(); 
     }
     return 0;

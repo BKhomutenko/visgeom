@@ -455,7 +455,7 @@ public:
         vector<int> kernelVec, waveVec;
         const int NORMALIZER = initKernel(kernelVec, LENGTH);
         const int WAVE_NORM = initWave(waveVec, LENGTH);
-        EpipolarDescriptor epipolarDescriptor(LENGTH, LENGTH * 5, waveVec.data(), {1, 2, 3});
+        EpipolarDescriptor epipolarDescriptor(LENGTH, LENGTH * 3, waveVec.data(), {1, 2, 3});
         
         MHPack salientPack;
         //TODO to optimize make a continuous vector<uint8_t>
@@ -534,15 +534,20 @@ public:
                 uVec.reserve(distance + margin);
                 vVec.reserve(distance + margin);
                 sampleVec.reserve(distance + margin);
+                bool imageBorder = false;
                 for (int d = 0; d < distance + margin; d++, raster.step())
                 {
                     if (raster.v < 0 or raster.v >= img2.rows 
-                        or raster.u < 0 or raster.u >= img2.cols) sampleVec.push_back(0);
+                        or raster.u < 0 or raster.u >= img2.cols) 
+                        {
+                            imageBorder = true;
+                            break;
+                        }//sampleVec.push_back(0);
                     else sampleVec.push_back(img2(raster.v, raster.u));
                     uVec.push_back(raster.u);
                     vVec.push_back(raster.v);
                 }
-                
+                if (imageBorder) continue;
                 vector<uint8_t> & descriptor = descriptorVec[salientPack.idxMapVec[idx]];
                 
                 //FIXME tmp
@@ -595,7 +600,7 @@ public:
                 //TODO make it possible to detect multiple hypotheses if there is no prior
                 //TODO make this a parameter
                 int dBest = -1;
-                int eBest = LENGTH*15;
+                int eBest = LENGTH*55;
                 for (int d = 0; d < distance; d++)
                 {
                     const int & acc = costVec[d + HALF_LENGTH];

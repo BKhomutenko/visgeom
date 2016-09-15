@@ -152,7 +152,7 @@ void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap
                     //FIXME temporary 
 //                    depth.at(x, y, h) =  smallDisparity(y, x*params.hypMax + h);
                     computeDepth(depth.at(x, y, h), depth.sigma(x, y, h), x, y, h);
-//                    depth.cost(x, y, h) = 1; //FIXME
+                    depth.cost(x, y, h) = DEFAULT_COST_DEPTH + h; //FIXME
                 }
                 else 
                 {
@@ -237,7 +237,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
             }
             
             //TODO revise the criterion (step == 1)
-            if (params.salientPoints and step == 1)
+            if (params.salientPoints and step <= 2)
             {
                 salientBuffer(y, x) = 1;
             }
@@ -626,7 +626,7 @@ bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int 
     dist = triangulate(pt1[0], pt1[1], u21, v21);
     if (dist < 0)
     {
-        cout << y << " " << x << "    " << dist << " " << disparity << endl;
+        // cout << y << " " << x << "    " << dist << " " << disparity << endl;
     }
     if (dist > MIN_DEPTH)
     {

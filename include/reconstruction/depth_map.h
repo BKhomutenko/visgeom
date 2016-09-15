@@ -244,8 +244,14 @@ private:
     void pixelMedianFilter(const int x, const int y, const int h, DepthMap & dst);
     void pixelAverageFilter(const Vector3iVec & matches, DepthMap & dst);
 
+    //Swap two hypotheses at the same pixel
+    void swapHypotheses(const int x, const int y, const int h1, const int h2);
+
+    //Sort all the hypotheses at a given pixel in the order of ascending cost
+    void sortHypStack(const int x, const int y);
+
     // Rejects hypotheses above the threshold
-    void costRejection(const double rejectionThreshold = DEFAULT_COST_DEPTH + 8);
+    void costRejection(const double rejectionThreshold = DEFAULT_COST_DEPTH + 16);
 
     std::vector<double> valVec;
     std::vector<double> sigmaVec; // uncertainty

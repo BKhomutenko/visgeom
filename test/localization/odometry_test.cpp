@@ -12,6 +12,7 @@
 
 using namespace std;
 
+const float imgIntensityScale = 0.2;
 
 // Helper function to read values from a file
 template <int N>
@@ -118,6 +119,7 @@ int main(int argc, char** argv)
 	paramFile >> stereoSgmParams.dispMax;
 	paramFile >> stereoSgmParams.scale;
 	paramFile.ignore();
+	std::cout << "Accepted parameters: u0 = " << stereoSgmParams.u0 << "; v0 = " << stereoSgmParams.v0 << "; dispMax = " << stereoSgmParams.dispMax << "; scale = " << stereoSgmParams.scale << std::endl;
 	stereoSgmParams.uMax = keyframe1.cols;
 	stereoSgmParams.vMax = keyframe1.rows;
 	// stereoSgmParams.setEqualMargin();
@@ -127,8 +129,8 @@ int main(int argc, char** argv)
 	EnhancedSGM stereoSGM(T12, &camera1, &camera2, stereoSgmParams);
 
 	MotionStereoParameters mstereoParams;
-	mstereoParams.verbosity = 0;
-	mstereoParams.descLength = (stereoSgmParams.scale / 2 + 1) * 2 + 1;
+	mstereoParams.verbosity = 3;
+	mstereoParams.descLength =  7; //(stereoSgmParams.scale / 2 + 1) * 2 + 1;
 	// mstereoParams.scale = stereoSgmParams.scale;
 	mstereoParams.dispMax = 32;
 	MotionStereo stereoMotion(&camera1, &camera2, mstereoParams);
@@ -162,9 +164,9 @@ int main(int argc, char** argv)
 	stereoSGM.computeStereo(keyframe1, keyframe2, keyDepth);
 
 	Mat32f keyDepthMap;
-	keyDepth.toMat(keyDepthMap);
+	keyDepth.toInverseMat(keyDepthMap);
 	cv::namedWindow("SGM Depthmap", 1);
-	cv::imshow("SGM Depthmap", keyDepthMap/50);
+	cv::imshow("SGM Depthmap", keyDepthMap / imgIntensityScale);
 	cv::waitKey(0);
 
 	int refinement = 0;
@@ -202,7 +204,7 @@ int main(int argc, char** argv)
 		//Images for photometric residual
 		Mat32f wrappedImg;
 		//Localization ~ after 5 refinements
-		if (refinement >= 4)
+		if (refinement >= 200)
 		{
 			// cout << "Calculating photometric localization..." << endl;
 
@@ -235,7 +237,7 @@ int main(int argc, char** argv)
 		//Step: Use motion stereo to refine depthmap
 		//Seed new depth estimation as equal to keyframe depthmap
 		DepthMap newDepth = keyDepth;
-
+		newDepth.setDefault();
 		//Compute new depth using computeDepth() of MotionStereo
 		// cout << "Calculating stereo from motion ..." << endl;
 		stereoMotion.computeDepth(Tmotion, newframe1, newDepth);
@@ -243,15 +245,15 @@ int main(int argc, char** argv)
 		//Merge the new depthmap into the keyframe depthmap
 		// cout << "Merging depthmaps ..." << endl;
 		keyDepth.merge(newDepth);
-		keyDepth.filterNoise();
+		// keyDepth.filterNoise();
 
 		//Output region
 		Mat32f newDepthMat, keyDepthMat;
-		newDepth.toMat(newDepthMat);
-		keyDepth.toMat(keyDepthMat);
+		newDepth.toInverseMat(newDepthMat);
+		keyDepth.toInverseMat(keyDepthMat);
 		cv::imshow("Current image", newframe1);
-		cv::imshow("Motion stereo depthmap", newDepthMat/1);
-		cv::imshow("Merged keyframe depthmap", keyDepthMat/1);
+		cv::imshow("Motion stereo depthmap", newDepthMat / imgIntensityScale);
+		cv::imshow("Merged keyframe depthmap", keyDepthMat / imgIntensityScale);
 		int pressedKey = cv::waitKey(0);
 		cout << "Pressed key: " << pressedKey << endl;
 		if( pressedKey == 1048603 or pressedKey == 27 ) break; // Break on ESC key

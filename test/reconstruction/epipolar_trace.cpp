@@ -121,7 +121,7 @@ int main(int argc, char** argv)
         cout << setw(10) << e;
     }
     cout << endl;
-    paramFile.ignore();
+    paramFile.ignore();paramFile.ignore();
     Transformation<double> T01(robotPose1.data()), T02(robotPose2.data());
     
     Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
@@ -133,13 +133,18 @@ int main(int argc, char** argv)
     string fileName1, fileName2;
     
     getline(paramFile, fileName1); //to SGM parameters
+    cout << "Input:" << fileName1 << endl;
     
     while(getline(paramFile, fileName1))
     {
+        cout << "Input:" << fileName1 << endl;
         getline(paramFile, fileName2);
+        cout << "Input:" << fileName2 << endl;
         
         img1 = imread(fileName1, 0);
         img2 = imread(fileName2, 0);
+        if(img1.empty()) cout << "Error in " << fileName1 << endl;
+        if(img2.empty()) cout << "Error in " << fileName2 << endl;
         
         imshow("out1", img1);
         imshow("out2", img2);
