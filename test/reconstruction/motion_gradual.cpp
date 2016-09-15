@@ -79,9 +79,9 @@ int main(int argc, char** argv)
     stereoParams.descLength = 5;
     
     SGMParameters stereoParams2;
-    stereoParams2.salientPoints = true;
+    stereoParams2.salientPoints = false;
     stereoParams2.verbosity = 3;
-    stereoParams2.hypMax = 3;
+    stereoParams2.hypMax = 1;
 //    stereoParams.salientPoints = false;
     paramFile >> stereoParams2.u0;
     paramFile >> stereoParams2.v0;
@@ -100,21 +100,15 @@ int main(int argc, char** argv)
 
     Mat8u img1 = imread(imageDir + imageName, 0);
     
-    ScaleParameters scaleParams;
-    scaleParams.scale = stereoParams2.scale;
-    scaleParams.u0 = 25;
-    scaleParams.v0 = 25;
-    scaleParams.uMax = img1.cols;
-    scaleParams.vMax = img1.rows;
-    scaleParams.setEqualMargin();
-    
-    stereoParams2.uMax = img1.cols;
-    stereoParams2.vMax = img1.rows;
+    stereoParams2.u0 = 100;
+    stereoParams2.v0 = 100;
+    stereoParams2.uMax = img1.cols - 250;
+    stereoParams2.vMax = img1.rows - 250;
     stereoParams2.setEqualMargin();
     
     int counter = 2;
     EnhancedCamera camera(params.data());
-    DepthMap depth(&camera, scaleParams);
+    DepthMap depth;
     depth.setDefault();
     
     MotionStereo stereo(&camera, &camera, stereoParams);
@@ -140,8 +134,9 @@ int main(int argc, char** argv)
     Mat32f res, sigmaRes;
     depth.toMat(res);
     depth.sigmaToMat(sigmaRes);
-    imshow("res" + to_string(counter), res / 3);
+    imshow("res" + to_string(counter), res / 50);
     imshow("sigma " + to_string(counter), sigmaRes*5);
+    waitKey();
     counter++;
     while (getline(paramFile, imageInfo))
     {

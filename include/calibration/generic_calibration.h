@@ -161,7 +161,6 @@ public:
         options.max_num_iterations = 250;
         Solver::Summary summary;
         Solve(options, &problem, &summary);
-        cout << summary.FullReport() << endl;
     }
 
     void addIntrinsicResidual(Problem & problem, vector<double> & intrinsic,
