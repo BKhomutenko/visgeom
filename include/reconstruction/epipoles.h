@@ -23,6 +23,8 @@ Computes and keeps the epipoles or aniepipoles
 
 #pragma once
 
+#include "io.h"
+
 #include "eigen.h"
 #include "geometry/geometry.h"
 #include "camera/generic_camera.h"
@@ -51,9 +53,11 @@ public:
             camera2->projectPoint(-Transform12.transInv(), epipole2);
             epipoleInverted2 = true;
         }
+        cout << "Epipoles' inversion " << epipoleInverted1 << " " << epipoleInverted2 << endl;
         
         epipolePx1 = round(epipole1);
         epipolePx2 = round(epipole2);
+        cout << "Epipoles : " << epipolePx1.transpose() << " " << epipolePx2.transpose() << endl;
     
     }
     

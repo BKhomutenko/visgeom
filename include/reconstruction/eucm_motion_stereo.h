@@ -413,7 +413,7 @@ public:
                 //TODO make it possible to detect multiple hypotheses if there is no prior
                 //TODO make this a parameter
                 int dBest = -1;
-                int eBest = LENGTH*15;
+                int eBest = LENGTH*25;
                 for (int d = 0; d < distance; d++)
                 {
                     const int & acc = costVec[d + HALF_LENGTH];
@@ -455,7 +455,7 @@ public:
         vector<int> kernelVec, waveVec;
         const int NORMALIZER = initKernel(kernelVec, LENGTH);
         const int WAVE_NORM = initWave(waveVec, LENGTH);
-        EpipolarDescriptor epipolarDescriptor(LENGTH, LENGTH * 5, waveVec.data(), {1, 2, 3});
+        EpipolarDescriptor epipolarDescriptor(LENGTH, LENGTH * 3, waveVec.data(), {1, 2, 3});
         
         MHPack salientPack;
         //TODO to optimize make a continuous vector<uint8_t>
@@ -507,10 +507,10 @@ public:
             
             // project min-max points
             Vector2d ptMin, ptMax;
-            camera2->projectPoint(cloud2[2*idx], ptMin);
-            camera2->projectPoint(cloud2[2*idx + 1], ptMax);
+            if (not camera2->projectPoint(cloud2[2*idx], ptMin)) continue;
+            if (not camera2->projectPoint(cloud2[2*idx + 1], ptMax)) continue;
             
-//            cout << cloud2[2*idx].norm() << " " << cloud2[2*idx + 1].norm() << endl;
+//            cout << (ptMin - ptMax).transpose() << " ##### ";
             
             Vector2i diff = round(ptMax - ptMin);
             const int diffLength = max(abs(diff[0]), abs(diff[1])) + 1;
@@ -523,7 +523,7 @@ public:
                 // query 3D point must be projected into 1st frame
                 CurveRasterizer<int, Polynomial2> raster(round(ptMax), round(ptMin),
                                                 epipolarPtr->getSecond(salientPack.cloud[2*idx]));
-                
+//                if (epipoles.secondIsInverted()) raster.setStep(-1);
                 
                 const int distance = min(diffLength, params.dispMax) / step;
                 raster.setStep(step);
@@ -534,15 +534,20 @@ public:
                 uVec.reserve(distance + margin);
                 vVec.reserve(distance + margin);
                 sampleVec.reserve(distance + margin);
+                bool imageBorder = false;
                 for (int d = 0; d < distance + margin; d++, raster.step())
                 {
                     if (raster.v < 0 or raster.v >= img2.rows 
-                        or raster.u < 0 or raster.u >= img2.cols) sampleVec.push_back(0);
+                        or raster.u < 0 or raster.u >= img2.cols) 
+                        {
+                            imageBorder = true;
+                            break;
+                        }//sampleVec.push_back(0);
                     else sampleVec.push_back(img2(raster.v, raster.u));
                     uVec.push_back(raster.u);
                     vVec.push_back(raster.v);
                 }
-                
+                if (imageBorder) continue;
                 vector<uint8_t> & descriptor = descriptorVec[salientPack.idxMapVec[idx]];
                 
                 //FIXME tmp
@@ -595,7 +600,7 @@ public:
                 //TODO make it possible to detect multiple hypotheses if there is no prior
                 //TODO make this a parameter
                 int dBest = -1;
-                int eBest = LENGTH*15;
+                int eBest = LENGTH*25;
                 for (int d = 0; d < distance; d++)
                 {
                     const int & acc = costVec[d + HALF_LENGTH];
@@ -618,7 +623,7 @@ public:
                         uVec[dBest + HALF_LENGTH], vVec[dBest + HALF_LENGTH], CAMERA_1);
                 double d2 = triangulate(salientPack.imagePointVec[idx][0], salientPack.imagePointVec[idx][1], 
                         uVec[dBest + HALF_LENGTH + 1], vVec[dBest + HALF_LENGTH + 1], CAMERA_1);
-                double sigma1 = abs(d2 - d1) / 1.732; //variance of a uniform distribution
+                double sigma1 = abs(d2 - d1) * SIGMA_COEFF; //variance of a uniform distribution
                 
                 //TODO make push by idx
                 Vector2i depthPt = depthPointVec[salientPack.idxMapVec[idx]];

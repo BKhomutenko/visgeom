@@ -43,12 +43,19 @@ struct EnhancedProjector
         const T & z = src[2];
         
         T denom = alpha * sqrt(z*z + beta*(x*x + y*y)) + (T(1.) - alpha) * z;
-
         if (denom < 1e-3) return false;
+        
+        // Check that the point is in the upper hemisphere in case of ellipsoid
+        if (alpha > T(0.5))
+        {
+            const T zn = z / denom; 
+            const T C = (alpha - T(1.)) / (alpha + alpha - T(1.));
+            if (zn < C) return false;
+        }
+        
         // Project the point to the mu plane
-        T xn = x / denom;
-        T yn = y / denom;
-
+        const T xn = x / denom;
+        const T yn = y / denom;
         // Compute image point
         dst[0] = fu * xn + u0;
         dst[1] = fv * yn + v0;

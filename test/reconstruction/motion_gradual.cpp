@@ -99,6 +99,8 @@ int main(int argc, char** argv)
     for (auto & x : robotPose1) imageStream >> x;
 
     Mat8u img1 = imread(imageDir + imageName, 0);
+    cout << "Image name: "<< imageDir + imageName << endl;
+    cout << "Image size: "<<img1.size()<<endl;;
     
     stereoParams2.u0 = 100;
     stereoParams2.v0 = 100;
@@ -132,11 +134,12 @@ int main(int argc, char** argv)
     stereoSG.computeStereo(img1, img2, depth);
     cout << timer.elapsed() << endl; 
     Mat32f res, sigmaRes;
-    depth.toMat(res);
-    depth.sigmaToMat(sigmaRes);
-    imshow("res" + to_string(counter), res / 50);
-    imshow("sigma " + to_string(counter), sigmaRes*5);
-    waitKey();
+    Mat32f res2, sigmaRes2;
+    depth.toInverseMat(res2);
+    depth.sigmaToMat(sigmaRes2);
+    imshow("res" + to_string(counter), res2 / 4);
+    imshow("sigma " + to_string(counter), sigmaRes2*5);
+    cv::waitKey(0);
     counter++;
     while (getline(paramFile, imageInfo))
     {
@@ -152,13 +155,14 @@ int main(int argc, char** argv)
 
 //        depth.setDefault();
         timer.reset();
-//        DepthMap depth2 = depth;
-        stereo.computeDepth(TleftRight, img2, depth);
+        DepthMap depth2 = depth;
+        stereo.computeDepth(TleftRight, img2, depth2);
+        depth.merge(depth2);
         cout << timer.elapsed() << endl; 
-        depth.toMat(res);
+        depth.toInverseMat(res);
         depth.sigmaToMat(sigmaRes);
 //        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
-        imshow("res " + to_string(counter), res / 3);
+        imshow("res " + to_string(counter), res / 4);
         imshow("sigma " + to_string(counter), sigmaRes*20);
         counter++; 
     }

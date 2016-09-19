@@ -116,7 +116,7 @@ int main(int argc, char** argv)
     {
         getline(paramFile, fileName2);
         
-        Mat8u img1 = imread(fileName1, 0) / 0.96;
+        Mat8u img1 = imread(fileName1, 0);
         Mat8u img2 = imread(fileName2, 0);
         Mat16s img1lap, img2lap;
 
@@ -178,11 +178,11 @@ int main(int argc, char** argv)
         stereo.computeStereo(img1, img2, depth);
         cout << "    stereo total time : " << timer.elapsed() << endl;
         
-        depth.toMat(depthMat);
+        depth.toInverseMat(depthMat);
         
         imshow("out1", out1);
         imshow("out2", out2);
-        imshow("res", depthMat/100);
+        imshow("res", depthMat*5);
         waitKey(); 
     }
     return 0;

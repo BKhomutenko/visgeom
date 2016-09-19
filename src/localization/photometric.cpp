@@ -246,6 +246,7 @@ void ScalePhotometric::wrapImage(const Mat32f & src, Mat32f & dst, const Transfo
 {   
     MHPack pack;
     dst.create(src.size());
+    dst.setTo(0);
     for (int i = 0; i < src.rows; i++)
     {
         for (int j = 0; j < src.cols; j++)
