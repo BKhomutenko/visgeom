@@ -624,18 +624,17 @@ bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int 
     }
     
     dist = triangulate(pt1[0], pt1[1], u21, v21);
-    if (dist < 0)
-    {
-        // cout << y << " " << x << "    " << dist << " " << disparity << endl;
-    }
+//    if (dist < 0)
+//    {
+//        // cout << y << " " << x << "    " << dist << " " << disparity << endl;
+//    }
     if (dist > MIN_DEPTH)
     {
         double d2 = triangulate(pt1[0], pt1[1], u22, v22);
         
         if (d2 > MIN_DEPTH)
         {
-            sigma = abs(d2 - dist) / 1.732;
-//            dist = 1 / dist; //FIXME
+            sigma = abs(d2 - dist) * SIGMA_COEFF;
             return true;
         }
     }

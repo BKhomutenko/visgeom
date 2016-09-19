@@ -27,3 +27,4 @@ const double DEFAULT_SIGMA_DEPTH = 30;
 const double DEFAULT_COST_DEPTH = 5;
 const double COST_CHANGE = 1;
 const double OUT_OF_RANGE = 0.0;
+const double SIGMA_COEFF = 1 / 1.7;

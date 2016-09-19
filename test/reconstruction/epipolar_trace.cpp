@@ -4,33 +4,71 @@
 #include "timer.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_epipolar.h"
+#include "reconstruction/epipolar_descriptor.h"
 #include "reconstruction/depth_map.h"
 
 EnhancedEpipolar * epipolar;
 Mat8u img1, img2;
+EnhancedCamera * cam1, * cam2;
+EpipolarDescriptor * epipolarDescriptor;
+StereoEpipoles * epipoles;
+Transformation<double> TleftRight;
 
 void CallBackFunc1(int event, int x, int y, int flags, void* userdata)
 {
-     if  ( event == cv::EVENT_LBUTTONDOWN )
-     {
-          cout << "Left button of the mouse is clicked 1 - position (" << x << ", " << y << ")" << endl;
-          epipolar->traceEpipolarLine(x, y, img2, CAMERA_1, 100);
-          cv::circle(img1, Point(x, y), 0, Scalar(0), -1);
-          imshow("out1", img1);
-          imshow("out2", img2);
-     }
+    if  ( event == cv::EVENT_LBUTTONDOWN )
+    {
+        cout << "Left button of the mouse is clicked 1 - position (" << x << ", " << y << ")" << endl;
+        
+        Vector3d X;
+        Vector2d pt;
+        cam1->reconstructPoint(Vector2d(x, y), X);
+        CurveRasterizer<int, Polynomial2> raster(Vector2i(x, y), epipoles->getFirstPx(),
+                             epipolar->getFirst(X));
+        if (epipoles->firstIsInverted()) raster.setStep(-1);
+        vector<uint8_t> descriptor;
+        const int step = epipolarDescriptor->compute(img1, raster, descriptor);
+        cout << "step :" << step << endl;
+        cout << "Descriptor :" << endl;
+        for (auto & x : descriptor)
+        {
+            cout << setw(5) << int(x);
+        }
+        cout << endl;
+        
+        //get the sample sequence
+        cam2->projectPoint(TleftRight.rotMatInv() * X, pt);
+        CurveRasterizer<int, Polynomial2> raster2(round(pt), epipoles->getSecondPx(),
+                             epipolar->getSecond(X));
+        if (epipoles->secondIsInverted()) raster2.setStep(-1);                     
+        raster2.setStep(step);                     
+        vector<uint8_t> samleVec;
+        raster2.steps(-5);
+        cout << "Samples :" << endl;
+        for (int i = 0; i < 32; i++, raster2.step())
+        {
+            cout << setw(5) << int(img2(raster2.v, raster2.u));
+        }
+        cout << endl;
+        
+        
+        epipolar->traceEpipolarLine(x, y, img2, CAMERA_1, 100);
+        cv::circle(img1, Point(x, y), 1, Scalar(128), -1);
+        imshow("out1", img1);
+        imshow("out2", img2);
+    }
 }
 
 void CallBackFunc2(int event, int x, int y, int flags, void* userdata)
 {
-     if  ( event == cv::EVENT_LBUTTONDOWN )
-     {
-          cout << "Left button of the mouse is clicked 2 - position (" << x << ", " << y << ")" << endl;
-          epipolar->traceEpipolarLine(x, y, img1,  CAMERA_2, 100);
-          cv::circle(img2, Point(x, y), 0, Scalar(0), -1);
-          imshow("out1", img1);
-          imshow("out2", img2);
-     }
+    if  ( event == cv::EVENT_LBUTTONDOWN )
+    {
+        cout << "Left button of the mouse is clicked 2 - position (" << x << ", " << y << ")" << endl;
+        epipolar->traceEpipolarLine(x, y, img1,  CAMERA_2, 100);
+        cv::circle(img2, Point(x, y), 1, Scalar(128), -1);
+        imshow("out1", img1);
+        imshow("out2", img2);
+    }
 }
 
 int main(int argc, char** argv)
@@ -124,11 +162,22 @@ int main(int argc, char** argv)
     paramFile.ignore();paramFile.ignore();
     Transformation<double> T01(robotPose1.data()), T02(robotPose2.data());
     
-    Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
+    TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
+    const int LENGTH = 7;
+    cam1 = new EnhancedCamera(params1.data());
+    cam2 = new EnhancedCamera(params2.data());
     
-    EnhancedCamera cam1(params1.data()), cam2(params2.data());
+    Vector2d pt;
+    cout << cam1->projectPoint(TleftRight.trans(), pt) << endl;
+    cout << pt << endl;
+    cout << cam2->projectPoint(-TleftRight.transInv(), pt) << endl;
+    cout << pt << endl;
     
-    epipolar = new EnhancedEpipolar(TleftRight, &cam1, &cam2, 2000);
+    
+    
+    epipolarDescriptor = new EpipolarDescriptor(LENGTH, 3*LENGTH, NULL, {1, 2, 3, 5, 7, 9});
+    epipoles = new StereoEpipoles(cam1, cam2, TleftRight);
+    epipolar = new EnhancedEpipolar(TleftRight, cam1, cam2, 2000);
     
     string fileName1, fileName2;
     

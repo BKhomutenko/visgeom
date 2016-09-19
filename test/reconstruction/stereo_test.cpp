@@ -116,7 +116,7 @@ int main(int argc, char** argv)
     {
         getline(paramFile, fileName2);
         
-        Mat8u img1 = imread(fileName1, 0) / 0.96;
+        Mat8u img1 = imread(fileName1, 0);
         Mat8u img2 = imread(fileName2, 0);
         Mat16s img1lap, img2lap;
 

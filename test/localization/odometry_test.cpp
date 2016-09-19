@@ -77,7 +77,7 @@ int main(int argc, char** argv)
 	std::string keyimg1name, keyimg2name;
 	img1File >> keyimg1name;
 	img2File >> keyimg2name;
-	Mat8u keyframe1 = imread(datasetFoldername + "/" + keyimg1name, 0) / 0.96;
+	Mat8u keyframe1 = imread(datasetFoldername + "/" + keyimg1name, 0);
 	Mat8u keyframe2 = imread(datasetFoldername + "/" + keyimg2name, 0);
 	std::cout << "Keyframe1 robot pose:" << std::endl;
 	array<double, 6> prevPose1 = readValues<6>(img1File, true);
@@ -129,7 +129,7 @@ int main(int argc, char** argv)
 	EnhancedSGM stereoSGM(T12, &camera1, &camera2, stereoSgmParams);
 
 	MotionStereoParameters mstereoParams;
-	mstereoParams.verbosity = 3;
+	mstereoParams.verbosity = 0;
 	mstereoParams.descLength =  7; //(stereoSgmParams.scale / 2 + 1) * 2 + 1;
 	// mstereoParams.scale = stereoSgmParams.scale;
 	mstereoParams.dispMax = 32;
@@ -177,7 +177,7 @@ int main(int argc, char** argv)
 		std::string img1name, img2name;
 		img1File >> img1name;
 		img2File >> img2name;
-		Mat8u newframe1 = imread(datasetFoldername + "/" + img1name, 0) / 0.96;
+		Mat8u newframe1 = imread(datasetFoldername + "/" + img1name, 0);
 		Mat8u newframe2 = imread(datasetFoldername + "/" + img2name, 0);
 		// std::cout << "New frame pose (cam1):" << std::endl;
 		array<double, 6> newPose1 = readValues<6>(img1File, false);
@@ -204,7 +204,7 @@ int main(int argc, char** argv)
 		//Images for photometric residual
 		Mat32f wrappedImg;
 		//Localization ~ after 5 refinements
-		if (refinement >= 200)
+		if (refinement >= 0)
 		{
 			// cout << "Calculating photometric localization..." << endl;
 
@@ -237,7 +237,7 @@ int main(int argc, char** argv)
 		//Step: Use motion stereo to refine depthmap
 		//Seed new depth estimation as equal to keyframe depthmap
 		DepthMap newDepth = keyDepth;
-		newDepth.setDefault();
+//		newDepth.setDefault();
 		//Compute new depth using computeDepth() of MotionStereo
 		// cout << "Calculating stereo from motion ..." << endl;
 		stereoMotion.computeDepth(Tmotion, newframe1, newDepth);

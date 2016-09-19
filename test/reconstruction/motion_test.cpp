@@ -74,7 +74,7 @@ int main(int argc, char** argv)
     int foo;
     paramFile >> foo;
     paramFile >> foo;
-    paramFile >> foo;
+    paramFile >> stereoParams.dispMax;
     paramFile >> stereoParams.scale;
     paramFile.ignore();
     string fileName1, fileName2;
@@ -118,32 +118,34 @@ int main(int argc, char** argv)
     
     ScaleParameters scaleParams;
     scaleParams.scale = stereoParams.scale;
+    
     scaleParams.u0 = 50;
-    scaleParams.v0 = 150;
+    scaleParams.v0 = 200;
     scaleParams.uMax = img1.cols;
     scaleParams.vMax = img1.rows;
     scaleParams.setEqualMargin();
     scaleParams.setYMargin(330);
-//    scaleParams.u0 = 800;
-//    scaleParams.v0 = 300;
-//    scaleParams.uMax = 850;
-//    scaleParams.vMax = 315;
-//    scaleParams.setXMargin(0);
-//    scaleParams.setYMargin(0);
+
+//    scaleParams.u0 = 700;
+//    scaleParams.v0 = 200;
+//    scaleParams.uMax = img1.cols;
+//    scaleParams.vMax = img1.rows;
+//    scaleParams.setYMargin(700);
+//    scaleParams.setXMargin(400);
     
     DepthMap depth(&camera1, scaleParams);
-    depth.setTo(100, 1000);
+    depth.setTo(252, 100);
     Mat32f res;
     timer.reset();
     stereo.computeDepth(TleftRight, img2, depth);
     cout << timer.elapsed() << endl;
     timer.reset();
 
-    depth.toMat(res);    
+    depth.toInverseMat(res);    
     
     imshow("out1", img1);
     imshow("out2", img2);
-    imshow("res", res/100);
+    imshow("res", res * 5 );
     waitKey(); 
     return 0;
 }

@@ -551,8 +551,8 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
             
             if (reconstFlags & MINMAX) 
             {
-                depthVec.push_back(max(depth - 4*sigma, MIN_DEPTH));
-                depthVec.push_back(depth + 4*sigma);
+                depthVec.push_back(max(depth - 2.5*sigma, MIN_DEPTH));
+                depthVec.push_back(depth + 2.5*sigma);
             }
             else
             {

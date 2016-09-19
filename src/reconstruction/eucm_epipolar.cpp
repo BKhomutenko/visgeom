@@ -208,6 +208,7 @@ void EnhancedEpipolar::traceEpipolarLine(int u, int v, Mat & out, CameraIdx camI
         X2 = Transform12.rotMatInv() * X1;
         if (not camera2->projectPoint(X2, pt)) return;
         raster1 = new CurveRasterizer<int, Polynomial2>(round(pt), epipoles.getSecondPx(), getSecond(X1));
+        if (epipoles.secondIsInverted()) raster1->setStep(-1);  
     }
     else if (camIdx == CAMERA_2)
     {
@@ -215,12 +216,14 @@ void EnhancedEpipolar::traceEpipolarLine(int u, int v, Mat & out, CameraIdx camI
         X1 = Transform12.rotMat() * X2;
         if (not camera1->projectPoint(X1, pt)) return;
         raster1 = new CurveRasterizer<int, Polynomial2>(round(pt), epipoles.getFirstPx(), getFirst(X1));
+        if (epipoles.firstIsInverted()) raster1->setStep(-1);
     }
     CurveRasterizer<int, Polynomial2> * raster2 = new CurveRasterizer<int, Polynomial2>(*raster1);
+    cv::circle(out, Point(raster1->u, raster1->v), 1, Scalar(128), -1);
     for (int i = 0; i < count; i++)
     {
-        cv::circle(out, Point(raster1->u, raster1->v), 0, Scalar(0), -1);
-//        cv::circle(out, Point(raster2->u, raster2->v), 2, Scalar(0), -1);
+        cv::circle(out, Point(raster1->u, raster1->v), 0, Scalar(128), -1);
+//        cv::circle(out, Point(raster2->u, raster2->v), 0, Scalar(128), -1);
         raster1->step();
 //        raster2->unstep();
     }
