@@ -110,13 +110,16 @@ int main(int argc, char** argv)
 
         EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
 
-        Mat32f depth;
+        DepthMap depth;
         auto t2 = clock();
         stereo.computeStereo(img1, img2, depth);
         auto t3 = clock();
         cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
+        
+        Mat32f dMat;
+        depth.toInverseMat(dMat);
 //        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
-        imwrite(imageDir + "res" + to_string(counter++) + ".png", stereo.disparity()*3);
+        imwrite(imageDir + "res" + to_string(counter++) + ".png", dMat*30);
     }
     return 0;
 }

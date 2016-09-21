@@ -102,10 +102,10 @@ int main(int argc, char** argv)
     cout << "Image name: "<< imageDir + imageName << endl;
     cout << "Image size: "<<img1.size()<<endl;;
     
-    stereoParams2.u0 = 100;
-    stereoParams2.v0 = 100;
-    stereoParams2.uMax = img1.cols - 250;
-    stereoParams2.vMax = img1.rows - 250;
+    stereoParams2.u0 = 50;
+    stereoParams2.v0 = 50;
+    stereoParams2.uMax = img1.cols;
+    stereoParams2.vMax = img1.rows;
     stereoParams2.setEqualMargin();
     
     int counter = 2;
@@ -137,7 +137,7 @@ int main(int argc, char** argv)
     Mat32f res2, sigmaRes2;
     depth.toInverseMat(res2);
     depth.sigmaToMat(sigmaRes2);
-    imshow("res" + to_string(counter), res2 / 4);
+    imshow("res" + to_string(counter), res2 *0.12);
     imshow("sigma " + to_string(counter), sigmaRes2*5);
     cv::waitKey(0);
     counter++;
@@ -162,7 +162,7 @@ int main(int argc, char** argv)
         depth.toInverseMat(res);
         depth.sigmaToMat(sigmaRes);
 //        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
-        imshow("res " + to_string(counter), res / 4);
+        imshow("res " + to_string(counter), res *0.12);
         imshow("sigma " + to_string(counter), sigmaRes*20);
         counter++; 
     }

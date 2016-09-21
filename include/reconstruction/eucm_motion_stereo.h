@@ -600,7 +600,7 @@ public:
                 //TODO make it possible to detect multiple hypotheses if there is no prior
                 //TODO make this a parameter
                 int dBest = -1;
-                int eBest = LENGTH*25;
+                int eBest = LENGTH*5;
                 for (int d = 0; d < distance; d++)
                 {
                     const int & acc = costVec[d + HALF_LENGTH];

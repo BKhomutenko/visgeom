@@ -103,7 +103,7 @@ int main(int argc, char** argv)
     stereoParams.flawCost = 5;
     stereoParams.verbosity = 0;
     stereoParams.hypMax = 1;
-    stereoParams.salientPoints = false;
+//    stereoParams.salientPoints = false;
     paramFile >> stereoParams.u0;
     paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
