@@ -623,7 +623,8 @@ void DepthMap::toInverseMat(Mat32f & out) const
     float* pOutData = (float*)out.data;
     for (int i = 0; i < hStep; ++i)
     {
-        *pOutData = 1 / (*pInData);
+        if ( *pInData < 1e-3 ) *pOutData = 0;
+        else *pOutData = 1 / (*pInData);
         ++pOutData;
         ++pInData;
     }

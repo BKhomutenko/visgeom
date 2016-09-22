@@ -182,7 +182,7 @@ int main(int argc, char** argv)
 	stereoSgmParams.setEqualMargin();
 	// stereoSgmParams.setXMargin(stereoSgmParams.u0);
 	stereoSgmParams.setYMargin(330);
-	stereoSgmParams.hypMax = 1;
+	stereoSgmParams.hypMax = 3;
 	EnhancedSGM stereoSGM(T12, &camera1, &camera2, stereoSgmParams);
 
 	MotionStereoParameters mstereoParams;
@@ -190,7 +190,7 @@ int main(int argc, char** argv)
 	mstereoParams.descLength =  vmap["MotionStereoParams.descLength"].as<int>(); //(stereoSgmParams.scale / 2 + 1) * 2 + 1;
 	mstereoParams.scale = vmap["MotionStereoParams.scale"].as<int>();
 	mstereoParams.dispMax = vmap["MotionStereoParams.dispMax"].as<int>();
-	MotionStereo stereoMotion(&camera1, &camera2, mstereoParams);
+	MotionStereo stereoMotion(&camera1, &camera1, mstereoParams);
 
 	//Create ScaleParameters object for depthmap
 	// ScaleParameters scaleParams;
