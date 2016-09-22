@@ -68,7 +68,8 @@ int main(int argc, char** argv)
 	options.add_options() ("help", "Produce help message");
 	options.add_options() ("foldername", po::value<string>()->required(), "Folder to search for the dataset");
 	options.add_options() ("skipRows", po::value<int>()->required(), "Number of rows of images to skip in the Image files");
-	
+	options.add_options() ("refinement", po::value<int>()->required(), "Refinement level threshold before photometric localization");
+
 	options.add_options() ("Intrinsics.Camera1", po::value< vector<double> >()->required(), "EUCM Intrinsics for camera 1 (6 doubles)");
 	options.add_options() ("Intrinsics.Camera2", po::value< vector<double> >()->required(), "EUCM Intrinsics for camera 2 (6 doubles)");
 	options.add_options() ("Extrinsics.Stereo", po::value< vector<double> >()->required(), "EUCM Stereo extrinsic calibration (6 doubles)");
@@ -82,6 +83,7 @@ int main(int argc, char** argv)
 	
 	options.add_options() ("MotionStereoParams.descLength", po::value<int>()->required(), "Motion Stereo descriptor length in pixels (needs to be odd)");
 	options.add_options() ("MotionStereoParams.dispMax", po::value<int>()->required(), "Motion Stereo maximum disparity");
+	options.add_options() ("MotionStereoParams.scale", po::value<int>()->required(), "Motion Stereo scale - unused?");
 	options.add_options() ("MotionStereoParams.verbosity", po::value<int>()->required(), "Motion Stereo verbosity level");
 
 	options.add_options() ("Pose.Base2Camera", po::value< vector<double> >()->required(), "6dof pose between robot base and camera 1 (6 doubles)");
@@ -177,16 +179,16 @@ int main(int argc, char** argv)
 	std::cout << "Accepted parameters: u0 = " << stereoSgmParams.u0 << "; v0 = " << stereoSgmParams.v0 << "; dispMax = " << stereoSgmParams.dispMax << "; scale = " << stereoSgmParams.scale << std::endl;
 	stereoSgmParams.uMax = keyframe1.cols;
 	stereoSgmParams.vMax = keyframe1.rows;
-	// stereoSgmParams.setEqualMargin();
-	stereoSgmParams.setXMargin(stereoSgmParams.u0);
+	stereoSgmParams.setEqualMargin();
+	// stereoSgmParams.setXMargin(stereoSgmParams.u0);
 	stereoSgmParams.setYMargin(330);
-	stereoSgmParams.hypMax = 3;
+	stereoSgmParams.hypMax = 1;
 	EnhancedSGM stereoSGM(T12, &camera1, &camera2, stereoSgmParams);
 
 	MotionStereoParameters mstereoParams;
 	mstereoParams.verbosity = vmap["MotionStereoParams.verbosity"].as<int>();
 	mstereoParams.descLength =  vmap["MotionStereoParams.descLength"].as<int>(); //(stereoSgmParams.scale / 2 + 1) * 2 + 1;
-	// mstereoParams.scale = stereoSgmParams.scale;
+	mstereoParams.scale = vmap["MotionStereoParams.scale"].as<int>();
 	mstereoParams.dispMax = vmap["MotionStereoParams.dispMax"].as<int>();
 	MotionStereo stereoMotion(&camera1, &camera2, mstereoParams);
 
@@ -259,7 +261,7 @@ int main(int argc, char** argv)
 		//Images for photometric residual
 		Mat32f wrappedImg;
 		//Localization ~ after 5 refinements
-		if (refinement >= 0)
+		if (refinement >= vmap["refinement"].as<int>())
 		{
 			// cout << "Calculating photometric localization..." << endl;
 
@@ -291,7 +293,7 @@ int main(int argc, char** argv)
 		
 		//Step: Use motion stereo to refine depthmap
 		//Seed new depth estimation as equal to keyframe depthmap
-		DepthMap newDepth = keyDepth;
+		DepthMap newDepth = keyDepth; newDepth.setTo(252, 100);
 //		newDepth.setDefault();
 		//Compute new depth using computeDepth() of MotionStereo
 		// cout << "Calculating stereo from motion ..." << endl;

@@ -70,7 +70,7 @@ int main(int argc, char** argv)
     Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
     
     MotionStereoParameters stereoParams;
-    stereoParams.verbosity = 0;
+    stereoParams.verbosity = 3;
     int foo;
     paramFile >> foo;
     paramFile >> foo;
