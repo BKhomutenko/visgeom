@@ -182,7 +182,7 @@ int main(int argc, char** argv)
 	stereoSgmParams.setEqualMargin();
 	// stereoSgmParams.setXMargin(stereoSgmParams.u0);
 	stereoSgmParams.setYMargin(330);
-	stereoSgmParams.hypMax = 3;
+	stereoSgmParams.hypMax = 1;
 	EnhancedSGM stereoSGM(T12, &camera1, &camera2, stereoSgmParams);
 
 	MotionStereoParameters mstereoParams;
@@ -311,6 +311,7 @@ int main(int argc, char** argv)
 		cv::imshow("Current image", newframe1);
 		cv::imshow("Motion stereo depthmap", newDepthMat / imgIntensityScale);
 		cv::imshow("Merged keyframe depthmap", keyDepthMat / imgIntensityScale);
+		cv::imshow("diff", (newDepthMat - keyDepthMap)*25 + 0.5);
 		int pressedKey = cv::waitKey(0);
 		cout << "Pressed key: " << pressedKey << endl;
 		if( pressedKey == 1048603 or pressedKey == 27 ) break; // Break on ESC key

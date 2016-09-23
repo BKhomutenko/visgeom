@@ -185,7 +185,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     vector<int> kernelVec, waveVec;
     const int NORMALIZER = initKernel(kernelVec, LENGTH);
     const int WAVE_NORM = initWave(waveVec, LENGTH);
-    EpipolarDescriptor epipolarDescriptor(LENGTH, 3*LENGTH, waveVec.data(), {1, 2, 4});
+    EpipolarDescriptor epipolarDescriptor(LENGTH, 10, waveVec.data(), {1, 2, 3, 5});
     
     if (params.salientPoints) salientBuffer.setTo(0);
     

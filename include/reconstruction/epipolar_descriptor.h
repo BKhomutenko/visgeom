@@ -38,7 +38,7 @@ public:
     EpipolarDescriptor(int length, int waveThresh, const int * wave, vector<int> stepVec) :
             LENGTH(length),
             HALF_LENGTH(length / 2),
-            WAVE_THRESH(waveThresh),
+            WAVE_THRESH(waveThresh*LENGTH),
             wavePtr(wave),
             samplingStepVec(stepVec) {}
             
@@ -71,7 +71,7 @@ public:
             }
             if (imageBorder /*or saturated*/) return -1;
             descResp = totalVariation(descVec.begin(), descVec.end(), int(0));
-            descResp = (descResp * /*255*/100) / (descVec[HALF_LENGTH] + /*255*/100);
+            descResp = (descResp * /*255*/100) / (descVec[HALF_LENGTH] + /*255*/10);
 //            descResp = filter(wavePtr, wavePtr + LENGTH, descVec.begin(), 0);
             if (goodResp()) return step;
         }

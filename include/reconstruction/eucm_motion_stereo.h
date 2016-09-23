@@ -323,9 +323,9 @@ public:
         
         // compute the weights for matching cost
         vector<int> kernelVec, waveVec;
-        const int NORMALIZER = initKernel(kernelVec, LENGTH);
-        const int WAVE_NORM = initWave(waveVec, LENGTH);
-        EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1});
+//        const int NORMALIZER = initKernel(kernelVec, LENGTH);
+//        const int WAVE_NORM = initWave(waveVec, LENGTH);
+        EpipolarDescriptor epipolarDescriptor(LENGTH, 10, waveVec.data(), {1});
         
         MHPack salientPack;
         //TODO to optimize make a continuous vector<uint8_t>
