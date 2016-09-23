@@ -180,7 +180,7 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
         double & d1 = at(x, y, h);
         double & sigma1 = sigma(x, y, h);
         double & cost1 = cost(x, y, h);
-        if( match(d1, sigma1, d, sigmaVal) )
+        if( (d1 > MIN_DEPTH) and match(d1, sigma1, d, sigmaVal) )
         {
             filter(d1, sigma1, d, sigmaVal);
             // cost1 = max(cost1 - 1.0, 0.0);
