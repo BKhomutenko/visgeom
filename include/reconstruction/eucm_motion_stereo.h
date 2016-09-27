@@ -489,7 +489,7 @@ public:
         
         if (params.verbosity > 1) cout << "    reconstructing salient points" << endl;
         depth.reconstruct(salientPack,
-             QUERY_POINTS | MINMAX | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING); 
+             QUERY_POINTS | MINMAX | DEFAULT_VALUES | ALL_HYPOTHESES | SIGMA_VALUE | INDEX_MAPPING); 
         
         //TODO make an option of emptying nonsalient points in the depth map
         depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
@@ -507,23 +507,30 @@ public:
             
             // project min-max points
             Vector2d ptMin, ptMax;
-            if (not camera2->projectPoint(cloud2[2*idx], ptMin)) continue;
+            //FIXME
+            
             if (not camera2->projectPoint(cloud2[2*idx + 1], ptMax)) continue;
             
+            int diffLength = 40; //FIXME
+            if (camera2->projectPoint(cloud2[2*idx], ptMin))
+            {
 //            cout << (ptMin - ptMax).transpose() << " ##### ";
             
-            Vector2i diff = round(ptMax - ptMin);
-            const int diffLength = max(abs(diff[0]), abs(diff[1])) + 1;
+                Vector2i diff = round(ptMax - ptMin);
+                diffLength = max(abs(diff[0]), abs(diff[1])) + 1;
+            }
             const int step = stepVec[salientPack.idxMapVec[idx]];
-            if (diffLength > 2*step)
+            const auto & ptEpipole2 = epipoles.getSecondPx();
+            const auto ptMaxRound = round(ptMax);
+            if (diffLength > 2*step and (ptMaxRound - ptEpipole2).squaredNorm() > 2500) 
             {
                 // if distance is big enough
                 // search along epipolar curve
                 
                 // query 3D point must be projected into 1st frame
-                CurveRasterizer<int, Polynomial2> raster(round(ptMax), round(ptMin),
+                CurveRasterizer<int, Polynomial2> raster(ptMaxRound, ptEpipole2,
                                                 epipolarPtr->getSecond(salientPack.cloud[2*idx]));
-//                if (epipoles.secondIsInverted()) raster.setStep(-1);
+                if (epipoles.secondIsInverted()) raster.setStep(-1);
                 
                 const int distance = min(diffLength, params.dispMax) / step;
                 raster.setStep(step);

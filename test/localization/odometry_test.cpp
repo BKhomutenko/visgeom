@@ -293,7 +293,8 @@ int main(int argc, char** argv)
 		
 		//Step: Use motion stereo to refine depthmap
 		//Seed new depth estimation as equal to keyframe depthmap
-		DepthMap newDepth = keyDepth; newDepth.setTo(252, 100);
+		DepthMap newDepth = keyDepth; 
+//		newDepth.setTo(252, 100);
 //		newDepth.setDefault();
 		//Compute new depth using computeDepth() of MotionStereo
 		// cout << "Calculating stereo from motion ..." << endl;
