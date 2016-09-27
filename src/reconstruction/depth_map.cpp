@@ -114,10 +114,10 @@ bool DepthMap::pushHypothesis(const int x, const int y, const double d, const do
 
     //Insert element into stack, so that stack is always sorted in cost ascending order
     if ( (at(x, y, hMax) > MIN_DEPTH) and (cost(x, y, hMax) <= DEFAULT_COST_DEPTH) ) return false;
-    h = hMax; //Replace element at the end of the stack
+    h = hMax-1; //Replace element at the end of the stack
     at(x, y, h) = d;
     sigma(x, y, h) = sigmaVal;
-    cost(x, y, h) = DEFAULT_COST_DEPTH;
+    cost(x, y, h) = DEFAULT_COST_DEPTH + 2*COST_CHANGE;
     sortHypStack(x, y);
     // double temp_d = d;
     // double temp_sigma = sigmaVal;
@@ -197,15 +197,15 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
     sortHypStack(x, y);
     if (matchFound) return true;
     //The program reaches this area if no matches were found
-    // else return pushHypothesis(x, y, d, sigmaVal);
-    else 
-    {
-        // cout << "Mismatch: " << x << " " << y << " " << d << " " << sigmaVal << endl;
-        // cout << "\t Options:" << endl;
-        // for(int h = 0; h < hMax; ++h)
-        //     cout << "\t" << at(x, y, h) << " " << sigma(x, y, h) << " " << cost(x, y, h) << endl;
-        return false;
-    }
+    else return pushHypothesis(x, y, d, sigmaVal);
+    // else 
+    // {
+    //     // cout << "Mismatch: " << x << " " << y << " " << d << " " << sigmaVal << endl;
+    //     // cout << "\t Options:" << endl;
+    //     // for(int h = 0; h < hMax; ++h)
+    //     //     cout << "\t" << at(x, y, h) << " " << sigma(x, y, h) << " " << cost(x, y, h) << endl;
+    //     return false;
+    // }
 }
 
 void DepthMap::costRejection(const double rejectionThreshold)
