@@ -113,7 +113,7 @@ bool DepthMap::pushHypothesis(const int x, const int y, const double d, const do
     // if (h == hMax) return false;    
 
     //Insert element into stack, so that stack is always sorted in cost ascending order
-    if ( (at(x, y, hMax) > MIN_DEPTH) and (cost(x, y, hMax) <= DEFAULT_COST_DEPTH) ) return false;
+    if ( (at(x, y, hMax-1) > MIN_DEPTH) and (cost(x, y, hMax-1) <= DEFAULT_COST_DEPTH) ) return false;
     h = hMax-1; //Replace element at the end of the stack
     at(x, y, h) = d;
     sigma(x, y, h) = sigmaVal;
