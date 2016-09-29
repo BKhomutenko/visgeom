@@ -148,8 +148,13 @@ bool DepthMap::pushImageHypothesis(const int u, const int v, const double d, con
 
 bool DepthMap::match(const double v1, const double s1, const double v2, const double s2)
 {
-    double delta = abs(v1 - v2);
-    return delta < 3 * s1 or delta < 3 * s2;
+    const double delta = abs(v1 - v2);
+    const bool output = delta < 1 * s1 or delta < 1 * s2;
+    // if (output and ((v1<1) or (v2<1)))
+    // {
+    //     cout << "v1: " << v1 << " v2: " << v2 << " s1: " << s1 << " s2: " << s2 << endl;
+    // }
+    return output;
 }
 
 void DepthMap::filter(double & v1, double & s1, const double v2, const double s2)
@@ -175,14 +180,29 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
 {
     if (not isValid(x, y)) return false;
     bool matchFound = false;
+    bool hypExist = false;
     for(int h = 0; h < hMax; ++h)
     {
         double & d1 = at(x, y, h);
         double & sigma1 = sigma(x, y, h);
         double & cost1 = cost(x, y, h);
-        if( (d1 > MIN_DEPTH) and match(d1, sigma1, d, sigmaVal) )
+        if( d1 == OUT_OF_RANGE )
+        {
+            if ( h == 0 )
+            {
+                pushHypothesis(x, y, d, sigmaVal);
+                // if(d<1) cout << "Pushing: x: " << x << " y: " << y << " d: " << d << " s: " << sigmaVal << endl;
+                return true;
+            }
+            break;
+        }
+        else if( (not matchFound) and match(d1, sigma1, d, sigmaVal) )
         {
             filter(d1, sigma1, d, sigmaVal);
+            // if(d1<1)
+            // {
+            //     cout << "After merge: d1: " << d1 << "  s1: " << sigma1 << endl;
+            // }
             // cost1 = max(cost1 - 1.0, 0.0);
             cost1 -= 2*COST_CHANGE;
             cost1 = std::max(cost1, 0.0);
@@ -195,9 +215,10 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
         }
     }
     sortHypStack(x, y);
-    if (matchFound) return true;
+    // if (matchFound) return true;
     //The program reaches this area if no matches were found
-    else return pushHypothesis(x, y, d, sigmaVal);
+    // else return pushHypothesis(x, y, d, sigmaVal);
+    return matchFound;
     // else 
     // {
     //     // cout << "Mismatch: " << x << " " << y << " " << d << " " << sigmaVal << endl;
@@ -541,7 +562,7 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
             double sigma = sigmaVec[queryIdx + h*hStep]; //TODO discard points with sigma > sigmaMax
             if (depth < MIN_DEPTH)
             {
-                if (reconstFlags & DEFAULT_VALUES)
+                if (reconstFlags & DEFAULT_VALUES and h == 0)
                 {
                     depth = DEFAULT_DEPTH;
                     sigma = DEFAULT_SIGMA_DEPTH;
@@ -616,10 +637,10 @@ void DepthMap::toMat(Mat32f & out) const
     copy(valVec.begin(), valVec.begin() + hStep, (float*)out.data);
 }
 
-void DepthMap::toInverseMat(Mat32f & out) const
+void DepthMap::toInverseMat(Mat32f & out, const int layer) const
 {
     out.create(yMax, xMax);
-    const double* pInData = &valVec[0];
+    const double* pInData = &valVec[0 + layer*hStep];
     float* pOutData = (float*)out.data;
     for (int i = 0; i < hStep; ++i)
     {
@@ -845,15 +866,20 @@ void DepthMap::filterNoise()
                 Vector3iVec matches;
                 matches.emplace_back(x, y, h); // Store current hypothesis
                 const double d = at(x, y, h);
+                if( d < MIN_DEPTH ) continue;
                 const double s = sigma(x, y, h);
-                for (int y1 = max(0, y-1); y1 < min(yMax, y+1); ++y1 )
+                for (int y1 = max(0, y-1); y1 < min(yMax, y+2); ++y1 )
                 {
-                    for (int x1 = max(0, x-1); x1 < min(xMax, x+1); ++x1 )
+                    for (int x1 = max(0, x-1); x1 < min(xMax, x+2); ++x1 )
                     {
+                        if ( (y1==y) and (x1==x) ) continue;
                         for (int h1 = 0; h1 < hMax; ++h1)
                         {
-                            if( match(d, s, at(x1,y1,h1), sigma(x1,y1,h1)) )
+                            const double & d1 = at(x1,y1,h1);
+                            if(d1 < MIN_DEPTH) break;
+                            else if( match(d, s, d1, sigma(x1,y1,h1)) )
                             {
+                                // if (d<1) cout << "Position: x: " << x << " y: " << y << " x1: " << x1 << " y1: " << y1 << endl;
                                 matches.emplace_back(x1,y1,h1);
                                 break; //break out of h1 loop, go to next pixel
                             }
@@ -868,13 +894,18 @@ void DepthMap::filterNoise()
                     cost(x, y, h) = DEFAULT_COST_DEPTH;
                     // pixelMedianFilter(x, y, h, newDepth);
                 }
+                // if (d < 1.0)
+                // {
+                //     cout << "d: " << d << ", matches: " << matches.size() << endl;
+                // }
                 // If it does match at least 2, then average
-                else pixelAverageFilter(matches, newDepth);
+                // else pixelAverageFilter(matches, newDepth);
             }
+            sortHypStack(x, y);
         }
     }
 
-    *this = newDepth;
+    // *this = newDepth;
 }
 
 void DepthMap::merge(const DepthMap & depth2)
@@ -891,6 +922,7 @@ void DepthMap::merge(const DepthMap & depth2)
                 const double d2 = depth2.at(x, y, h2);
                 if (d2 < MIN_DEPTH) continue;
                 const double sigma2 = depth2.sigma(x, y, h2);
+                if (sigma2 > 3) continue;
                 filterPushHypothesis(x, y, d2, sigma2);
             }
         }

@@ -80,6 +80,7 @@ int main(int argc, char** argv)
 	options.add_options() ("StereoSGMParams.scale", po::value<double>()->required(), "Stereo SGM Parameters - scale");
 	options.add_options() ("StereoSGMParams.verbosity", po::value<int>()->required(), "Stereo SGM Parameters - verbosity level");
 	options.add_options() ("StereoSGMParams.salientPoints", po::value<bool>()->required(), "Stereo SGM Parameters - use only salient points");
+	options.add_options() ("StereoSGMParams.hypMax", po::value<int>()->required(), "Stereo SGM Parameters - number of hypotheses to use");
 	
 	options.add_options() ("MotionStereoParams.descLength", po::value<int>()->required(), "Motion Stereo descriptor length in pixels (needs to be odd)");
 	options.add_options() ("MotionStereoParams.dispMax", po::value<int>()->required(), "Motion Stereo maximum disparity");
@@ -182,7 +183,7 @@ int main(int argc, char** argv)
 	stereoSgmParams.setEqualMargin();
 	// stereoSgmParams.setXMargin(stereoSgmParams.u0);
 	stereoSgmParams.setYMargin(330);
-	stereoSgmParams.hypMax = 1;
+	stereoSgmParams.hypMax = vmap["StereoSGMParams.hypMax"].as<int>();;
 	EnhancedSGM stereoSGM(T12, &camera1, &camera2, stereoSgmParams);
 
 	MotionStereoParameters mstereoParams;
@@ -219,11 +220,16 @@ int main(int argc, char** argv)
 	//Get initial SGM depthmap
 	DepthMap keyDepth; // Use 3-hypothesis depthmap
 	stereoSGM.computeStereo(keyframe1, keyframe2, keyDepth);
+	keyDepth.filterNoise();
 
-	Mat32f keyDepthMap;
+	Mat32f keyDepthMap, keyDepthMap2, keyDepthMap3;
 	keyDepth.toInverseMat(keyDepthMap);
+	keyDepth.toInverseMat(keyDepthMap2,1);
+	keyDepth.toInverseMat(keyDepthMap3,2);
 	cv::namedWindow("SGM Depthmap", 1);
 	cv::imshow("SGM Depthmap", keyDepthMap / imgIntensityScale);
+	cv::imshow("SGM Depthmap2", keyDepthMap2 / imgIntensityScale);
+	cv::imshow("SGM Depthmap3", keyDepthMap3 / imgIntensityScale);
 	cv::waitKey(0);
 
 	int refinement = 0;
@@ -303,15 +309,19 @@ int main(int argc, char** argv)
 		//Merge the new depthmap into the keyframe depthmap
 		// cout << "Merging depthmaps ..." << endl;
 		keyDepth.merge(newDepth);
-		// keyDepth.filterNoise();
+		keyDepth.filterNoise();
 
 		//Output region
-		Mat32f newDepthMat, keyDepthMat;
+		Mat32f newDepthMat, keyDepthMat, keyDepthMat2, keyDepthMat3;
 		newDepth.toInverseMat(newDepthMat);
 		keyDepth.toInverseMat(keyDepthMat);
+		keyDepth.toInverseMat(keyDepthMat2,1);
+		keyDepth.toInverseMat(keyDepthMat3,2);
 		cv::imshow("Current image", newframe1);
 		cv::imshow("Motion stereo depthmap", newDepthMat / imgIntensityScale);
 		cv::imshow("Merged keyframe depthmap", keyDepthMat / imgIntensityScale);
+		cv::imshow("depthmap2", keyDepthMat2 / imgIntensityScale);
+		cv::imshow("depthmap3", keyDepthMat3 / imgIntensityScale);
 		cv::imshow("diff", (newDepthMat - keyDepthMap)*25 + 0.5);
 		int pressedKey = cv::waitKey(0);
 		cout << "Pressed key: " << pressedKey << endl;

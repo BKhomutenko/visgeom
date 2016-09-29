@@ -199,7 +199,7 @@ public:
     
     //TODO make a wrap method
     void toMat(Mat32f & out) const;
-    void toInverseMat(Mat32f & out) const;
+    void toInverseMat(Mat32f & out, const int layer = 0) const;
     void sigmaToMat(Mat32f & out) const;
     
     // access methods
