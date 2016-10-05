@@ -91,7 +91,7 @@ inline int initWave(vector<int32_t> & outVec, int length)
 }
 
 template<typename Titer1, typename Titer2, typename Tdata>
-Tdata filter(Titer1 kernelIter, Titer1 kernelEnd, Titer2 dataIter, Tdata val)
+Tdata convolve(Titer1 kernelIter, Titer1 kernelEnd, Titer2 dataIter, Tdata val)
 {
     for (; kernelIter != kernelEnd; ++kernelIter, ++dataIter)
     {

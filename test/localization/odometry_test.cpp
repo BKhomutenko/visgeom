@@ -15,7 +15,7 @@
 using namespace std;
 namespace po = boost::program_options;
 
-const float imgIntensityScale = 0.2;
+const float imgIntensityScale = 0.5;
 
 // Helper function to read values from a file
 template <int N>
@@ -220,16 +220,16 @@ int main(int argc, char** argv)
 	//Get initial SGM depthmap
 	DepthMap keyDepth; // Use 3-hypothesis depthmap
 	stereoSGM.computeStereo(keyframe1, keyframe2, keyDepth);
-	keyDepth.filterNoise();
+//	keyDepth.filterNoise();
 
 	Mat32f keyDepthMap, keyDepthMap2, keyDepthMap3;
 	keyDepth.toInverseMat(keyDepthMap);
-	keyDepth.toInverseMat(keyDepthMap2,1);
-	keyDepth.toInverseMat(keyDepthMap3,2);
+//	keyDepth.toInverseMat(keyDepthMap2,1);
+//	keyDepth.toInverseMat(keyDepthMap3,2);
 	cv::namedWindow("SGM Depthmap", 1);
 	cv::imshow("SGM Depthmap", keyDepthMap / imgIntensityScale);
-	cv::imshow("SGM Depthmap2", keyDepthMap2 / imgIntensityScale);
-	cv::imshow("SGM Depthmap3", keyDepthMap3 / imgIntensityScale);
+//	cv::imshow("SGM Depthmap2", keyDepthMap2 / imgIntensityScale);
+//	cv::imshow("SGM Depthmap3", keyDepthMap3 / imgIntensityScale);
 	cv::waitKey(0);
 
 	int refinement = 0;
@@ -299,30 +299,30 @@ int main(int argc, char** argv)
 		
 		//Step: Use motion stereo to refine depthmap
 		//Seed new depth estimation as equal to keyframe depthmap
-		DepthMap newDepth = keyDepth; 
+//		DepthMap newDepth = keyDepth; 
 //		newDepth.setTo(252, 100);
 //		newDepth.setDefault();
 		//Compute new depth using computeDepth() of MotionStereo
 		// cout << "Calculating stereo from motion ..." << endl;
-		stereoMotion.computeDepth(Tmotion, newframe1, newDepth);
+		stereoMotion.validateDepth(Tmotion, newframe1, keyDepth);
 
 		//Merge the new depthmap into the keyframe depthmap
 		// cout << "Merging depthmaps ..." << endl;
-		keyDepth.merge(newDepth);
-		keyDepth.filterNoise();
+//		keyDepth.merge(newDepth);
+//		keyDepth.filterNoise();
 
 		//Output region
 		Mat32f newDepthMat, keyDepthMat, keyDepthMat2, keyDepthMat3;
-		newDepth.toInverseMat(newDepthMat);
+//		newDepth.toInverseMat(newDepthMat);
 		keyDepth.toInverseMat(keyDepthMat);
-		keyDepth.toInverseMat(keyDepthMat2,1);
-		keyDepth.toInverseMat(keyDepthMat3,2);
+//		keyDepth.toInverseMat(keyDepthMat2,1);
+//		keyDepth.toInverseMat(keyDepthMat3,2);
 		cv::imshow("Current image", newframe1);
-		cv::imshow("Motion stereo depthmap", newDepthMat / imgIntensityScale);
+//		cv::imshow("Motion stereo depthmap", newDepthMat / imgIntensityScale);
 		cv::imshow("Merged keyframe depthmap", keyDepthMat / imgIntensityScale);
-		cv::imshow("depthmap2", keyDepthMat2 / imgIntensityScale);
-		cv::imshow("depthmap3", keyDepthMat3 / imgIntensityScale);
-		cv::imshow("diff", (newDepthMat - keyDepthMap)*25 + 0.5);
+//		cv::imshow("depthmap2", keyDepthMat2 / imgIntensityScale);
+//		cv::imshow("depthmap3", keyDepthMat3 / imgIntensityScale);
+//		cv::imshow("diff", (newDepthMat - keyDepthMap)*25 + 0.5);
 		int pressedKey = cv::waitKey(0);
 		cout << "Pressed key: " << pressedKey << endl;
 		if( pressedKey == 1048603 or pressedKey == 27 ) break; // Break on ESC key

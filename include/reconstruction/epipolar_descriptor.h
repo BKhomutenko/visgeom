@@ -35,13 +35,21 @@ NOTE:
 class EpipolarDescriptor
 {
 public:
+    //FIXME remove the old constructor
     EpipolarDescriptor(int length, int waveThresh, const int * wave, vector<int> stepVec) :
             LENGTH(length),
             HALF_LENGTH(length / 2),
             WAVE_THRESH(waveThresh*LENGTH),
             wavePtr(wave),
             samplingStepVec(stepVec) {}
-            
+     
+    EpipolarDescriptor(int length, int waveThresh, vector<int> stepVec) :
+            LENGTH(length),
+            HALF_LENGTH(length / 2),
+            WAVE_THRESH(waveThresh*LENGTH),
+            wavePtr(NULL),
+            samplingStepVec(stepVec) {}   
+                
     // return: the sampling step
     int compute(const Mat8u & img1, const CurveRasterizer<int, Polynomial2> & descRasterRef,
                 vector<uint8_t> & descVec)
@@ -72,7 +80,6 @@ public:
             if (imageBorder /*or saturated*/) return -1;
             descResp = totalVariation(descVec.begin(), descVec.end(), int(0));
             descResp = (descResp * /*255*/100) / (descVec[HALF_LENGTH] + /*255*/10);
-//            descResp = filter(wavePtr, wavePtr + LENGTH, descVec.begin(), 0);
             if (goodResp()) return step;
         }
         return samplingStepVec.back();

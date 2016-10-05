@@ -9,6 +9,7 @@
 
 EnhancedEpipolar * epipolar;
 Mat8u img1, img2;
+Mat8u orig1, orig2;
 EnhancedCamera * cam1, * cam2;
 EpipolarDescriptor * epipolarDescriptor;
 StereoEpipoles * epipoles;
@@ -27,7 +28,7 @@ void CallBackFunc1(int event, int x, int y, int flags, void* userdata)
                              epipolar->getFirst(X));
         if (epipoles->firstIsInverted()) raster.setStep(-1);
         vector<uint8_t> descriptor;
-        const int step = epipolarDescriptor->compute(img1, raster, descriptor);
+        const int step = epipolarDescriptor->compute(orig1, raster, descriptor);
         cout << "step :" << step << endl;
         cout << "Descriptor :" << endl;
         for (auto & x : descriptor)
@@ -47,7 +48,7 @@ void CallBackFunc1(int event, int x, int y, int flags, void* userdata)
         cout << "Samples :" << endl;
         for (int i = 0; i < 32; i++, raster2.step())
         {
-            cout << setw(5) << int(img2(raster2.v, raster2.u));
+            cout << setw(5) << int(orig2(raster2.v, raster2.u));
         }
         cout << endl;
         
@@ -175,7 +176,7 @@ int main(int argc, char** argv)
     
     
     
-    epipolarDescriptor = new EpipolarDescriptor(LENGTH, 3*LENGTH, NULL, {1, 2, 3, 5, 7, 9});
+    epipolarDescriptor = new EpipolarDescriptor(LENGTH, 10, {1, 2});
     epipoles = new StereoEpipoles(cam1, cam2, TleftRight);
     epipolar = new EnhancedEpipolar(TleftRight, cam1, cam2, 2000);
     
@@ -194,7 +195,8 @@ int main(int argc, char** argv)
         img2 = imread(fileName2, 0);
         if(img1.empty()) cout << "Error in " << fileName1 << endl;
         if(img2.empty()) cout << "Error in " << fileName2 << endl;
-        
+        img1.copyTo(orig1);
+        img2.copyTo(orig2);
         imshow("out1", img1);
         imshow("out2", img2);
         cv::setMouseCallback("out1", CallBackFunc1, NULL);

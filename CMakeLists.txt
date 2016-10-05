@@ -17,47 +17,47 @@ include_directories(${Boost_INCLUDE_DIR})
 include_directories(include)
 
 ### CALIBRATION ###
-add_executable( calibration
-    test/calibration/calibration.cpp
-)
+#add_executable( calibration
+#    test/calibration/calibration.cpp
+#)
 
-target_link_libraries( calibration ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( calibration ${CERES_LIBRARIES})
+#target_link_libraries( calibration ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( calibration ${CERES_LIBRARIES})
 
-add_executable( calibration_mei
-    test/calibration/calibration_mei.cpp
-)
+#add_executable( calibration_mei
+#    test/calibration/calibration_mei.cpp
+#)
 
-target_link_libraries( calibration_mei ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( calibration_mei ${CERES_LIBRARIES})
+#target_link_libraries( calibration_mei ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( calibration_mei ${CERES_LIBRARIES})
 
-add_executable( calibration_stereo
-    test/calibration/calibration_stereo.cpp
-)
+#add_executable( calibration_stereo
+#    test/calibration/calibration_stereo.cpp
+#)
 
-target_link_libraries( calibration_stereo ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( calibration_stereo ${CERES_LIBRARIES})
+#target_link_libraries( calibration_stereo ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( calibration_stereo ${CERES_LIBRARIES})
 
-add_executable( calibration_robot
-    test/calibration/calibration_robot.cpp
-)
+#add_executable( calibration_robot
+#    test/calibration/calibration_robot.cpp
+#)
 
-target_link_libraries( calibration_robot ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( calibration_robot ${CERES_LIBRARIES})
+#target_link_libraries( calibration_robot ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( calibration_robot ${CERES_LIBRARIES})
 
-add_executable( calibration_base
-    test/calibration/calibration_base.cpp
-)
+#add_executable( calibration_base
+#    test/calibration/calibration_base.cpp
+#)
 
-target_link_libraries( calibration_base ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( calibration_base ${CERES_LIBRARIES})
+#target_link_libraries( calibration_base ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( calibration_base ${CERES_LIBRARIES})
 
-add_executable( rectify
-    test/calibration/rectify.cpp
-)
+#add_executable( rectify
+#    test/calibration/rectify.cpp
+#)
 
-target_link_libraries( rectify ${OpenCV_LIBRARIES} )
-TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
+#target_link_libraries( rectify ${OpenCV_LIBRARIES} )
+#TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
 
 ### RECONSTRUCTION ###
 
@@ -79,83 +79,84 @@ add_executable( epipolar
 target_link_libraries( epipolar ${OpenCV_LIBS} )
 
 
-add_executable( descriptor_step 
-    test/reconstruction/descriptor_step.cpp
-    src/reconstruction/eucm_epipolar.cpp
-)
+#add_executable( descriptor_step 
+#    test/reconstruction/descriptor_step.cpp
+#    src/reconstruction/eucm_epipolar.cpp
+#)
 
-target_link_libraries( descriptor_step ${OpenCV_LIBS} )
-
-
-add_executable( multistereo 
-    test/reconstruction/stereo_multibase.cpp
-    src/reconstruction/eucm_sgm.cpp
-    src/reconstruction/eucm_stereo.cpp
-    src/reconstruction/eucm_epipolar.cpp
-    src/reconstruction/depth_map.cpp
-)
-
-target_link_libraries( multistereo ${OpenCV_LIBS} )
-
-add_executable( generate_plane 
-    test/reconstruction/generate_plane.cpp
-    src/reconstruction/eucm_sgm.cpp
-    src/reconstruction/eucm_stereo.cpp
-    src/reconstruction/eucm_epipolar.cpp
-    src/reconstruction/depth_map.cpp
-)
-
-target_link_libraries( generate_plane ${OpenCV_LIBS} )
+#target_link_libraries( descriptor_step ${OpenCV_LIBS} )
 
 
-add_executable( reproject_plane
-    test/reconstruction/reproject_test.cpp
-    src/reconstruction/depth_map.cpp
-)
+#add_executable( multistereo 
+#    test/reconstruction/stereo_multibase.cpp
+#    src/reconstruction/eucm_sgm.cpp
+#    src/reconstruction/eucm_stereo.cpp
+#    src/reconstruction/eucm_epipolar.cpp
+#    src/reconstruction/depth_map.cpp
+#)
 
-target_link_libraries( reproject_plane ${OpenCV_LIBS} )
+#target_link_libraries( multistereo ${OpenCV_LIBS} )
 
-add_executable( depth_reconstruct_test
-    test/reconstruction/depth_reconstruct_test.cpp
-    src/reconstruction/depth_map.cpp
-)
+#add_executable( generate_plane 
+#    test/reconstruction/generate_plane.cpp
+#    src/reconstruction/eucm_sgm.cpp
+#    src/reconstruction/eucm_stereo.cpp
+#    src/reconstruction/eucm_epipolar.cpp
+#    src/reconstruction/depth_map.cpp
+#)
 
-target_link_libraries( depth_reconstruct_test ${OpenCV_LIBS} )
+#target_link_libraries( generate_plane ${OpenCV_LIBS} )
 
-add_executable( motion_test
-    test/reconstruction/motion_test.cpp
-    src/reconstruction/eucm_stereo.cpp
-    src/reconstruction/eucm_epipolar.cpp
-    src/reconstruction/depth_map.cpp
-)
 
-target_link_libraries( motion_test ${OpenCV_LIBS} )
+#add_executable( reproject_plane
+#    test/reconstruction/reproject_test.cpp
+#    src/reconstruction/depth_map.cpp
+#)
 
-add_executable( merge_test
-    test/reconstruction/merge_test.cpp
-    src/reconstruction/eucm_sgm.cpp
-    src/reconstruction/eucm_stereo.cpp
-    src/reconstruction/eucm_epipolar.cpp
-    src/reconstruction/depth_map.cpp
-)
+#target_link_libraries( reproject_plane ${OpenCV_LIBS} )
 
-target_link_libraries( merge_test ${OpenCV_LIBS} )
+#add_executable( depth_reconstruct_test
+#    test/reconstruction/depth_reconstruct_test.cpp
+#    src/reconstruction/depth_map.cpp
+#)
 
-add_executable( motion_gradual
-    test/reconstruction/motion_gradual.cpp
-    src/reconstruction/eucm_sgm.cpp
-    src/reconstruction/eucm_stereo.cpp
-    src/reconstruction/eucm_epipolar.cpp
-    src/reconstruction/depth_map.cpp
-)
+#target_link_libraries( depth_reconstruct_test ${OpenCV_LIBS} )
 
-target_link_libraries( motion_gradual ${OpenCV_LIBS} )
+#add_executable( motion_test
+#    test/reconstruction/motion_test.cpp
+#    src/reconstruction/eucm_stereo.cpp
+#    src/reconstruction/eucm_epipolar.cpp
+#    src/reconstruction/depth_map.cpp
+#)
+
+#target_link_libraries( motion_test ${OpenCV_LIBS} )
+
+#add_executable( merge_test
+#    test/reconstruction/merge_test.cpp
+#    src/reconstruction/eucm_sgm.cpp
+#    src/reconstruction/eucm_stereo.cpp
+#    src/reconstruction/eucm_epipolar.cpp
+#    src/reconstruction/depth_map.cpp
+#)
+
+#target_link_libraries( merge_test ${OpenCV_LIBS} )
+
+#add_executable( motion_gradual
+#    test/reconstruction/motion_gradual.cpp
+#    src/reconstruction/eucm_sgm.cpp
+#    src/reconstruction/eucm_stereo.cpp
+#    src/reconstruction/eucm_epipolar.cpp
+#    src/reconstruction/depth_map.cpp
+#)
+
+#target_link_libraries( motion_gradual ${OpenCV_LIBS} )
 
 ## LOCALIZATION ###
 add_executable( odometry_test
     test/localization/odometry_test.cpp
     src/reconstruction/eucm_stereo.cpp
     src/reconstruction/eucm_sgm.cpp
+    src/reconstruction/eucm_motion_stereo.cpp
     src/reconstruction/eucm_epipolar.cpp
     src/reconstruction/depth_map.cpp
     src/localization/cost_functions.cpp
@@ -164,18 +165,18 @@ add_executable( odometry_test
 
 target_link_libraries( odometry_test ${OpenCV_LIBS} ${CERES_LIBRARIES} ${Boost_LIBRARIES})
 
-add_executable( photometric
-    test/localization/photometric_test.cpp
-    src/localization/photometric.cpp
-    src/localization/cost_functions.cpp
-    src/reconstruction/eucm_stereo.cpp
-    src/reconstruction/eucm_sgm.cpp
-    src/reconstruction/eucm_epipolar.cpp
-    src/reconstruction/depth_map.cpp
-)
+#add_executable( photometric
+#    test/localization/photometric_test.cpp
+#    src/localization/photometric.cpp
+#    src/localization/cost_functions.cpp
+#    src/reconstruction/eucm_stereo.cpp
+#    src/reconstruction/eucm_sgm.cpp
+#    src/reconstruction/eucm_epipolar.cpp
+#    src/reconstruction/depth_map.cpp
+#)
 
-target_link_libraries( photometric ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( photometric ${CERES_LIBRARIES})
+#target_link_libraries( photometric ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( photometric ${CERES_LIBRARIES})
 
 #add_executable( mi_test
 #    test/localization/mi_test.cpp

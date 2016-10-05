@@ -542,7 +542,6 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
 
     result.idxVec.clear();
     result.idxMapVec.clear();
-    result.imagePointVec.clear();
     result.hypIdxVec.clear();
     result.costVec.clear();
     result.sigmaVec.clear();
@@ -572,8 +571,8 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
             
             if (reconstFlags & MINMAX) 
             {
-                depthVec.push_back(max(depth - 2.5*sigma, MIN_DEPTH));
-                depthVec.push_back(depth + 2.5*sigma);
+                depthVec.push_back(max(depth - 3*sigma, MIN_DEPTH));
+                depthVec.push_back(depth + 3*sigma);
             }
             else
             {
@@ -587,7 +586,6 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
             if (reconstFlags & INDEX_MAPPING) result.idxMapVec.push_back(i);
         }
     }
-    
 
     vector<bool> maskVec;
     Vector3dVec cloud;

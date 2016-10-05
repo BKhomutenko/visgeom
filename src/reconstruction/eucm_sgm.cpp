@@ -152,13 +152,13 @@ void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap
                     //FIXME temporary 
 //                    depth.at(x, y, h) =  smallDisparity(y, x*params.hypMax + h);
                     computeDepth(depth.at(x, y, h), depth.sigma(x, y, h), x, y, h);
-                    depth.cost(x, y, h) = DEFAULT_COST_DEPTH + h; //FIXME
+                    depth.cost(x, y, h) = errorBuffer(y, x*params.dispMax + h);
                 }
                 else 
                 {
-//                    depth.at(x, y, h) = OUT_OF_RANGE;
-//                    depth.sigma(x, y, h) = OUT_OF_RANGE;
-//                    depth.cost(x, y, h) = 100; //FIXME
+                    depth.at(x, y, h) = OUT_OF_RANGE;
+                    depth.sigma(x, y, h) = OUT_OF_RANGE;
+                    depth.cost(x, y, h) = 100;
                 }
             }
         }
@@ -178,9 +178,10 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 {
     if (params.verbosity > 0) cout << "EnhancedSGM::computeCurveCost" << endl;
     
+    
     const int HALF_LENGTH = getHalfLength();
     const int LENGTH = HALF_LENGTH * 2 + 1;
-    
+    cout << "SGM LENGTH: " << LENGTH << endl;
     // compute the weights for matching cost
     vector<int> kernelVec, waveVec;
     const int NORMALIZER = initKernel(kernelVec, LENGTH);

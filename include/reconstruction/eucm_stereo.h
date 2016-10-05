@@ -38,7 +38,7 @@ struct StereoParameters : public ScaleParameters
 {
     int dispMax = 48;
   
-    int maxError = 150;
+    int maxError = 25;
     int maxBias = 10;
     
     int verbosity = 0;
