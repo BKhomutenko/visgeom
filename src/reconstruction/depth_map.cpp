@@ -38,7 +38,7 @@ void DepthMap::applyMask(const Mat8u & mask)
             {
                 for (int h = 0; h < hMax; h++)
                 {
-                    at(x, y, h) = 0;
+                    at(x, y, h) = OUT_OF_RANGE;
                 }
             }
         }
@@ -188,6 +188,9 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
         double & cost1 = cost(x, y, h);
         if( d1 == OUT_OF_RANGE )
         {
+            // Assuming hyp stack is sorted, break out of hyp stack the moment an empty
+            // hypothesis is found. Also, if the hyp stack is empty (first hyp is empty)
+            // then push the point into the stack
             if ( h == 0 )
             {
                 pushHypothesis(x, y, d, sigmaVal);
@@ -547,7 +550,7 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
     result.sigmaVec.clear();
     result.cloud.clear();
     result.valVec.clear();
-//    result.datatype = (minmax_flag) ? MHPack::MINMAX_DISTANCE_VEC_WITH_SIGN : MHPack::RECONSTRUCTION_WITH_SIGMA;
+    //result.datatype = (minmax_flag) ? MHPack::MINMAX_DISTANCE_VEC_WITH_SIGN : MHPack::RECONSTRUCTION_WITH_SIGMA;
 
     vector<double> depthVec;
     for (int i = 0; i < queryIdxVec.size(); i++)
@@ -653,6 +656,31 @@ void DepthMap::sigmaToMat(Mat32f & out) const
 {
     out.create(yMax, xMax);
     copy(sigmaVec.begin(), sigmaVec.begin() + hStep, (float*)out.data);
+}
+
+// Stacked output image looks like subplot(numHyps,1), with a 3 row gap 
+// between each hyp layer
+void DepthMap::toStackedInverseMat(Mat32f & out, const int numlayers) const
+{
+    out.create((yMax+3)*numlayers, xMax);
+    float* pOutData = (float*)out.data;
+    for (int layer = 0; layer < numlayers; ++layer)
+    {
+        //copy hypothesis layer
+        const double* pInData = &valVec[0 + layer*hStep];
+        for (int i = 0; i < hStep; ++i)
+        {
+            if ( *pInData < 1e-3 ) *pOutData = 0;
+            else *pOutData = 1 / (*pInData);
+            ++pOutData;
+            ++pInData;
+        }
+
+        //Add 3 intermediate rows (with values 0,1,0) respectively
+        for (int i = 0; i < xMax; ++i) *(pOutData++) = 0;
+        for (int i = 0; i < xMax; ++i) *(pOutData++) = 100; // 100 to account for any scaling later
+        for (int i = 0; i < xMax; ++i) *(pOutData++) = 0;
+    }
 }
 
 //TODO do not reconstruct all the points but a selected subset

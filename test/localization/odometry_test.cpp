@@ -223,7 +223,7 @@ int main(int argc, char** argv)
 //	keyDepth.filterNoise();
 
 	Mat32f keyDepthMap, keyDepthMap2, keyDepthMap3;
-	keyDepth.toInverseMat(keyDepthMap);
+	keyDepth.toStackedInverseMat(keyDepthMap,3);
 //	keyDepth.toInverseMat(keyDepthMap2,1);
 //	keyDepth.toInverseMat(keyDepthMap3,2);
 	cv::namedWindow("SGM Depthmap", 1);
@@ -314,7 +314,7 @@ int main(int argc, char** argv)
 		//Output region
 		Mat32f newDepthMat, keyDepthMat, keyDepthMat2, keyDepthMat3;
 //		newDepth.toInverseMat(newDepthMat);
-		keyDepth.toInverseMat(keyDepthMat);
+		keyDepth.toStackedInverseMat(keyDepthMat, 3);
 //		keyDepth.toInverseMat(keyDepthMat2,1);
 //		keyDepth.toInverseMat(keyDepthMat3,2);
 		cv::imshow("Current image", newframe1);

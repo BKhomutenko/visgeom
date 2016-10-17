@@ -201,6 +201,7 @@ public:
     void toMat(Mat32f & out) const;
     void toInverseMat(Mat32f & out, const int layer = 0) const;
     void sigmaToMat(Mat32f & out) const;
+    void toStackedInverseMat(Mat32f & out, const int numlayers = 1) const;
     
     // access methods
     int getWidth() const { return xMax; }
