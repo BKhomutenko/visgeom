@@ -28,6 +28,8 @@ NOTE:
 #include "std.h"
 #include "eigen.h"
 
+//FIXME remove hypStep
+
 void DepthMap::applyMask(const Mat8u & mask)
 {
     for (int y = 0; y < yMax; y++)

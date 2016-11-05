@@ -138,7 +138,8 @@ void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap
 {
     computeCurveCost(img1, img2);
     computeDynamicProgramming();
-    reconstructDisparity();
+    if (params.hypMax == 1) reconstructDisparity();
+    else reconstructDisparityMH();
     depth = DepthMap(camera1, params, params.hypMax);
     assert((ScaleParameters)depth == (ScaleParameters)params);
     for (int h = 0; h < params.hypMax; h++)
@@ -181,12 +182,11 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     
     const int HALF_LENGTH = getHalfLength();
     const int LENGTH = HALF_LENGTH * 2 + 1;
-    cout << "SGM LENGTH: " << LENGTH << endl;
     // compute the weights for matching cost
     vector<int> kernelVec, waveVec;
-    const int NORMALIZER = initKernel(kernelVec, LENGTH);
-    const int WAVE_NORM = initWave(waveVec, LENGTH);
-    EpipolarDescriptor epipolarDescriptor(LENGTH, 10, waveVec.data(), {1, 2, 3, 5});
+//    const int NORMALIZER = initKernel(kernelVec, LENGTH);
+//    const int WAVE_NORM = initWave(waveVec, LENGTH);
+    EpipolarDescriptor epipolarDescriptor(LENGTH, 3, waveVec.data(), {1, 2, 4, 8});
     
     if (params.salientPoints) salientBuffer.setTo(0);
     
@@ -220,7 +220,6 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 fill(outPtr + 1, outPtr + params.dispMax, 255);
                 continue;
             }
-            
             if (params.imageBasedCost) 
             {
                 switch (step)
@@ -238,11 +237,10 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
             }
             
             //TODO revise the criterion (step == 1)
-            if (params.salientPoints and step <= 2)
+            if (params.salientPoints and step <= 4)
             {
                 salientBuffer(y, x) = 1;
             }
-            
             const int nSteps = ( params.dispMax  + step - 1 ) / step; 
                
             //sample the curve 
@@ -275,6 +273,30 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 }
             }
             vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+            if (y == 350 and x > 469 and x < 481)
+            {
+                cout << "Point : " << x << " " << y << endl;
+                cout << "Step : " << step << endl;
+                cout << "samples :" << endl;
+                for (auto & x : sampleVec)
+                {
+                    cout << setw(6) << int(x);
+                }
+                cout << endl;
+                cout << "cost :" << endl;
+                for (auto & x : costVec)
+                {
+                    cout << setw(6) << int(x);
+                }
+                cout << endl;
+                cout << "descriptor :" << endl;
+                for (auto & x : descriptor)
+                {
+                    cout << setw(6) << int(x);
+                }
+                cout << endl;
+            }
+            
 //            //compute the bias;
 //            int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
             
@@ -442,10 +464,51 @@ void EnhancedSGM::computeDynamicProgramming()
     
 }
 
-//TODO make with local minima
 void EnhancedSGM::reconstructDisparity()
 {
     if (params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparity" << endl;
+//    int sizeAcc = 0;
+//    int sizeCount = 0;
+    for (int y = 0; y < params.yMax; y++)
+    {
+        int32_t* dynRow1 = (int32_t*)(tableauLeft.row(y).data);
+        int32_t* dynRow2 = (int32_t*)(tableauRight.row(y).data);
+        int32_t* dynRow3 = (int32_t*)(tableauTop.row(y).data);
+        int32_t* dynRow4 = (int32_t*)(tableauBottom.row(y).data);
+        uint8_t* errRow = errorBuffer.row(y).data;
+        for (int x = 0; x < params.xMax; x++)
+        {
+            if (params.salientPoints and salientBuffer(y, x) == 0)
+            {
+                smallDisparity(y, x) = -1;
+                continue;
+            }
+            int32_t & bestDisp = smallDisparity(y, x);
+            int32_t & bestCost = finalErrorMat(y, x);
+            bestCost = INT32_MAX;
+            bestDisp = -1;
+            for (int d = 0; d < params.dispMax; d++)
+            {
+                int base = x * params.dispMax;
+                const int & err = errRow[base + d];
+                if (err > params.maxError) continue;
+                int cost = dynRow1[base + d] + dynRow2[base + d] 
+                        + dynRow3[base + d] + dynRow4[base + d] - 2*err;
+                if ( bestCost > cost)
+                {
+                    bestDisp = d;
+                    bestCost = cost;
+                }
+            }
+            if (params.verbosity > 4) cout << "    x: " << x << " best error: " << finalErrorMat(y, x) << endl;
+        }
+        if (params.verbosity > 3) cout << "    y: " << y << endl;
+    }
+}
+
+void EnhancedSGM::reconstructDisparityMH()
+{
+    if (params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparityMH" << endl;
     const int hypShift = params.xMax*params.yMax;
 //    int sizeAcc = 0;
 //    int sizeCount = 0;
@@ -500,7 +563,6 @@ void EnhancedSGM::reconstructDisparity()
                 smallDisparity(y, x * params.hypMax + hypIdx) = indexedCostVec[hypIdx].second;
                 finalErrorMat(y, x * params.hypMax + hypIdx) = indexedCostVec[hypIdx].first;
             }*/
-            bool verbose = (y == 0 and x == 24);
             for (int hypIdx = 0; hypIdx < params.hypMax; hypIdx++)
             {
                 int32_t & bestDisp = smallDisparity(y, x * params.hypMax + hypIdx);

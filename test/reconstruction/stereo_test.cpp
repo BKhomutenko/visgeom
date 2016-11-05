@@ -121,7 +121,7 @@ int main(int argc, char** argv)
         Mat16s img1lap, img2lap;
 
         stereoParams.uMax = img1.cols;
-        stereoParams.vMax = img1.rows - 180;
+        stereoParams.vMax = img1.rows;
         stereoParams.setEqualMargin();
     //    
     //    Laplacian(img1, img1lap, CV_16S, 3);
@@ -182,7 +182,9 @@ int main(int argc, char** argv)
         
         imshow("out1", out1);
         imshow("out2", out2);
-        imshow("res", depthMat*5);
+        imshow("res", depthMat * 5);
+        imshow("disp", stereo.disparity() * 256);
+        cout << stereo.disparity()(350, 468) << " " << stereo.disparity()(350, 469) << endl;
         waitKey(); 
     }
     return 0;

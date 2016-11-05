@@ -474,7 +474,7 @@ void filter(double & v1, double & s1, const double v2, const double s2)
 {
     double denom = s1 + s2;
     v1 = (v1 * s2 + v2 * s1) / denom;
-    s1 = s1 * s2 / denom;
+    s1 = max(s1 * s2 / denom, 0.1);
 }
 
 void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2, DepthMap & depth)
@@ -485,7 +485,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
     const int MARGIN = LENGTH - 1;
     
     //init necessary data structures
-    EpipolarDescriptor epipolarDescriptor(params.descLength, 10, {1, 2});
+    EpipolarDescriptor epipolarDescriptor(params.descLength, 5, {1, 2});
     StereoEpipoles epipoles(camera1, camera2, T12);
     epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
     Transform12 = T12;
@@ -519,15 +519,20 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
             if (epipoles.firstIsInverted()) descRaster.setStep(-1);
             vector<uint8_t> descriptor;
             const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
-            if (step < 1) continue;
-            
-            if (epipolarDescriptor.goodResp())
+            if (step < 1 or not epipolarDescriptor.goodResp()) continue;
+            if (params.verbosity > 1) 
             {
-                descriptorVec.push_back(descriptor);
-                toComputePointVec.push_back(pt);
-                stepVec.push_back(step);
-                depthComputePtVec.emplace_back(x, y);
+                cout << x << " " << y << " " << epipolarDescriptor.getResp() << endl;
+                for (auto & x : descriptor)
+                {
+                    cout << int(x) << " ";
+                }
+                cout << endl;
             }
+            descriptorVec.push_back(descriptor);
+            toComputePointVec.push_back(pt);
+            stepVec.push_back(step);
+            depthComputePtVec.emplace_back(x, y);
         }
     }
     
@@ -561,7 +566,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
         const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
         
         Vector2i diff = round(ptMax - ptMin);
-        const int distance = (max(abs(diff[0]), abs(diff[1])) + 1)/step + MARGIN;
+        const int distance = max(max(abs(diff[0]), abs(diff[1]))/step, 3) + MARGIN;
             
         CurveRasterizer<int, Polynomial2> raster(ptMaxRound, ptEpipole2,
                                             epipolarPtr->getSecond(toValidatePack.cloud[2*idx]));
@@ -623,7 +628,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
         }
         
         //TODO make sure that both stereo objects use the same descriptor length
-        if (*bestCostIter > depth.cost(x, y) + 3*LENGTH)
+        if (*bestCostIter > depth.cost(x, y) + 3*LENGTH or *bestCostIter > params.maxError)
         {
             //reject
             depth.at(x, y) = OUT_OF_RANGE;
@@ -639,6 +644,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
                     uVec[dBest + 1], vVec[dBest + 1], CAMERA_1);
             double sigma1 = abs(d1 - d2) * SIGMA_COEFF;
             filter(depth.at(x, y), depth.sigma(x, y), d1, sigma1);
+            depth.cost(x, y) = (depth.cost(x, y) + *bestCostIter)/2;
 //            depth.at(x, y) = d1;
 //            depth.sigma(x, y) = sigma1;
         }
@@ -705,7 +711,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
         Vector2i depthPt = depthComputePtVec[idx];
         const int & x = depthPt[0], & y = depthPt[1];
         
-        if (params.verbosity > 1)
+        if (params.verbosity > 2)
         {
             cout << "Point : " << toComputePointVec[idx].transpose();
             cout << "   step : " << step << endl;
@@ -742,6 +748,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
             double sigma1 = abs(d1 - d2) * SIGMA_COEFF;
             depth.at(x, y) = d1;
             depth.sigma(x, y) = sigma1;
+            depth.cost(x, y) = *bestCostIter;
         }
     }
     

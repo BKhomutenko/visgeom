@@ -67,9 +67,9 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
                 grad /= _scale;  // normalize according to the scale
                 
                 jacobianCalculator.dfdxi(transformedPoints[i], grad, jacobian[0] + i*6);
-                for (int j = 0; j < 6; j++) *(jacobian[0] + i*6 + j) /= (_dataPack.valVec[i] + 1); 
+                for (int j = 0; j < 6; j++) *(jacobian[0] + i*6 + j) /= (_dataPack.valVec[i] + 10); 
                 
-                residual[i] = (f - _dataPack.valVec[i]) / (_dataPack.valVec[i] + 1);
+                residual[i] = (f - _dataPack.valVec[i]) / (_dataPack.valVec[i] + 10);
             }
             else
             {
@@ -90,7 +90,7 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
             {
                 double f;
                 imageInterpolator.Evaluate(pt[1] / _scale, pt[0] / _scale, &f);
-                residual[i] = (f - _dataPack.valVec[i]) / (_dataPack.valVec[i] + 1);
+                residual[i] = (f - _dataPack.valVec[i]) / (_dataPack.valVec[i] + 10);
             }
             else
             {

@@ -118,6 +118,7 @@ public:
     
     void computeDynamicStep(const int* inCost, const uint8_t * error, int * outCost);
     
+    void reconstructDisparityMH();
     void reconstructDisparity();  // using the result of the dynamic programming
     
     //// MISCELLANEOUS

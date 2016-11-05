@@ -70,7 +70,7 @@ int main(int argc, char** argv)
     Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
     
     MotionStereoParameters stereoParams;
-    stereoParams.verbosity = 3;
+    stereoParams.verbosity = 0;
     int foo;
     paramFile >> foo;
     paramFile >> foo;
@@ -134,10 +134,10 @@ int main(int argc, char** argv)
 //    scaleParams.setXMargin(400);
     
     DepthMap depth(&camera1, scaleParams);
-    depth.setTo(252, 100);
+    depth.setTo(0, 0);
     Mat32f res;
     timer.reset();
-    stereo.computeDepth(TleftRight, img2, depth);
+    stereo.validateDepth(TleftRight, img2, depth);
     cout << timer.elapsed() << endl;
     timer.reset();
 

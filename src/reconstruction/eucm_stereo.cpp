@@ -129,15 +129,15 @@ int computeError(int v, int thMin, int thMax)
 vector<int> EnhancedStereo::compareDescriptor(const vector<uint8_t> & desc,
         const vector<uint8_t> & sampleVec) const
 {
-    vector<int> thMinVec(sampleVec.size()), thMaxVec(sampleVec.size());
+    vector<int> thMinVec(desc.size()), thMaxVec(desc.size());
     
-    for (int i = 1; i < sampleVec.size() - 1; i++)
+    for (int i = 1; i < desc.size() - 1; i++)
     {
         const int & d = desc[i];
         int d1 = (desc[i] + desc[i - 1]) / 2;
         int d2 = (desc[i] + desc[i + 1]) / 2;
         thMinVec[i] = min(d, min(d1, d2));
-        thMaxVec[i] = max(d, min(d1, d2));
+        thMaxVec[i] = max(d, max(d1, d2));
     }
     
     if (desc[0] > desc[1])
@@ -151,7 +151,7 @@ vector<int> EnhancedStereo::compareDescriptor(const vector<uint8_t> & desc,
         thMinVec[0] = desc[0];
     }
     
-    const int & d = desc[sampleVec.size() - 2];
+    const int & d = desc[desc.size() - 2];
     if (desc.back() > d)
     {
         thMinVec.back() = (desc.back() + d) / 2;
@@ -177,7 +177,7 @@ vector<int> EnhancedStereo::compareDescriptor(const vector<uint8_t> & desc,
     {
 //        rowB[0] = rowA[0] + params.flawCost + abs(int(sampleVec[0]) - int(desc[i]));
         rowB[0] = rowA[0] + params.flawCost + computeError(sampleVec[0], thMinVec[i], thMaxVec[i]);
-        int cost = min(rowA[i] + params.flawCost, rowA[0]);
+        int cost = min(rowA[1] + params.flawCost, rowA[0]);
 //        rowB[1] = cost + abs(int(sampleVec[1]) - int(desc[i]));
         rowB[1] = cost + computeError(sampleVec[1], thMinVec[i], thMaxVec[i]);
         for (int j = 2; j < sampleVec.size(); j++)

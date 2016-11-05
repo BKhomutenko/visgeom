@@ -79,7 +79,7 @@ public:
             }
             if (imageBorder /*or saturated*/) return -1;
             descResp = totalVariation(descVec.begin(), descVec.end(), int(0));
-            descResp = (descResp * /*255*/100) / (descVec[HALF_LENGTH] + /*255*/10);
+            descResp = (descResp * /*255*/100) / (int(descVec[HALF_LENGTH]) + /*255*/30);
             if (goodResp()) return step;
         }
         return samplingStepVec.back();
