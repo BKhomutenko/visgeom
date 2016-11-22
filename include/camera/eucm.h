@@ -29,7 +29,7 @@ The Enhanced Unified Camera Model
 template<typename T> 
 struct EnhancedProjector
 {
-    bool operator() (const T* params, const T* src, T* dst)
+    bool operator() (const T* params, const T* src, T* dst) const
     {
         const T & alpha = params[0];
         const T & beta = params[1];
@@ -60,6 +60,11 @@ struct EnhancedProjector
         dst[0] = fu * xn + u0;
         dst[1] = fv * yn + v0;
         return true;  
+    } 
+    
+    int countIntrinsic() const
+    {
+        return 6;
     } 
 };
 

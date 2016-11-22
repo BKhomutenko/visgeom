@@ -57,6 +57,10 @@ public:
     
     void feedWheelOdometry(const Transformation<double> xiOdomNew, const double t);
     
+    // The transformation since the last localization operation
+    // In case when the odometry can be reset on the hardware side
+    void feedWheelOdometryIncrement(const Transformation<double> xiOdomNew, const double t);
+    
 private:
 
     void initFirstKeyFrame(const Mat8u & imageNew, const double t);
