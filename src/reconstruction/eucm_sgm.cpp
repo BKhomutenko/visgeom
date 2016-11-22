@@ -237,7 +237,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
             }
             
             //TODO revise the criterion (step == 1)
-            if (params.salientPoints and step <= 4)
+            if (params.salientPoints and step <= 2)
             {
                 salientBuffer(y, x) = 1;
             }
