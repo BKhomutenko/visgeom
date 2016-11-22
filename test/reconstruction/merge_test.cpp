@@ -8,38 +8,7 @@
 
 int main(int argc, char** argv)
 {	
-    /*Polynomial2 poly2;
-    poly2.kuu = -1; 
-    poly2.kuv = 1; 
-    poly2.kvv= -1; 
-    poly2.ku = 0.25; 
-    poly2.kv = 0.25; 
-    poly2.k1 = 5;
-    
-    CurveRasterizer<Polynomial2> raster(1, 1, -100, 100, poly2);
-    CurveRasterizer2<Polynomial2> raster2(1, 1, -100, 100, poly2);
 
-    auto tr0 = clock();
-    int x1 = 0;
-    int x2 = 0;
-    for (int i = 0; i < 10000000; i++)
-    {
-        raster.step();
-        x1 += raster.x;
-    }
-    auto tr1 = clock();
-    
-    for (int i = 0; i < 10000000; i++)
-    {
-        raster2.step();
-        x2 += raster2.x;
-    }
-    auto tr2 = clock();
-    
-    cout << "optimized " << double(tr1 - tr0) / CLOCKS_PER_SEC << endl;
-    cout << "simple " << double(tr2 - tr1) / CLOCKS_PER_SEC << endl;
-    cout << x1 << " " << x2 << endl;
-    return 0;*/
     ifstream paramFile(argv[1]);
     if (not paramFile.is_open())
     {
@@ -140,18 +109,6 @@ int main(int argc, char** argv)
     stereoParams.uMax = img1.cols;
     stereoParams.vMax = img1.rows;
     stereoParams.setEqualMargin();
-//    
-//    Laplacian(img1, img1lap, CV_16S, 3);
-//    Laplacian(img2, img2lap, CV_16S, 3);
-//    
-//    GaussianBlur(img1, img1, Size(3, 3), 0, 0);
-//    GaussianBlur(img2, img2, Size(3, 3), 0, 0);
-//    
-//    img1lap = img1lap + 128;
-//    img2lap = img2lap + 128;
-//    img1lap.copyTo(img1);
-//    img2lap.copyTo(img2);
-////    
     
     Timer timer, timer1;
     timer1.reset();
