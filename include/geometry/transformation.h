@@ -47,7 +47,7 @@ public:
     Transformation(T x, T y, T z, T qx, T qy, T qz, T qw)
     : mtrans(x, y, z), mrot(Quaternion<T>(qx, qy, qz, qw).toRotationVector()) {}
 
-
+    
 
     void setParam(Vector3<T> & newTrans, Vector3<T> & newRot)
     {
@@ -67,6 +67,12 @@ public:
         t = -R*mtrans;
     }
 
+    void scale(const T lambda)
+    {
+        mrot *= lambda;
+        mtrans *= lambda;
+    }
+    
     Transformation compose(const Transformation & transfo) const
     {
         Transformation res;
