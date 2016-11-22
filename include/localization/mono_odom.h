@@ -32,7 +32,8 @@ Relative camera pose estimation based on photometric error and depth map
 #include "localization/photometric.h"
 
 //TODO make a parameter structure
-const double MIN_TRANS = 0.25;
+const double MIN_INIT_DIST = 0.25;   // minimal distance traveled befor VO is used
+const double MIN_STEREO_BASE = 0.05; // minimal acceptable stereo base
 
 
 class MonoOdometry
@@ -44,7 +45,8 @@ public:
     xiBaseCam(xiBaseCam),
     motionStereo(camera, camera, params),
     photometricLocalizer(5, camera),
-    state(EMPTY) 
+    state(EMPTY),
+    woState(EMPTY)
     {
         photometricLocalizer.setVerbosity(0);
     }
@@ -57,9 +59,10 @@ public:
     
 private:
 
-    void initFirstKeyFrame(const Mat8u & imageNew);
+    void initFirstKeyFrame(const Mat8u & imageNew, const double t);
     
-    void createKeyFrame(const Mat8u & imageNew);
+    //xiLocal is supposed to be up to date
+    void createKeyFrame(const Mat8u & imageNew, const double t);
     
     void computeVisualOdometry(const Mat8u & imageNew, const double t);
     
@@ -79,7 +82,7 @@ private:
     Transformation<double> xiOdom; // the last WO measurement
     Transformation<double> xiBaseCam; // extrinsic calibration
     DepthMap depthMap; 
-    OdomState state;
+    OdomState state, woState;
     double tLocal, tOdom;
     
     //utils

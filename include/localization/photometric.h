@@ -75,7 +75,7 @@ public:
     
     void computePoseMI(const Mat32f & img2, Transformation<double> & T12);
 
-    //TODO make enum for ochosing the camera
+    //TODO make enum for choosing the camera
     array<double, 6> covarianceEigenValues(const int scaleIdx, 
             const Transformation<double> T12, bool baseValues);
 

@@ -36,50 +36,72 @@ void MonoOdometry::feedImage(const Mat8u & imageNew, const double t)
     switch (state)
     {
     case EMPTY:
-        initFirstKeyFrame(imageNew);
+        initFirstKeyFrame(imageNew, t);
         state = INIT_FIRST_FRAME;
+        break;
     case INIT_FIRST_FRAME:
         refineDepth(imageNew);
-        if (xiLocal.trans().norm() > MIN_TRANS) state = ACTIVE;        
+        if (xiLocal.trans().norm() > MIN_INIT_DIST) state = ACTIVE;    
+        break;    
     case ACTIVE:
+    
+        // if some singular values of the covariance matrix after the localization is too low
+        
+        computeVisualOdometry(imageNew, t);
+        
         if (false) // conditionning gets wors
         {
-            createKeyFrame(imageNew);
+            createKeyFrame(imageNew, t);
         }
         else
         {
-            computeVisualOdometry(imageNew, t);
             refineDepth(imageNew);
         }
+        break;
     }
 }
 
 void MonoOdometry::feedWheelOdometry(const Transformation<double> xiOdomNew, const double t)
 {
-    Transformation<double> dxi = xiOdom.inverseCompose(xiOdomNew);
-    
-    //TODO treat the case when tLocal < tOdom ???
-    
-    if (tLocal > tOdom)
+    //TODO potentially dangerous code because two automata work simultaneously
+    // verification's needed
+    switch (woState)
     {
-        //interpolate
-        double lambda = (t - tLocal) / (t - tOdom);
-        dxi.scale(lambda);
+    case EMPTY:
+        tOdom = t;
+        tLocal = t;
+        xiOdom = xiOdomNew; 
+        woState = ACTIVE;   
+        break;     
+    case ACTIVE:
+        Transformation<double> dxi = xiOdom.inverseCompose(xiOdomNew);
+        //TODO treat the case when tLocal < tOdom ???
+        if (tLocal > tOdom)
+        {
+            //interpolate
+            double lambda = (t - tLocal) / (t - tOdom);
+            dxi.scale(lambda);
+        }
+        
+        //update state
+        xiLocal = xiLocal.compose(dxi);
+        xiOdom = xiOdomNew;
+        tOdom = t;
+        tLocal = t;
+        break;
     }
-    
-    //update state
-    xiLocal = xiLocal.compose(dxi);
-    xiOdom = xiOdomNew;
-    tOdom = t;
-    tLocal = t;
 }
     
-void MonoOdometry::initFirstKeyFrame(const Mat8u & imageNew)
+void MonoOdometry::initFirstKeyFrame(const Mat8u & imageNew, const double t)
 {
     imageVec.emplace_back();
     imageNew.copyTo(imageVec.back());
     transfoVec.emplace_back();
     motionStereo.setBaseImage(imageNew);
+    
+    //update the state
+    xiLocal = Transformation<double>();
+    tLocal = t;
     
     //TODO rename to setBaseImage
 	photometricLocalizer.computeBaseScaleSpace(imageNew);
@@ -88,44 +110,33 @@ void MonoOdometry::initFirstKeyFrame(const Mat8u & imageNew)
     //poseCovarVec.emplaceBack();
 }
     
-void MonoOdometry::createKeyFrame(const Mat8u & imageNew)
+void MonoOdometry::createKeyFrame(const Mat8u & imageNew, const double t)
 {
-    //TODO project depth forward
+    // project depth forward
+    
+    // insert new instances into the map
+    
+    // update the states
 }
 
 void MonoOdometry::computeVisualOdometry(const Mat8u & imageNew, const double t)
 {
-    Transformation<double> xiCam12;
+    Transformation<double> xiCam12 = xiBaseCam.inverseCompose(xiLocal.compose(xiBaseCam));;
+    
     photometricLocalizer.depth() = depthMap; //TODO make a method setDepth()
-    photometricLocalizer.computePose(imageNew, xiCam12);
+    
+    photometricLocalizer.computePose(imageNew, xiCam12); //TODO optimize directly xiLocal
+                            //TODO get the covariance matrix
+                            //TODO introduce the odometry prior with its propoer covariance
+    
     xiLocal = xiBaseCam.compose(xiCam12.composeInverse(xiBaseCam));
     tLocal = t;
 }
 
 void MonoOdometry::refineDepth(const Mat8u & imageNew)
 {
+    if (xiLocal.trans().norm() < MIN_STEREO_BASE) return; 
     motionStereo.computeDepth(xiLocal, imageNew, depthMap);
 }
     
-//    enum OdomState {EMPTY, INIT_FIRST_FRAME, ACTIVE, LOST};
-//    // memory
-//    vector<Mat8u> imageVec;
-//    vector<Transformation<double>> transfoVec;
-//    vector<Matrix6d> poseCovarVec;
-//    
-//    // state
-//    Transformation<double> xiLocal; // pose wrt actual keyframe
-//    Transformation<double> xiOdom; // the last WO measurement
-//    Transformation<double> xiBaseCam; // extrinsic calibration
-//    DepthMap depthMap; 
-//    OdomState state;
-//    
-//    //utils
-//    MotionStereo motionStereo;
-//    
-//    //TODO add WO sigma
-//    //TODO add a threshold for new the KFr instantiation 
-
-
-
 

@@ -138,7 +138,7 @@ int main(int argc, char** argv)
     depth.toInverseMat(res2);
     depth.sigmaToMat(sigmaRes2);
     imshow("res" + to_string(counter), res2 *0.12);
-    imshow("sigma " + to_string(counter), sigmaRes2*5);
+    imshow("sigma " + to_string(counter), sigmaRes2*20);
     cv::waitKey(0);
     counter++;
     while (getline(paramFile, imageInfo))
@@ -156,7 +156,7 @@ int main(int argc, char** argv)
 //        depth.setDefault();
         timer.reset();
         DepthMap depth2 = depth;
-        stereo.computeDepth(TleftRight, img2, depth2);
+        stereo.validateDepth(TleftRight, img2, depth2);
         depth.merge(depth2);
         cout << timer.elapsed() << endl; 
         depth.toInverseMat(res);

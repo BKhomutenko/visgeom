@@ -78,75 +78,77 @@ int main(int argc, char** argv)
     paramFile >> stereoParams.scale;
     paramFile.ignore();
     string fileName1, fileName2;
-    getline(paramFile, fileName1);
-    getline(paramFile, fileName2);
-    
-    Mat8u img1 = imread(fileName1, 0);
-    Mat8u img2 = imread(fileName2, 0);
-//    img1 /= 0.96;
-//    
-//    Laplacian(img1, img1lap, CV_16S, 3);
-//    Laplacian(img2, img2lap, CV_16S, 3);
-//    
-//    GaussianBlur(img1, img1, Size(3, 3), 0, 0);
-//    GaussianBlur(img2, img2, Size(3, 3), 0, 0);
-//    
-//    img1lap = img1lap + 128;
-//    img2lap = img2lap + 128;
-//    img1lap.copyTo(img1);
-//    img2lap.copyTo(img2);
-////    
-    
-    Timer timer;
-    EnhancedCamera camera1(params1.data()), camera2(params2.data());
-    MotionStereo stereo(&camera1, &camera2, stereoParams);
-    stereo.setBaseImage(img1);
-    cout << "    initialization time : " << timer.elapsed() << endl;
-    
-    
-//    
-//    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
-//    {
-//        out1(x) = 0;
-//        out1(x.y + 1, x.x) = 0;
-//        out1(x.y, x.x + 1) = 255;
-//        out1(x.y + 1, x.x + 1) = 255;
-//        stereo.traceEpipolarLine(x, out2);
-//    }
-    
-    
-    
-    ScaleParameters scaleParams;
-    scaleParams.scale = stereoParams.scale;
-    
-    scaleParams.u0 = 50;
-    scaleParams.v0 = 200;
-    scaleParams.uMax = img1.cols;
-    scaleParams.vMax = img1.rows;
-    scaleParams.setEqualMargin();
-    scaleParams.setYMargin(330);
+    while(getline(paramFile, fileName1))
+    {
+        getline(paramFile, fileName2);
+        
+        Mat8u img1 = imread(fileName1, 0);
+        Mat8u img2 = imread(fileName2, 0);
+    //    img1 /= 0.96;
+    //    
+    //    Laplacian(img1, img1lap, CV_16S, 3);
+    //    Laplacian(img2, img2lap, CV_16S, 3);
+    //    
+    //    GaussianBlur(img1, img1, Size(3, 3), 0, 0);
+    //    GaussianBlur(img2, img2, Size(3, 3), 0, 0);
+    //    
+    //    img1lap = img1lap + 128;
+    //    img2lap = img2lap + 128;
+    //    img1lap.copyTo(img1);
+    //    img2lap.copyTo(img2);
+    ////    
+        
+        Timer timer;
+        EnhancedCamera camera1(params1.data()), camera2(params2.data());
+        MotionStereo stereo(&camera1, &camera2, stereoParams);
+        stereo.setBaseImage(img1);
+        cout << "    initialization time : " << timer.elapsed() << endl;
+        
+        
+    //    
+    //    for (auto & x : {Point(320, 300), Point(500, 300), Point(750, 300), Point(350, 500), Point(600, 450)})
+    //    {
+    //        out1(x) = 0;
+    //        out1(x.y + 1, x.x) = 0;
+    //        out1(x.y, x.x + 1) = 255;
+    //        out1(x.y + 1, x.x + 1) = 255;
+    //        stereo.traceEpipolarLine(x, out2);
+    //    }
+        
+        
+        
+        ScaleParameters scaleParams;
+        scaleParams.scale = stereoParams.scale;
+        
+        scaleParams.u0 = 0;
+        scaleParams.v0 = 0;
+        scaleParams.uMax = img1.cols;
+        scaleParams.vMax = img1.rows;
+        scaleParams.setEqualMargin();
+        scaleParams.setYMargin(330);
 
-//    scaleParams.u0 = 700;
-//    scaleParams.v0 = 200;
-//    scaleParams.uMax = img1.cols;
-//    scaleParams.vMax = img1.rows;
-//    scaleParams.setYMargin(700);
-//    scaleParams.setXMargin(400);
-    
-    DepthMap depth(&camera1, scaleParams);
-    depth.setTo(0, 0);
-    Mat32f res;
-    timer.reset();
-    stereo.validateDepth(TleftRight, img2, depth);
-    cout << timer.elapsed() << endl;
-    timer.reset();
+    //    scaleParams.u0 = 700;
+    //    scaleParams.v0 = 200;
+    //    scaleParams.uMax = img1.cols;
+    //    scaleParams.vMax = img1.rows;
+    //    scaleParams.setYMargin(700);
+    //    scaleParams.setXMargin(400);
+        
+        DepthMap depth(&camera1, scaleParams);
+        depth.setTo(0, 0);
+        Mat32f res;
+        timer.reset();
+        stereo.validateDepth(TleftRight, img2, depth);
+        cout << timer.elapsed() << endl;
+        timer.reset();
 
-    depth.toInverseMat(res);    
-    
-    imshow("out1", img1);
-    imshow("out2", img2);
-    imshow("res", res * 5 );
-    waitKey(); 
+        depth.toInverseMat(res);    
+        
+        imshow("out1", img1);
+        imshow("out2", img2);
+        imshow("res", res * 5 );
+        waitKey(); 
+    }
     return 0;
 }
 
