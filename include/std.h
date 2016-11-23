@@ -23,6 +23,7 @@ STL types and methods
 
 #include <vector>
 #include <array>
+#include <map>
 #include <algorithm>
 #include <random>
 #include <cmath>
@@ -31,6 +32,7 @@ STL types and methods
 using std::vector;
 using std::array;
 using std::pair;
+using std::map;
 
 // Algorithms
 using std::copy;

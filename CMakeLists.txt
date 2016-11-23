@@ -37,6 +37,16 @@ add_library( localization STATIC
 TARGET_LINK_LIBRARIES( localization reconstruction  ${OpenCV_LIBS} ${CERES_LIBRARIES})
 
 ### CALIBRATION ###
+add_executable( generic_calibration
+    test/calibration/generic_calibration.cpp
+)
+
+target_link_libraries( generic_calibration 
+    ${OpenCV_LIBS}  
+    ${CERES_LIBRARIES}
+    ${Boost_LIBRARIES}
+)
+
 add_executable( calibration
     test/calibration/calibration.cpp
 )

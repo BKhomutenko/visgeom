@@ -32,9 +32,11 @@ struct GenericProjection
     _grid(grid),
     _transformStatusVec(transformStatusVec),
     _constTransformVec(constTransformVec),
-    _constIntrinsicVec(intrinsicVec)  
+    _constIntrinsicVec(intrinsicVec),
+    _intrinsicCount(Projector<double>::INTRINSIC_COUNT)
     {
-        assert(_constIntrinsicVec.size() == Projector<double>().countIntrinsic());
+        assert(_constIntrinsicVec.size() == _intrinsicCount or 
+               _constIntrinsicVec.size() == 0);
     }
     
     GenericProjection(const Vector2dVec & proj, const Vector3dVec & grid,
@@ -43,13 +45,15 @@ struct GenericProjection
     _proj(proj),
     _grid(grid),
     _transformStatusVec(transformStatusVec),
-    _constTransformVec(constTransformVec)  {}
+    _constTransformVec(constTransformVec),
+    _intrinsicCount(Projector<double>::INTRINSIC_COUNT)  {}
     
     GenericProjection(const Vector2dVec & proj, const Vector3dVec & grid,
             const vector<TransformationStatus> & transformStatusVec) : 
     _proj(proj),
     _grid(grid),
-    _transformStatusVec(transformStatusVec)  {}
+    _transformStatusVec(transformStatusVec),
+    _intrinsicCount(Projector<double>::INTRINSIC_COUNT)  {}
          
     template <typename T>
     bool operator()(const T * const* params,
@@ -96,8 +100,8 @@ struct GenericProjection
         vector<T> intrinsicVec;
         if (_constIntrinsicVec.size() == 0)
         {
-            intrinsicVec.resize(projector.countIntrinsic());
-            copy(params[paramIdx], params[paramIdx] + projector.countIntrinsic(), intrinsicVec.begin());
+            intrinsicVec.resize(_intrinsicCount);
+            copy(params[paramIdx], params[paramIdx] + _intrinsicCount, intrinsicVec.begin());
         }
         else
         {
@@ -126,6 +130,7 @@ struct GenericProjection
         return true;
     }
     
+    const int _intrinsicCount;
     const Vector2dVec _proj;
     const Vector3dVec _grid;
     const vector<double> _constIntrinsicVec;

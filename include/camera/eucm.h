@@ -61,11 +61,8 @@ struct EnhancedProjector
         dst[1] = fv * yn + v0;
         return true;  
     } 
-    
-    int countIntrinsic() const
-    {
-        return 6;
-    } 
+      
+    static const int INTRINSIC_COUNT = 6;
 };
 
 class EnhancedCamera : public ICamera
