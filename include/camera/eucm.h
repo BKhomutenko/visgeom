@@ -125,7 +125,7 @@ public:
         const double & y = src(1);
         const double & z = src(2);
 
-        double rho = sqrt(z*z + beta*(x*x + y*y));
+        double rho = sqrt(z * z + beta * (x * x + y * y));
         double gamma = 1. - alpha;
         double d = alpha * rho + gamma * z;
         double k = 1. / d / d;
@@ -144,6 +144,44 @@ public:
 
     }
     
+    virtual bool intrinsicJacobian(const Vector3d & src,
+                    double * dudalpha, double * dvdalpha) const
+    {
+        const double & alpha = params[0];
+        const double & beta = params[1];
+        const double & fu = params[2];
+        const double & fv = params[3];
+        const double & u0 = params[4];
+        const double & v0 = params[5];
+        
+        const double & x = src(0);
+        const double & y = src(1);
+        const double & z = src(2);
+        
+        double x2y2 = x * x + y * y;
+        double rho2 = z * z + beta * (x2y2);
+        double rho = sqrt(rho2);
+        double gamma = 1. - alpha;
+        double eta = alpha * rho + gamma * z;
+        double eta2 = eta * eta;
+        
+        dudalpha[0] = -fu * x * (rho - z) / eta2;
+        dudalpha[1] = -fu * x * alpha * x2y2 / (2 * eta2 * rho);
+        dudalpha[2] = x / eta;
+        dudalpha[3] = 0;
+        dudalpha[4] = 1;
+        dudalpha[5] = 0;
+        
+        dvdalpha[0] = -fv * y * (rho - z) / eta2;
+        dvdalpha[1] = -fv * y * alpha * x2y2 / (2 * eta2 * rho);
+        dvdalpha[2] = 0;
+        dvdalpha[3] = y / eta;
+        dvdalpha[4] = 0;
+        dvdalpha[5] = 1;
+        
+        return true;
+
+    }
     
     virtual EnhancedCamera * clone() const { return new EnhancedCamera(width, height, params.data()); }
     

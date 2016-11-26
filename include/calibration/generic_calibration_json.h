@@ -34,285 +34,386 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 using boost::property_tree::ptree;
 using boost::property_tree::read_json;
 
-struct CalibrationData
-{
-    Vector2dVec projection;
-    array<double, 6> extrinsic;
-    string fileName;
-};
-
-struct CalibrationBoard
-{
-    string type;
-    int nx, ny;
-    double size;
+struct TransformInfo {
+    bool global;
+    bool prior;
+    bool initialized;  
 };
 
 //TODO choose the model in the parameter file, not as atemplate parameter
-template<template<typename> class Projector>
 class GenericCameraCalibration
 {
 protected:
-    map<string, double*> intrinsicMap;
-    map<string, map<string, double*>> sequenceTransformMap;
-    map<string, double*> transformMap;
+    map<string, vector<double>> intrinsicMap;
+    map<string, Array6d> globalTransformMap;
+    map<string, list<Array6d>> sequenceTransformMap;
+    map<string, TransformInfo> transformInfoMap;
+    map<string, ICamera*> cameraMap;
     Problem globalProblem;
     
     //temporary variables
     int Nx, Ny;
+    ptree root;
     
 public:
     //TODO implement access to the results
     
-    ~GenericCameraCalibration()
-    {
-        for (auto & x : intrinsicMap)
-        {
-            delete[] x.second;
-        }
-        for (auto & sequenceMap : sequenceTransformMap)
-        {
-            for (auto & x : sequenceMap.second)
-            {
-                delete[] x.second;
-            }
-        }
-        for (auto & x : transformMap)
-        {
-            delete[] x.second;
-        }
-    }
+    virtual ~GenericCameraCalibration()
+    { }
     
     bool compute()
     {
-               
         //run the solver
         Solver::Options options;
-        options.max_num_iterations = 500;
+//        options.check_gradients = true;
+        options.max_num_iterations = 250;
         options.function_tolerance = 1e-10;
         options.gradient_tolerance = 1e-10;
         options.parameter_tolerance = 1e-10;
+        options.logging_type = ceres::SILENT;
 //        options.minimizer_progress_to_stdout = true;
         Solver::Summary summary;
         Solve(options, &globalProblem, &summary);
         cout << summary.FullReport() << endl;
         
+        cout << "Intrinsic parameters :" << endl;
         for (auto & x : intrinsicMap)
         {
             cout << x.first << " : ";
-            for (int i = 0; i < Projector<double>::INTRINSIC_COUNT; i++)
+            for (int i = 0; i < cameraMap[x.first]->numParams(); i++) //FIXME store the intrinsic size
             {
                 cout << x.second[i] << "  ";
             }
             cout << endl;
+            
         }
-    } 
+        
+        cout << "Local extrinsic parameters :" << endl;
+        for (auto & sequenceMap : sequenceTransformMap)
+        {
+            cout << "Sequence : " << sequenceMap.first << endl;
+            int i = 0;
+            for (auto & x : sequenceMap.second)
+            {
+                cout << i++ << " : " << Transformation<double>(x.data()) << endl;
+            }
+        }
+        
+        cout << "Global extrinsic parameters :" << endl;
+        for (auto & x : globalTransformMap)
+        {
+            cout << x.first << " : " << Transformation<double>(x.second.data()) << endl;
+        }
+        
+    }
+    
+    void parseTransforms()
+    {
+        for (auto & transInfo : root.get_child("transformations"))
+        {
+            string name = transInfo.second.get<string>("name");
+            transformInfoMap[name] = TransformInfo();
+            auto & info = transformInfoMap[name];
+            info.global = transInfo.second.get<bool>("global");
+            info.prior = transInfo.second.get<bool>("prior");
+            info.initialized = false;
+            
+            if (info.global)
+            {
+                globalTransformMap[name] = Array6d();
+                if (info.prior)
+                {
+                    int i = 0;
+                    for (auto & x : transInfo.second.get_child("value"))
+                    {
+                        globalTransformMap[name][i++] = x.second.get_value<double>();
+                    }
+                }
+            }
+            else 
+            {
+                sequenceTransformMap[name] = list<Array6d>();
+                auto & valVec = sequenceTransformMap[name];
+                if (info.prior)
+                {
+                    for (auto & val : transInfo.second.get_child("value"))
+                    {
+                        valVec.emplace_back();
+                        int i = 0;
+                        for (auto & x : val.second)
+                        {
+                            valVec.back()[i++] = x.second.get_value<double>();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    void parseCameras()
+    {
+        for (auto & cameraInfo : root.get_child("cameras"))
+        {
+            string name = cameraInfo.second.get<string>("name");
+            intrinsicMap[name] = vector<double>();
+            auto & intrinsicVec = intrinsicMap[name];
+            string cameraType = cameraInfo.second.get<string>("type");
+            for (auto & x : cameraInfo.second.get_child("value"))
+            {
+                intrinsicVec.push_back(x.second.get_value<double>());
+            }
+            if (cameraType == "eucm")
+            {
+                cout << "Model : EUCM" << endl;
+                assert(intrinsicVec.size() == 6);
+                cameraMap[name] = new EnhancedCamera(intrinsicVec.data());
+            }
+            else
+            {
+                cout << "ERROR : invalid camera model name" << endl;
+                assert(false);
+            }
+        }
+    }
+    
+    //returns the first transform if it is a sequence
+    Array6d & getTransformData(const string & name, int idx = 0)
+    {
+        if (transformInfoMap[name].global)  return globalTransformMap[name];
+        else
+        {
+            auto iter = sequenceTransformMap[name].begin();
+            advance(iter, idx);
+            return *iter;
+        }
+    }
+    
+    Transformation<double> getTransform(const string & name, int idx = 0)
+    {
+        return Transformation<double>(getTransformData(name, idx).data());
+    }
+    
+    void parseData()
+    {
+        for (auto & dataInfo : root.get_child("data"))
+        {
+            //TODO add different init for a different type
+            vector<string> transNameVec;
+            vector<TransformationStatus> transStatusVec;
+            vector<Transformation<double>> constTransVec;
+            for (auto & transInfo : dataInfo.second.get_child("transform_chain"))
+            {
+                transNameVec.push_back(transInfo.second.get<string>("name"));
+                
+                if (transformInfoMap.find(transNameVec.back()) == transformInfoMap.end())
+                {
+                    //the transformation is constant
+                    transStatusVec.push_back(TRANSFORM_CONSTANT);
+                    vector<double> xiData;
+                    xiData.reserve(6);
+                    for (auto & x : transInfo.second.get_child("value"))
+                    {
+                        xiData.push_back(x.second.get_value<double>());
+                    }
+                    assert(xiData.size() == 6);
+                    constTransVec.emplace_back(xiData.data());
+                }
+                else
+                {
+                    if (transInfo.second.get<bool>("direct")) 
+                    {
+                        transStatusVec.push_back(TRANSFORM_DIRECT);
+                    }
+                    else transStatusVec.push_back(TRANSFORM_INVERSE);
+                }
+            }
+            
+            string cameraName = dataInfo.second.get<string>("camera");
+            
+            Nx = dataInfo.second.get<int>("object.cols");
+            Ny = dataInfo.second.get<int>("object.rows");
+            double sqSize= dataInfo.second.get<double>("object.size");
+            Vector3dVec grid;
+            grid.reserve(Nx*Ny);
+            for (int i = 0; i < Ny; i++)
+            {
+                for (int j = 0; j < Nx; j++)
+                {
+                   grid.emplace_back(sqSize * j, sqSize * i, 0); 
+                }
+            }
+            
+            bool checkExtraction = dataInfo.second.get<bool>("parameters.check_extraction");
+            string initName = dataInfo.second.get<string>("init");
+            string prefix = dataInfo.second.get<string>("images.prefix");
+            
+            bool initialize = false;
+            if (initName != "none")
+            {
+                //there is a transform to initialize
+                assert(transformInfoMap.find(initName) != transformInfoMap.end());
+                assert(transformInfoMap[initName].prior == false);
+                assert(transformInfoMap[initName].initialized == false);
+                if (not transformInfoMap[initName].global)
+                {
+                    assert(sequenceTransformMap[initName].size() == 0);
+                }
+                initialize = true;
+                transformInfoMap[initName].initialized = true;
+            }
+            
+            for (auto & x : transNameVec)
+            {
+//                cout << x << endl;
+//                cout << transformInfoMap[x].prior << " " <<
+//                     transformInfoMap[x].initialized << endl;
+                assert(transformInfoMap[x].prior xor
+                     transformInfoMap[x].initialized);
+            }
+            
+            //process images, init the transform
+            Vector2dVec projection;
+            int sequenceIdx = -1;
+            for (auto & x : dataInfo.second.get_child("images.names"))
+            {
+                //TODO make possible const xiImage
+                string filename = x.second.get_value<string>();
+                cout << filename << endl;
+                sequenceIdx++;
+                if (not extractGridProjection(prefix + filename, projection, checkExtraction))
+                {
+                    if (not transformInfoMap[initName].global)
+                    {
+                        sequenceTransformMap[initName].push_back({0, 0, 1, 0, 0, 0});
+                    }
+                    continue;
+                }
+                
+                
+                if (initialize)
+                {
+    //                cout << "    Estimate initial extrinsic" << endl;
+                    auto xi = estimateInitialGrid(cameraMap[cameraName], projection, grid);
+                    auto constTransIter = constTransVec.begin();
+                    for (int i = 0; i < transNameVec.size(); i++)
+                    {
+                        const string & name = transNameVec[i];
+    //                    cout << "        " << name << endl;
+                        if (name == initName) break;
+                        else if (transStatusVec[i] == TRANSFORM_CONSTANT)
+                        {
+                            xi = (*constTransIter).inverseCompose(xi);
+                            constTransIter++;
+                        }
+                        else if (transStatusVec[i] == TRANSFORM_DIRECT)
+                        {
+                            xi = getTransform(name, sequenceIdx).inverseCompose(xi);
+                        }
+                        else if (transStatusVec[i] == TRANSFORM_INVERSE)
+                        {
+                            xi = getTransform(name, sequenceIdx).compose(xi);
+                        }
+                    }
+                    constTransIter = constTransVec.end();
+                    for (int i = transNameVec.size() - 1; i >= 0; i--)
+                    {
+                        const string & name = transNameVec[i];
+    //                    cout << "        " << name << endl;
+                        if (name == initName) break;
+                        else if (transStatusVec[i] == TRANSFORM_CONSTANT)
+                        {
+                            constTransIter--;
+                            xi = xi.composeInverse(*constTransIter);
+                        }
+                        else if (transStatusVec[i] == TRANSFORM_DIRECT)
+                        {
+                            xi = xi.composeInverse(getTransform(name, sequenceIdx));
+                        }
+                        else if (transStatusVec[i] == TRANSFORM_INVERSE)
+                        {
+                            xi = xi.compose(getTransform(name, sequenceIdx));
+                        }
+                    }
+                    
+                    if (transStatusVec.back() == TRANSFORM_INVERSE)
+                    {
+                        xi = xi.inverse();
+                    }
+                    
+                    if (transformInfoMap[initName].global)
+                    {
+                        xi.toArray(globalTransformMap[initName].data());
+                        initialize = false;
+                    }
+                    else
+                    {
+                        sequenceTransformMap[initName].push_back(xi.toArray());
+                    }
+                }
+                
+                
+                // make the vector of pointers to the transformation data
+                cout << "    Initialisze pointers" << endl;
+                vector<double*> ptrVec;
+                for (int i = 0; i < transNameVec.size(); i++)
+                {
+                    const string & name = transNameVec[i];
+                    if (transStatusVec[i] == TRANSFORM_CONSTANT) continue;
+                    else if (transformInfoMap[name].global)
+                    {
+                        ptrVec.push_back(globalTransformMap[name].data());
+                    }
+                    else
+                    {
+                        ptrVec.push_back(sequenceTransformMap[name].back().data());
+                    }
+                }
+
+                //add a residual
+                GenericProjectionJac * costFunction = new GenericProjectionJac(projection, grid,
+                                            cameraMap[cameraName], transStatusVec, constTransVec,
+                                            true);
+                                            
+                switch (ptrVec.size())
+                {
+                case 0:
+                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                         intrinsicMap[cameraName].data());
+                    break;
+                case 1:
+                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                            ptrVec[0], intrinsicMap[cameraName].data());
+                    break;
+                case 2:
+                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                            ptrVec[0], ptrVec[1], intrinsicMap[cameraName].data());
+                    break;
+                case 3:
+                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                            ptrVec[0], ptrVec[1], ptrVec[2], intrinsicMap[cameraName].data());
+                    break;
+                case 4:
+                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                            ptrVec[0], ptrVec[1], ptrVec[2],
+                            ptrVec[3], intrinsicMap[cameraName].data());
+                    break;
+                case 5:
+                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                            ptrVec[0], ptrVec[1], ptrVec[2],
+                            ptrVec[3], ptrVec[4], intrinsicMap[cameraName].data());
+                    break;
+                }
+            }
+        }
+    }
+    
     
     bool addResiduals(const string & infoFileName)
     {
-        ptree root;
         read_json(infoFileName, root);
-        
-        vector<string> transNameVec;
-        vector<TransformationStatus> transStatusVec;
-        vector<Transformation<double>> constTransVec;
-        vector<double> intrinsicVec;
-//        vector<double> extrinsicDefault;
-        string cameraId, sequenceId;
-        
-        //read out the transformations
-        for (auto & transInfo : root.get_child("transform_chain"))
-        {
-            transNameVec.emplace_back(transInfo.second.get<string>("name"));
-            bool isVariable = transInfo.second.get<bool>("variable");
-            bool isDirect = transInfo.second.get<bool>("direct");
-            
-            //read out the initial value
-            vector<double> transform;
-            for (auto & x : transInfo.second.get_child("value"))
-            {
-                transform.push_back( double(x.second.get_value<double>()) );
-            }
-            
-            if (isVariable)
-            {
-                if (isDirect) transStatusVec.push_back(TRANFORM_DIRECT);
-                else transStatusVec.push_back(TRANSFORM_INVERSE);
-            }
-            else
-            {
-                //read out the value
-                //fill up the const transformation vector
-                transStatusVec.push_back(TRANSFORM_CONSTANT);
-                constTransVec.emplace_back(transform.data());
-                if (not isDirect)
-                {
-                    constTransVec.back() = constTransVec.back().inverse();
-                }
-            }
-            
-            //initialize the transform in the map
-            if (transNameVec.back() == "xiImage")
-            {
-                sequenceId = transInfo.second.get<string>("id");
-                if (sequenceTransformMap.find(sequenceId) == sequenceTransformMap.end())
-                {
-                    sequenceTransformMap[sequenceId] = map<string, double*>();
-//                    extrinsicDefault = transform;
-                }
-            }
-            else if (isVariable)
-            {
-                if (transformMap.find(transNameVec.back()) == transformMap.end())
-                {
-                    transformMap[transNameVec.back()] = new double[6];
-                }
-            }
-        }
-        
-        //read out the camera
-        cameraId = root.get<string>("camera.name");
-        bool isVariableIntrinsic = root.get<bool>("camera.variable");
-        if (isVariableIntrinsic)
-        {
-            if (intrinsicMap.find(sequenceId) == intrinsicMap.end())
-            {
-                intrinsicMap[cameraId] = new double[Projector<double>::INTRINSIC_COUNT]; //FIXME
-                int i = 0;
-                for (auto & x : root.get_child("camera.intrinsic"))
-                {
-                    intrinsicMap[cameraId][i] = double(x.second.get_value<double>());
-                    i++;
-                }
-            }
-        }
-        else
-        {
-            for (auto & x : root.get_child("camera.intrinsic"))
-            {
-                intrinsicVec.push_back( double(x.second.get_value<double>()) );
-            }
-        }
-        //initialize the object
-        Nx = root.get<int>("object.cols");
-        Ny = root.get<int>("object.rows");
-        double sqSize= root.get<double>("object.size");
-        Vector3dVec grid;
-        grid.reserve(Nx*Ny);
-        for (int i = 0; i < Ny; i++)
-        {
-            for (int j = 0; j < Nx; j++)
-            {
-               grid.emplace_back(sqSize * j, sqSize * i, 0); 
-            }
-        }
-        
-        //initialize the sequence extrinsic, grid projections
-        //and add the residuals to the problem
-        Vector2dVec projection;
-        string prefix = root.get<string>("camera.images.prefix");
-        for (auto & x : root.get_child("camera.images.names"))
-        {
-            //TODO make possible const xiImage
-            string filename = x.second.get_value<string>();
-            if (not extractGridProjection(prefix + filename, projection,
-                    root.get<bool>("params.check_extraction"))) continue;
-            
-            if (sequenceTransformMap[sequenceId].find(filename) == sequenceTransformMap[sequenceId].end())
-            {
-                sequenceTransformMap[sequenceId][filename] = new double[6];
-                estimateInitialGrid(intrinsicMap[cameraId], projection, grid,
-                    sequenceTransformMap[sequenceId][filename]);
-            }
-            
-            // make the vector of pointers
-            vector<double*> ptrVec;
-            for (int i = 0; i < transNameVec.size(); i++)
-            {
-                const string & name = transNameVec[i];
-                if (name == "xiImage")
-                {
-                    ptrVec.push_back(sequenceTransformMap[sequenceId][filename]);
-                }
-                else if (transStatusVec[i] != TRANSFORM_CONSTANT)
-                {
-                    ptrVec.push_back(transformMap[name]);
-                }
-            }
-            
-            
-            //add a residual
-            typedef DynamicAutoDiffCostFunction<GenericProjection<Projector>> projectionCF;
-            GenericProjection<Projector> * boardProjection;
-            boardProjection = new GenericProjection<Projector>(projection, grid,
-                                        transStatusVec, constTransVec, intrinsicVec);
-            projectionCF * costFunction = new projectionCF(boardProjection);
-            costFunction->SetNumResiduals(2 * Nx * Ny);
-            //add parameter blocks for all nonconstant transformations
-            for (int i = 0; i < ptrVec.size(); i++)
-            {
-                costFunction->AddParameterBlock(6); 
-            }
-            
-            if (isVariableIntrinsic)
-            {
-                costFunction->AddParameterBlock(Projector<double>::INTRINSIC_COUNT);
-                switch (ptrVec.size())
-                {
-                case 1:
-                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                            ptrVec[0], intrinsicMap[cameraId]);
-                    break;
-                case 2:
-                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                            ptrVec[0], ptrVec[1], intrinsicMap[cameraId]);
-                    break;
-                case 3:
-                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                            ptrVec[0], ptrVec[1], ptrVec[2], intrinsicMap[cameraId]);
-                    break;
-                case 4:
-                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                            ptrVec[0], ptrVec[1], ptrVec[2],
-                            ptrVec[3], intrinsicMap[cameraId]);
-                    break;
-                case 5:
-                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                            ptrVec[0], ptrVec[1], ptrVec[2],
-                            ptrVec[3], ptrVec[4], intrinsicMap[cameraId]);
-                    break;
-                }
-            }
-            else
-            {
-                switch (ptrVec.size())
-                {
-                case 1:
-                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                            ptrVec[0]);
-                    break;
-                case 2:
-                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                            ptrVec[0], ptrVec[1]);
-                    break;
-                case 3:
-                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                            ptrVec[0], ptrVec[1], ptrVec[2]);
-                    break;
-                case 4:
-                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                            ptrVec[0], ptrVec[1], ptrVec[2],
-                            ptrVec[3]);
-                    break;
-                case 5:
-                    globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                            ptrVec[0], ptrVec[1], ptrVec[2],
-                            ptrVec[3], ptrVec[4]);
-                    break;
-                }
-            }
-        }
-        
+        parseTransforms();
+        parseCameras();
+        parseData();
     }
 
     bool extractGridProjection(const string & fileName, Vector2dVec & projection, bool checkExtraction)
@@ -343,7 +444,7 @@ public:
                 return false;
             }
         }
-
+        
         projection.resize(Nx * Ny);
         for (int i = 0; i < Nx * Ny; i++)
         {
@@ -352,37 +453,25 @@ public:
         return true;
     }
 
-    void estimateInitialGrid(const double * const intrinsic,
-            const Vector2dVec & projection, const Vector3dVec & grid,
-            double * const extrinsic)
+    Transformation<double> estimateInitialGrid(const ICamera * camera,
+            const Vector2dVec & projection, const Vector3dVec & grid)
     {
         Problem problem;
-        typedef DynamicAutoDiffCostFunction<GridEstimate<Projector>> dynamicProjectionCF;
-
-        GridEstimate<Projector> * boardEstimate;
+        GenericProjectionJac * costFunction = new GenericProjectionJac(projection, grid,
+                                        camera, {TRANSFORM_DIRECT}, {}, false);
+        array<double, 6> xi{0, 0, 1, 0, 0, 0};
         
-        fill(extrinsic, extrinsic + 6, 0);
-        extrinsic[2] = 1;
+        Vector2d v = projection[1] - projection[0];
+        xi[5] = atan2(v[1], v[0]);
         
-        //compute initial orientation
-        auto v = projection[1] - projection[0];
-        float alpha = atan2(v[1], v[0]);
-        extrinsic[5] = alpha;
+        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), xi.data());
         
-        //optimize the position
-        vector<double> intrinsicVec(intrinsic, intrinsic + Projector<double>::INTRINSIC_COUNT);
-        boardEstimate = new GridEstimate<Projector>(projection,
-                                    grid, intrinsicVec);
-        dynamicProjectionCF * costFunction = new dynamicProjectionCF(boardEstimate);
-        costFunction->AddParameterBlock(6);
-        costFunction->SetNumResiduals(2 * Nx * Ny);
-        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), extrinsic);
-
-        //run the solver
         Solver::Options options;
         options.max_num_iterations = 250;
         Solver::Summary summary;
         Solve(options, &problem, &summary);
+//        cout << summary.BriefReport() << endl;
+        return Transformation<double>(xi.data());
     }
     
 /*

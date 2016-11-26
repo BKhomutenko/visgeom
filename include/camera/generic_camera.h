@@ -24,6 +24,8 @@ Abstract camera class
 #include "eigen.h"
 #include "geometry/geometry.h"
 
+//TODO replace eigen vectors by double*
+
 class ICamera
 {
 public:
@@ -39,7 +41,11 @@ public:
     //TODO implement the projection and distortion Jacobian
     virtual bool projectionJacobian(const Vector3d & src,
             Matrix23d & Jac) const {return false;}
-
+    
+    //MEMORY IS SUPPOSED TO BE ALLOCATED
+    virtual bool intrinsicJacobian(const Vector3d & src,
+            double * dudalpha, double * dvdalpha) const {return false;}
+            
     virtual void setParameters(const double * const newParams)
     {
         copy(newParams, newParams + params.size(), params.begin());
@@ -102,6 +108,8 @@ public:
     }
     
     const double * getParams() const { return params.data(); }
+    
+    int numParams() { return params.size(); }
     
 protected:
     std::vector<double> params;

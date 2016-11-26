@@ -145,8 +145,7 @@ public:
         //compute initial orientation
         
         auto v = projection[1] - projection[0];
-        float alpha = atan2(v[1], v[0]);
-        extrinsic[5] = alpha;
+        extrinsic[5] = atan2(v[1], v[0]);
         
         //optimize the position
         boardEstimate = new GridEstimate<Projector>(projection,

@@ -95,3 +95,77 @@ private:
     Matrix3d R21, M21;
 };
 
+/*
+computes the jacobian matrix dp / dxi23 if the transformation chain looks like
+T12 T23
+1 -- camera frame
+2 -- intermediate frame
+3 -- frame where the point is projected
+
+inverted means that frame 2 follows frame 3, not precede
+
+For example, if frames 1 and 3 coinside ,then xi13 will be Identity, and xi23 defines the camera pose
+in a certain frame 2
+*/
+class InterJacobian
+{
+public:
+    InterJacobian(const ICamera * camera,
+            const Transformation<double> & xi13, const Transformation<double> & xi23, bool inverted) :
+    _camera(camera->clone()),
+    R12( xi13.rotMat() * xi23.rotMatInv() ),
+    t13( xi13.trans() ),
+    M12( R12 *interOmegaRot(xi23.rot()) ) 
+    {
+        if (inverted)
+        {
+            R12 *= -1; // to take into account the invertion of the kinematic screw
+            M12 *= -1;
+        }
+        
+    }
+    
+    // Point jacobian
+    void dpdxi(const Vector3d & X1, double * dudxi, double * dvdxi)
+    {
+        Matrix23d projJac;
+        _camera->projectionJacobian(X1, projJac);
+        
+        Vector3d t3X = X1 - t13; // projected into the first frame
+        
+        Map<Covector3d> dudtr(dudxi);
+        Map<Covector3d> dudrot(dudxi + 3);
+        dudtr = projJac.row(0) * R12;
+        dudrot = -projJac.row(0) * hat(t3X) * M12;
+        
+        Map<Covector3d> dvdtr(dvdxi);
+        Map<Covector3d> dvdrot(dvdxi + 3);
+        dvdtr = projJac.row(1) * R12;
+        dvdrot = -projJac.row(1) * hat(t3X) * M12;
+    }
+    
+    //brightness jacobian
+    void dfdxi(const Vector3d & X1, const Covector2d & grad, double * dfdxi)
+    {
+        Matrix23d projJac;
+        _camera->projectionJacobian(X1, projJac);
+        
+        Covector3d dfdX = grad * projJac;
+        
+        Vector3d t3X = X1 - t13; // projected into the first frame
+        
+        Map<Covector3d> dfdtr(dfdxi);
+        Map<Covector3d> dfdrot(dfdxi + 3);
+        dfdtr = dfdX * R12;
+        dfdrot = -dfdX * hat(t3X) * M12;
+    }
+    
+private:
+    ICamera * _camera;
+    Matrix3d R12, M12;
+    Vector3d t13;
+    //R12 IS NOT NECESSARILY A ROTATION MATRIX
+};
+
+
+

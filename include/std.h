@@ -24,15 +24,18 @@ STL types and methods
 #include <vector>
 #include <array>
 #include <map>
+#include <list>
 #include <algorithm>
 #include <random>
 #include <cmath>
 
 // Containers
 using std::vector;
+using std::list;
 using std::array;
 using std::pair;
 using std::map;
+using Array6d = array<double, 6>;
 
 // Algorithms
 using std::copy;
