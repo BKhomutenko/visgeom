@@ -28,6 +28,7 @@ STL types and methods
 #include <algorithm>
 #include <random>
 #include <cmath>
+#include <limits>
 
 // Containers
 using std::vector;
@@ -54,3 +55,5 @@ using std::abs;
 
 //constants
 const double HALF_PI = M_PI / 2;
+const double DOUBLE_INF = std::numeric_limits<double>::infinity();
+

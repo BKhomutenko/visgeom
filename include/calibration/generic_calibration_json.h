@@ -66,6 +66,7 @@ public:
         //run the solver
         Solver::Options options;
 //        options.check_gradients = true;
+        options.gradient_check_relative_precision = 1e-2;
         options.max_num_iterations = 250;
         options.function_tolerance = 1e-10;
         options.gradient_tolerance = 1e-10;
@@ -251,7 +252,11 @@ public:
             if (initName != "none")
             {
                 //there is a transform to initialize
+                auto nameIter = find(transNameVec.begin(), transNameVec.end(), initName);
+                assert(nameIter != transNameVec.end());
                 assert(transformInfoMap.find(initName) != transformInfoMap.end());
+                
+                //it is not allowed to initialize a transformation with a prior
                 assert(transformInfoMap[initName].prior == false);
                 assert(transformInfoMap[initName].initialized == false);
                 if (not transformInfoMap[initName].global)
@@ -262,43 +267,48 @@ public:
                 transformInfoMap[initName].initialized = true;
             }
             
+            //to make sure that all the other transformations are initialized
             for (auto & x : transNameVec)
             {
-//                cout << x << endl;
-//                cout << transformInfoMap[x].prior << " " <<
-//                     transformInfoMap[x].initialized << endl;
                 assert(transformInfoMap[x].prior xor
                      transformInfoMap[x].initialized);
             }
             
             //process images, init the transform
+            //TODO separate globalProblem initialization and grid extraction:
+            //1 - create a grid vector which stores all the extracted grids
+            //2 - initialize the transforms and 
+            //3 - initialize globalProblem
             Vector2dVec projection;
             int sequenceIdx = -1;
             for (auto & x : dataInfo.second.get_child("images.names"))
             {
-                //TODO make possible const xiImage
                 string filename = x.second.get_value<string>();
-                cout << filename << endl;
+                cout << ".";
                 sequenceIdx++;
                 if (not extractGridProjection(prefix + filename, projection, checkExtraction))
                 {
-                    if (not transformInfoMap[initName].global)
-                    {
+                    cout << "WARNING : GRID NOT EXTRACTED" << endl;
+                    if (initialize and not transformInfoMap[initName].global) 
+                    {   
+                        //to make sure that the number of transforms corresponds to the number of images
+                        // even though some of them are not initialized
                         sequenceTransformMap[initName].push_back({0, 0, 1, 0, 0, 0});
                     }
                     continue;
                 }
                 
-                
+                //TODO properly initialize a global transformation
+                // make two separate functions
+                // initGlobal, initSequence
                 if (initialize)
                 {
-    //                cout << "    Estimate initial extrinsic" << endl;
                     auto xi = estimateInitialGrid(cameraMap[cameraName], projection, grid);
+                    if (transformInfoMap[initName].global) cout << xi << endl;
                     auto constTransIter = constTransVec.begin();
                     for (int i = 0; i < transNameVec.size(); i++)
                     {
                         const string & name = transNameVec[i];
-    //                    cout << "        " << name << endl;
                         if (name == initName) break;
                         else if (transStatusVec[i] == TRANSFORM_CONSTANT)
                         {
@@ -319,7 +329,14 @@ public:
                     {
                         const string & name = transNameVec[i];
     //                    cout << "        " << name << endl;
-                        if (name == initName) break;
+                        if (name == initName)
+                        {
+                            if (transStatusVec[i] == TRANSFORM_INVERSE)
+                            {
+                                xi = xi.inverse();
+                            }
+                            break;
+                        }
                         else if (transStatusVec[i] == TRANSFORM_CONSTANT)
                         {
                             constTransIter--;
@@ -333,11 +350,11 @@ public:
                         {
                             xi = xi.compose(getTransform(name, sequenceIdx));
                         }
-                    }
-                    
-                    if (transStatusVec.back() == TRANSFORM_INVERSE)
-                    {
-                        xi = xi.inverse();
+                        if (transformInfoMap[initName].global)
+                        {
+                            cout << xi << endl;
+                            cout << getTransform(name, sequenceIdx) << endl;
+                        }
                     }
                     
                     if (transformInfoMap[initName].global)
@@ -351,9 +368,7 @@ public:
                     }
                 }
                 
-                
                 // make the vector of pointers to the transformation data
-                cout << "    Initialisze pointers" << endl;
                 vector<double*> ptrVec;
                 for (int i = 0; i < transNameVec.size(); i++)
                 {
@@ -365,7 +380,8 @@ public:
                     }
                     else
                     {
-                        ptrVec.push_back(sequenceTransformMap[name].back().data());
+                        auto & arr = getTransformData(name, sequenceIdx);
+                        ptrVec.push_back(arr.data());
                     }
                 }
 
@@ -404,6 +420,7 @@ public:
                     break;
                 }
             }
+            cout << endl; // to close the sequence of "." TODO make this output properly
         }
     }
     
@@ -467,185 +484,11 @@ public:
         problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), xi.data());
         
         Solver::Options options;
-        options.max_num_iterations = 250;
+        options.max_num_iterations = 500;
         Solver::Summary summary;
         Solve(options, &problem, &summary);
-//        cout << summary.BriefReport() << endl;
         return Transformation<double>(xi.data());
     }
-    
-/*
 
-
-    //TODO chanche the file formatting
-    bool initializeIntrinsic(const string & infoFileName,
-            vector<CalibrationData> & calibDataVec)
-    {
-        // open the file and read the data
-        ifstream calibInfoFile(infoFileName);
-        if (not calibInfoFile.is_open())
-        {
-            cout << infoFileName << " : ERROR, file is not found" << endl;
-            return false;
-        }
-        bool checkExtraction;
-        calibInfoFile >> Nx >> Ny >> sqSize >> outlierThresh >> checkExtraction;
-        calibInfoFile.ignore();  // To get to the next line
-
-        calibDataVec.clear();
-        string imageFolder;
-        string imageName;
-        getline(calibInfoFile, imageFolder);
-        while (getline(calibInfoFile, imageName))
-        {
-            CalibrationData calibData;
-            bool isExtracted;
-
-            calibData.fileName = imageFolder + imageName;
-            isExtracted = extractGridProjection(calibData.fileName, calibData.projection, checkExtraction);
-
-            if (not isExtracted)
-            {
-                continue;
-            }
-
-            calibData.extrinsic = array<double, 6>{0, 0, 1, 0, 0, 0};
-            calibDataVec.push_back(calibData);
-
-            cout << "." << flush;
-        }
-        cout << "done" << endl;
-        return true;
-    }
-
-    void constructGrid()
-    {
-        grid.resize(Nx * Ny);
-        for (int i = 0; i < Nx * Ny; i++)
-        {
-            grid[i] = Vector3d(sqSize * (i % Nx), sqSize * (i / Nx), 0);
-        }
-    }
-
-    void estimateInitialGrid(const vector<double> & intrinsic,
-            const Vector2dVec & projection,
-            array<double, 6> & extrinsic)
-    {
-        Problem problem;
-        typedef DynamicAutoDiffCostFunction<GridEstimate<Projector>> dynamicProjectionCF;
-
-        GridEstimate<Projector> * boardEstimate;
-        
-        //compute initial orientation
-        
-        auto v = projection[1] - projection[0];
-        float alpha = atan2(v[1], v[0]);
-        extrinsic[5] = alpha;
-        
-        //optimize the position
-        boardEstimate = new GridEstimate<Projector>(projection,
-                                    grid, intrinsic);
-        dynamicProjectionCF * costFunction = new dynamicProjectionCF(boardEstimate);
-        costFunction->AddParameterBlock(6);
-        costFunction->SetNumResiduals(2 * Nx * Ny);
-        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), extrinsic.data());
-
-        //run the solver
-        Solver::Options options;
-        options.max_num_iterations = 250;
-        Solver::Summary summary;
-        Solve(options, &problem, &summary);
-    }
-
-    void addIntrinsicResidual(Problem & problem, vector<double> & intrinsic,
-            const Vector2dVec & projection,
-            array<double, 6> & extrinsic)
-    {
-        typedef DynamicAutoDiffCostFunction<GridProjection<Projector>> projectionCF;
-        GridProjection<Projector> * boardProjection;
-        boardProjection = new GridProjection<Projector>(projection, grid);
-        projectionCF * costFunction = new projectionCF(boardProjection);
-        costFunction->AddParameterBlock(intrinsic.size());
-        costFunction->AddParameterBlock(6);
-        costFunction->SetNumResiduals(2 * Nx * Ny);
-        problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), intrinsic.data(), extrinsic.data());
-    }
-
-    void residualAnalysis(const vector<double> & intrinsic,
-            const vector<CalibrationData> & calibDataVec)
-    {
-        double Ex = 0, Ey = 0;
-        double Emax = 0;
-        Mat_<float> errorPlot(400, 400, 0.f);
-        circle(errorPlot, Point(200, 200), 50, 0.4, 1);
-        circle(errorPlot, Point(200, 200), 100, 0.4, 1);
-        circle(errorPlot, Point(200, 200), 150, 0.4, 1);
-        for (int ptIdx = 0; ptIdx < calibDataVec.size(); ptIdx++)
-        {
-                Vector3dVec transfModelVec;
-                Transformation<double> TcamGrid(calibDataVec[ptIdx].extrinsic.data());
-                TcamGrid.transform(grid, transfModelVec);
-
-                Vector2dVec projModelVec(transfModelVec.size());
-                Projector<double> projector;
-                for (int i = 0; i < transfModelVec.size(); i++)
-                {
-                    projector(intrinsic.data(),
-                            transfModelVec[i].data(),
-                            projModelVec[i].data());
-                }
-
-                Mat frame = imread(calibDataVec[ptIdx].fileName, 0);
-
-                bool outlierDetected = false;
-                for (int i = 0; i < Nx * Ny; i++)
-                {
-                    Vector2d p = calibDataVec[ptIdx].projection[i];
-                    Vector2d pModel = projModelVec[i];
-                    Vector2d delta = p - pModel;
-                    int y0 = floor(delta(1)*100+ 200), x0 = floor(delta(0)*100+ 200);
-                    for (auto y : {y0, y0 + 1})
-                    {
-                        for (auto x : {x0, x0 + 1})
-                        {
-                            if (y >= 0 and y < 400 and x >= 0 and x < 400)
-                                errorPlot(y, x) += 0.2;
-                        }
-                    }
-                    double dx = delta[0] * delta[0];
-                    double dy = delta[1] * delta[1];
-                    if (outlierThresh != 0 and dx + dy > outlierThresh * outlierThresh)
-                    {
-                        outlierDetected = true;
-                        cout << calibDataVec[ptIdx].fileName << " # " << i << endl;
-                        cout << delta.transpose() << endl;
-                        circle(frame, Point(pModel(0), pModel(1)), 8, 105, 3);
-                    }
-                    else
-                    {
-                        circle(frame, Point(pModel(0), pModel(1)), 8, 190, 3);
-                    }
-                    if (dx + dy > Emax)
-                    {
-                        Emax = dx + dy;
-                    }
-                    Ex += dx;
-                    Ey += dy;
-                }
-                if (outlierDetected)
-                {
-                    imshow("reprojection", frame);
-                    waitKey();
-                }
-        }
-        Ex /= calibDataVec.size() * Nx * Ny;
-        Ey /= calibDataVec.size() * Nx * Ny;
-        Ex = sqrt(Ex);
-        Ey = sqrt(Ey);
-        Emax = sqrt(Emax);
-        cout << "Ex = " << Ex << "; Ey = " << Ey << "; Emax = " << Emax << endl;
-        imshow("errorPlot", errorPlot);
-        waitKey();
-    }*/
 };
 

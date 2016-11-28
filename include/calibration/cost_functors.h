@@ -226,8 +226,8 @@ struct GenericProjectionJac : ceres::CostFunction
             }
             else
             {
-                residual[2*i] = 0.;
-                residual[2*i + 1] = 0.;
+                residual[2*i] = DOUBLE_INF;
+                residual[2*i + 1] = DOUBLE_INF;
             }
         }
         

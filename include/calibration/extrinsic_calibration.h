@@ -345,7 +345,7 @@ public:
 //        options.minimizer_progress_to_stdout = true;
         Solver::Summary summary;
         Solve(options, &problem, &summary);
-//        cout << summary.BriefReport() << endl;
+        cout << summary.FullReport() << endl;
         
         transfo = Transformation<double>(extrinsic.data());
     } 
