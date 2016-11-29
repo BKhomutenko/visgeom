@@ -183,6 +183,26 @@ public:
 
     }
     
+    virtual double upperBound(int idx) const
+    {
+        switch (idx)
+        {
+        case 0:     return 1;       //alpha
+        case 1:     return 10;     //beta
+        default:    return 1e5;     //the rest
+        }
+    }
+    
+    virtual double lowerBound(int idx) const
+    {
+        switch (idx)
+        {
+        case 0:     return 0;       //alpha
+        case 1:     return 0.1;     //beta
+        default:    return 1;     //the rest
+        }
+    }
+    
     virtual EnhancedCamera * clone() const { return new EnhancedCamera(width, height, params.data()); }
     
     virtual ~EnhancedCamera() {}

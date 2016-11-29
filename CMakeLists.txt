@@ -18,6 +18,16 @@ include_directories(include)
 
 #Lib compilation
 
+add_library( calibration STATIC     
+    src/calibration/unified_calibration.cpp
+)
+
+target_link_libraries( calibration 
+    ${OpenCV_LIBS}  
+    ${CERES_LIBRARIES}
+    ${Boost_LIBRARIES}
+)
+
 add_library( reconstruction STATIC     
     src/reconstruction/eucm_stereo.cpp
     src/reconstruction/eucm_sgm.cpp
@@ -37,11 +47,12 @@ add_library( localization STATIC
 TARGET_LINK_LIBRARIES( localization reconstruction  ${OpenCV_LIBS} ${CERES_LIBRARIES})
 
 ### CALIBRATION ###
-add_executable( generic_calibration
+add_executable( calib
     test/calibration/generic_calibration.cpp
 )
 
-target_link_libraries( generic_calibration 
+target_link_libraries( calib
+    calibration
     ${OpenCV_LIBS}  
     ${CERES_LIBRARIES}
     ${Boost_LIBRARIES}
@@ -49,47 +60,47 @@ target_link_libraries( generic_calibration
 
 
 
-add_executable( calibration
-    test/calibration/calibration.cpp
-)
+#add_executable( calibration
+#    test/calibration/calibration.cpp
+#)
 
-target_link_libraries( calibration ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( calibration ${CERES_LIBRARIES})
+#target_link_libraries( calibration ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( calibration ${CERES_LIBRARIES})
 
-add_executable( calibration_mei
-    test/calibration/calibration_mei.cpp
-)
+#add_executable( calibration_mei
+#    test/calibration/calibration_mei.cpp
+#)
 
-target_link_libraries( calibration_mei ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( calibration_mei ${CERES_LIBRARIES})
+#target_link_libraries( calibration_mei ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( calibration_mei ${CERES_LIBRARIES})
 
-add_executable( calibration_stereo
-    test/calibration/calibration_stereo.cpp
-)
+#add_executable( calibration_stereo
+#    test/calibration/calibration_stereo.cpp
+#)
 
-target_link_libraries( calibration_stereo ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( calibration_stereo ${CERES_LIBRARIES})
+#target_link_libraries( calibration_stereo ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( calibration_stereo ${CERES_LIBRARIES})
 
-add_executable( calibration_robot
-    test/calibration/calibration_robot.cpp
-)
+#add_executable( calibration_robot
+#    test/calibration/calibration_robot.cpp
+#)
 
-target_link_libraries( calibration_robot ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( calibration_robot ${CERES_LIBRARIES})
+#target_link_libraries( calibration_robot ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( calibration_robot ${CERES_LIBRARIES})
 
-add_executable( calibration_base
-    test/calibration/calibration_base.cpp
-)
+#add_executable( calibration_base
+#    test/calibration/calibration_base.cpp
+#)
 
-target_link_libraries( calibration_base ${OpenCV_LIBS} )
-TARGET_LINK_LIBRARIES( calibration_base ${CERES_LIBRARIES})
+#target_link_libraries( calibration_base ${OpenCV_LIBS} )
+#TARGET_LINK_LIBRARIES( calibration_base ${CERES_LIBRARIES})
 
-add_executable( rectify
-    test/calibration/rectify.cpp
-)
+#add_executable( rectify
+#    test/calibration/rectify.cpp
+#)
 
-target_link_libraries( rectify ${OpenCV_LIBRARIES} )
-TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
+#target_link_libraries( rectify ${OpenCV_LIBRARIES} )
+#TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
 
 ### RECONSTRUCTION ###
 

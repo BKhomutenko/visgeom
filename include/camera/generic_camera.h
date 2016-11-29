@@ -109,7 +109,10 @@ public:
     
     const double * getParams() const { return params.data(); }
     
-    int numParams() { return params.size(); }
+    int numParams() const { return params.size(); }
+    
+    virtual double lowerBound(int idx) const { return 0; }
+    virtual double upperBound(int idx) const { return 1e4; }
     
 protected:
     std::vector<double> params;
