@@ -121,3 +121,82 @@ public:
 
 Transformation<double> readOutTransform(const ptree & node);
 
+/* TODO add the residual analysis
+    void residualAnalysis(const vector<double> & intrinsic,
+            const vector<CalibrationData> & calibDataVec)
+    {
+        double Ex = 0, Ey = 0;
+        double Emax = 0;
+        Mat_<float> errorPlot(400, 400, 0.f);
+        circle(errorPlot, Point(200, 200), 50, 0.4, 1);
+        circle(errorPlot, Point(200, 200), 100, 0.4, 1);
+        circle(errorPlot, Point(200, 200), 150, 0.4, 1);
+        for (int ptIdx = 0; ptIdx < calibDataVec.size(); ptIdx++)
+        {
+                Vector3dVec transfModelVec;
+                Transformation<double> TcamGrid(calibDataVec[ptIdx].extrinsic.data());
+                TcamGrid.transform(grid, transfModelVec);
+
+                Vector2dVec projModelVec(transfModelVec.size());
+                Projector<double> projector;
+                for (int i = 0; i < transfModelVec.size(); i++)
+                {
+                    projector(intrinsic.data(),
+                            transfModelVec[i].data(),
+                            projModelVec[i].data());
+                }
+
+                Mat frame = imread(calibDataVec[ptIdx].fileName, 0);
+
+                bool outlierDetected = false;
+                for (int i = 0; i < Nx * Ny; i++)
+                {
+                    Vector2d p = calibDataVec[ptIdx].projection[i];
+                    Vector2d pModel = projModelVec[i];
+                    Vector2d delta = p - pModel;
+                    int y0 = floor(delta(1)*100+ 200), x0 = floor(delta(0)*100+ 200);
+                    for (auto y : {y0, y0 + 1})
+                    {
+                        for (auto x : {x0, x0 + 1})
+                        {
+                            if (y >= 0 and y < 400 and x >= 0 and x < 400)
+                                errorPlot(y, x) += 0.2;
+                        }
+                    }
+                    double dx = delta[0] * delta[0];
+                    double dy = delta[1] * delta[1];
+                    if (outlierThresh != 0 and dx + dy > outlierThresh * outlierThresh)
+                    {
+                        outlierDetected = true;
+                        cout << calibDataVec[ptIdx].fileName << " # " << i << endl;
+                        cout << delta.transpose() << endl;
+                        circle(frame, Point(pModel(0), pModel(1)), 8, 105, 3);
+                    }
+                    else
+                    {
+                        circle(frame, Point(pModel(0), pModel(1)), 8, 190, 3);
+                    }
+                    if (dx + dy > Emax)
+                    {
+                        Emax = dx + dy;
+                    }
+                    Ex += dx;
+                    Ey += dy;
+                }
+                if (outlierDetected)
+                {
+                    imshow("reprojection", frame);
+                    waitKey();
+                }
+        }
+        Ex /= calibDataVec.size() * Nx * Ny;
+        Ey /= calibDataVec.size() * Nx * Ny;
+        Ex = sqrt(Ex);
+        Ey = sqrt(Ey);
+        Emax = sqrt(Emax);
+        cout << "Ex = " << Ex << "; Ey = " << Ey << "; Emax = " << Emax << endl;
+        imshow("errorPlot", errorPlot);
+        waitKey();
+    }
+*/
+
