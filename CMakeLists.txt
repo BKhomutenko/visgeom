@@ -59,50 +59,6 @@ target_link_libraries( calib
     ${Boost_LIBRARIES}
 )
 
-
-
-#add_executable( calibration
-#    test/calibration/calibration.cpp
-#)
-
-#target_link_libraries( calibration ${OpenCV_LIBS} )
-#TARGET_LINK_LIBRARIES( calibration ${CERES_LIBRARIES})
-
-#add_executable( calibration_mei
-#    test/calibration/calibration_mei.cpp
-#)
-
-#target_link_libraries( calibration_mei ${OpenCV_LIBS} )
-#TARGET_LINK_LIBRARIES( calibration_mei ${CERES_LIBRARIES})
-
-#add_executable( calibration_stereo
-#    test/calibration/calibration_stereo.cpp
-#)
-
-#target_link_libraries( calibration_stereo ${OpenCV_LIBS} )
-#TARGET_LINK_LIBRARIES( calibration_stereo ${CERES_LIBRARIES})
-
-#add_executable( calibration_robot
-#    test/calibration/calibration_robot.cpp
-#)
-
-#target_link_libraries( calibration_robot ${OpenCV_LIBS} )
-#TARGET_LINK_LIBRARIES( calibration_robot ${CERES_LIBRARIES})
-
-#add_executable( calibration_base
-#    test/calibration/calibration_base.cpp
-#)
-
-#target_link_libraries( calibration_base ${OpenCV_LIBS} )
-#TARGET_LINK_LIBRARIES( calibration_base ${CERES_LIBRARIES})
-
-#add_executable( rectify
-#    test/calibration/rectify.cpp
-#)
-
-#target_link_libraries( rectify ${OpenCV_LIBRARIES} )
-#TARGET_LINK_LIBRARIES( rectify ${CERES_LIBRARIES})
-
 ### RECONSTRUCTION ###
 
 add_executable( stereo 
