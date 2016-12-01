@@ -77,6 +77,8 @@ protected:
     
     void addGridResidualBlocks();
     
+    void initGlobalTransform(const string & name);
+    
 public:
     virtual ~GenericCameraCalibration() 
     { 
@@ -116,4 +118,6 @@ public:
             const Vector2dVec & projection, const Vector3dVec & grid);
 
 };
+
+Transformation<double> readOutTransform(const ptree & node);
 

@@ -62,8 +62,8 @@ public:
     // Point jacobian
     void dpdxi(const Vector3d & X2, double * dudxi, double * dvdxi)
     {
-        Matrix23d projJac;
-        _camera->projectionJacobian(X2, projJac);
+        Matrix23drm projJac;
+        _camera->projectionJacobian(X2, projJac.data(), projJac.data() + 3);
         
         Map<Covector3d> dudtr(dudxi);
         Map<Covector3d> dudrot(dudxi + 3);
@@ -79,8 +79,8 @@ public:
     //brightness jacobian
     void dfdxi(const Vector3d & X2, const Covector2d & grad, double * dfdxi)
     {
-        Matrix23d projJac;
-        _camera->projectionJacobian(X2, projJac);
+        Matrix23drm projJac;
+        _camera->projectionJacobian(X2, projJac.data(), projJac.data() + 3);
         
         Covector3d dfdX = grad * projJac;
         
@@ -128,8 +128,8 @@ public:
     // Point jacobian
     void dpdxi(const Vector3d & X1, double * dudxi, double * dvdxi)
     {
-        Matrix23d projJac;
-        _camera->projectionJacobian(X1, projJac);
+        Matrix23drm projJac;
+        _camera->projectionJacobian(X1, projJac.data(), projJac.data() + 3);
         
         Vector3d t3X = X1 - t13; // projected into the first frame
         
@@ -147,8 +147,8 @@ public:
     //brightness jacobian
     void dfdxi(const Vector3d & X1, const Covector2d & grad, double * dfdxi)
     {
-        Matrix23d projJac;
-        _camera->projectionJacobian(X1, projJac);
+        Matrix23drm projJac;
+        _camera->projectionJacobian(X1, projJac.data(), projJac.data() + 3);
         
         Covector3d dfdX = grad * projJac;
         

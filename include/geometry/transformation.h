@@ -27,8 +27,7 @@ A template-base coordinate transformation implementation
 template<typename T>
 class Transformation
 {
-public:
-    //FIXME
+public:   
     Transformation() : mrot(ZERO, ZERO, ZERO), mtrans(ZERO, ZERO, ZERO) {}
 
     Transformation(Vector3<T> trans, Vector3<T> rot) : mtrans(trans), mrot(rot) {}
@@ -220,4 +219,24 @@ private:
     Vector3<T> mtrans;
 
 };
+
+template<typename T>
+Transformation<T> transformFromData(const vector<T> & valVec)
+{
+    switch (valVec.size())
+    {
+    case 3:     //x, y, theta
+        return Transformation<T>(valVec[0], valVec[1], 0, 0, 0, valVec[2]);
+    case 6:     //full 6 dof
+        return Transformation<T>(valVec.data());
+    case 12:    //homogeneous transformation
+        Matrix3<T> R;
+        R << valVec[0], valVec[1], valVec[2],
+             valVec[4], valVec[5], valVec[6],
+             valVec[8], valVec[9], valVec[10];
+        
+        Vector3<T> t(valVec[3], valVec[7], valVec[11]);
+        return Transformation<T>(t, R);
+    }
+}
 

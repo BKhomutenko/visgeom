@@ -49,7 +49,7 @@ void MonoOdometry::feedImage(const Mat8u & imageNew, const double t)
         
         computeVisualOdometry(imageNew, t);
         
-        if (false) // conditionning gets wors
+        if (false) // conditionning gets worse
         {
             createKeyFrame(imageNew, t);
         }

@@ -20,6 +20,7 @@ include_directories(include)
 
 add_library( calibration STATIC     
     src/calibration/unified_calibration.cpp
+    src/calibration/cost_functors.cpp
 )
 
 target_link_libraries( calibration 

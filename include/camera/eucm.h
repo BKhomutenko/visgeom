@@ -112,7 +112,7 @@ public:
         return projector(params.data(), src.data(), dst.data()); 
     }
     
-    virtual bool projectionJacobian(const Vector3d & src, Matrix23d & Jac) const
+    virtual bool projectionJacobian(const Vector3d & src, double * dudx, double * dvdx) const
     {
         const double & alpha = params[0];
         const double & beta = params[1];
@@ -127,18 +127,40 @@ public:
 
         double rho = sqrt(z * z + beta * (x * x + y * y));
         double gamma = 1. - alpha;
-        double d = alpha * rho + gamma * z;
-        double k = 1. / d / d;
+        double eta = alpha * rho + gamma * z;
+        
+        bool isProjected = true;
+        if (eta < 1e-3) isProjected = false;
+        else if (alpha > 0.5)
+        {
+            const double zn = z / eta; 
+            const double C = (alpha - 1.) / (alpha + alpha - 1.);
+            if (zn < C) isProjected = false;
+        }
+        
+        if (not isProjected)
+        {
+            dudx[0] = 0;
+            dudx[1] = 0;
+            dudx[2] = 0;
+            dvdx[0] = 0;  
+            dvdx[1] = 0;
+            dvdx[2] = 0;
+            return false;
+         
+        }
+        
+        double k = 1. / eta / eta;
         double abrho = alpha * beta / rho;
         double Jxy = k * abrho * x * y;
         double Jz = k * (gamma + alpha * z / rho);
         double Jx = gamma * z + alpha * rho;
-        Jac(0, 0) = fu * k * (Jx - abrho * x * x);
-        Jac(0, 1) = -fu * Jxy;
-        Jac(0, 2) = -fu * x * Jz;
-        Jac(1, 0) = -fv * Jxy;    
-        Jac(1, 1) = fv * k * (Jx - abrho * y * y);
-        Jac(1, 2) = -fv * y * Jz;
+        dudx[0] = fu * k * (Jx - abrho * x * x);
+        dudx[1] = -fu * Jxy;
+        dudx[2] = -fu * x * Jz;
+        dvdx[0] = -fv * Jxy;    
+        dvdx[1] = fv * k * (Jx - abrho * y * y);
+        dvdx[2] = -fv * y * Jz;
 
         return true;
 
@@ -163,6 +185,26 @@ public:
         double rho = sqrt(rho2);
         double gamma = 1. - alpha;
         double eta = alpha * rho + gamma * z;
+        
+        bool isProjected = true;
+        if (eta < 1e-3) isProjected = false;
+        else if (alpha > 0.5)
+        {
+            const double zn = z / eta; 
+            const double C = (alpha - 1.) / (alpha + alpha - 1.);
+            if (zn < C) isProjected = false;
+        }
+        
+        if (not isProjected)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                dudalpha[i] = 0;
+                dvdalpha[i] = 0;
+            }
+            return false;
+        }
+        
         double eta2 = eta * eta;
         
         dudalpha[0] = -fu * x * (rho - z) / eta2;

@@ -69,7 +69,7 @@ Matrix3<T> rotationMatrix(const Vector3<T> & v)
 template<typename T>
 Vector3<T> rotationVector(const Matrix3<T> & R)
 {
-    return Quaternion<T>(R).toRotationVector;
+    return Quaternion<T>(R).toRotationVector();
 }
 
 template<typename T>

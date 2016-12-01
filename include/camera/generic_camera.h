@@ -40,7 +40,7 @@ public:
 
     //TODO implement the projection and distortion Jacobian
     virtual bool projectionJacobian(const Vector3d & src,
-            Matrix23d & Jac) const {return false;}
+            double * dudx, double * dvdx) const {return false;}
     
     //MEMORY IS SUPPOSED TO BE ALLOCATED
     virtual bool intrinsicJacobian(const Vector3d & src,
