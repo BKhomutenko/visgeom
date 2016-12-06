@@ -22,17 +22,16 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "ocv.h"
 #include "eigen.h"
 #include "ceres.h"
+#include "utils/json.h"
 
 //TODO make a separate header
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
+
 
 #include <glog/logging.h>
 
-#include "cost_functors.h"
+#include "calib_cost_functions.h"
 
-using boost::property_tree::ptree;
-using boost::property_tree::read_json;
+
 
 struct TransformInfo {
     bool global;
@@ -118,8 +117,6 @@ public:
             const Vector2dVec & projection, const Vector3dVec & grid);
 
 };
-
-Transformation<double> readOutTransform(const ptree & node);
 
 /* TODO add the residual analysis
     void residualAnalysis(const vector<double> & intrinsic,

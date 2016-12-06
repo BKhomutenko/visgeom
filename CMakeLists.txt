@@ -20,7 +20,7 @@ include_directories(include)
 
 add_library( calibration STATIC     
     src/calibration/unified_calibration.cpp
-    src/calibration/cost_functors.cpp
+    src/calibration/calib_cost_functions.cpp
 )
 
 target_link_libraries( calibration 
@@ -156,12 +156,23 @@ target_link_libraries( motion_gradual
 
 ## LOCALIZATION ###
 add_executable( odometry_test
-    test/localization/odometry_test.cpp
+    test/localization/mono_odom_test.cpp
 )
 
 target_link_libraries( odometry_test  
     reconstruction
     localization 
+    ${OpenCV_LIBS}
+    ${CERES_LIBRARIES}
+    ${Boost_LIBRARIES}
+)
+
+add_executable( sparse_odom_test
+    test/localization/sparse_odom_test.cpp
+)
+
+target_link_libraries( sparse_odom_test 
+    localization
     ${OpenCV_LIBS}
     ${CERES_LIBRARIES}
     ${Boost_LIBRARIES}

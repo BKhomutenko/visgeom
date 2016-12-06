@@ -22,14 +22,11 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "ocv.h"
 #include "eigen.h"
 #include "ceres.h"
-
-//TODO make a separate header
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
+#include "utils/json.h"
 
 #include <glog/logging.h>
 
-//#include "calibration/cost_functors.h"
+#include "calibration/calib_cost_functions.h"
 #include "camera/generic_camera.h"
 #include "camera/eucm.h"
     
@@ -98,7 +95,7 @@ void GenericCameraCalibration::parseTransforms()
             globalTransformMap[name] = Array6d();
             if (info.prior)
             {
-                auto transf = readOutTransform(transInfo.second.get_child("value"));
+                auto transf = readTransform(transInfo.second.get_child("value"));
                 transf.toArray(globalTransformMap[name].data());
             }
         }
@@ -110,7 +107,7 @@ void GenericCameraCalibration::parseTransforms()
                 auto & valVec = sequenceTransformMap[name];
                 for (auto & val : transInfo.second.get_child("value"))
                 {
-                    auto transf = readOutTransform(val.second);
+                    auto transf = readTransform(val.second);
                     valVec.emplace_back(transf.toArray());
                 }
             }
@@ -462,7 +459,7 @@ void GenericCameraCalibration::parseData()
             vector<Transformation<double>> odometryVec;
             for (auto & odomItem : dataInfo.second.get_child("value"))
             {
-                odometryVec.emplace_back(readOutTransform(odomItem.second));
+                odometryVec.emplace_back(readTransform(odomItem.second));
             }
             
             //use the odometry as initial values
@@ -569,15 +566,3 @@ Transformation<double> GenericCameraCalibration::estimateInitialGrid(const strin
 //    cout << Transformation<double>(xi.data()) << endl;
     return Transformation<double>(xi.data());
 }
-
-
-Transformation<double> readOutTransform(const ptree & node)
-{
-    vector<double> valVec;
-    for (auto & x : node)
-    {
-        valVec.push_back(x.second.get_value<double>());
-    }
-    return transformFromData(valVec);
-}
-
