@@ -20,7 +20,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "eigen.h"
 
 #include "geometry/geometry.h"
-#include "camera/mei.h"
+#include "projection/mei.h"
 #include "calibration/calibration.h"
 
 int main(int argc, char** argv) {

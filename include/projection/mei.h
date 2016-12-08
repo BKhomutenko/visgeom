@@ -23,7 +23,7 @@ The Unified Camera Model with distortions
 
 #include <Eigen/Eigen>
 
-#include "camera/generic_camera.h"
+#include "projection/generic_camera.h"
 
 
 template<typename T> 

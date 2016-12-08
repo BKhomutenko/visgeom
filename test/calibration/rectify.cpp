@@ -20,8 +20,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "eigen.h"
 
 #include "geometry/geometry.h"
-#include "camera/pinhole.h"
-#include "camera/eucm.h"
+#include "projection/pinhole.h"
+#include "projection/eucm.h"
 
 void initRemap(const array<double, 6> & params1, const array<double, 3> & params2,
     Mat32f & mapX, Mat32f & mapY, const array<double, 3> & rot)

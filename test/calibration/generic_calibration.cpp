@@ -23,7 +23,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include <boost/property_tree/json_parser.hpp>
 
 #include "geometry/geometry.h"
-#include "camera/eucm.h"
+#include "projection/eucm.h"
 #include "calibration/unified_calibration.h"
 
 using boost::property_tree::ptree;

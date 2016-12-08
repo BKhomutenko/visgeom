@@ -2,7 +2,7 @@
 #include "ocv.h"
 #include "eigen.h"
 
-#include "camera/eucm.h"
+#include "projection/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"

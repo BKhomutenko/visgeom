@@ -21,8 +21,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "io.h"
 
 #include "geometry/geometry.h"
-#include "utils/jacobian.h"
-#include "camera/generic_camera.h"
+#include "projection/jacobian.h"
+#include "projection/generic_camera.h"
 
 
 bool GenericProjectionJac::Evaluate(double const * const * params,

@@ -27,9 +27,9 @@ Relative camera pose estimation based on photometric error and depth map
 #include "ceres.h" 
 
 #include "geometry/geometry.h"
-#include "camera/generic_camera.h"
+#include "projection/generic_camera.h"
 #include "localization/photometric.h"
-#include "camera/generic_camera.h"
+#include "projection/generic_camera.h"
 //TODO make a parameter structure
 const double MIN_INIT_DIST = 0.25;   // minimal distance traveled befor VO is used
 const double MIN_STEREO_BASE = 0.15; // minimal acceptable stereo base

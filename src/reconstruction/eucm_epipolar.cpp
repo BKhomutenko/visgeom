@@ -26,7 +26,7 @@ Semi-global block matching algorithm for non-rectified images
 #include "std.h"
 #include "eigen.h"
 #include "geometry/geometry.h"
-#include "camera/eucm.h"
+#include "projection/eucm.h"
 #include "reconstruction/curve_rasterizer.h"
 
 

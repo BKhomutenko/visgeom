@@ -28,8 +28,8 @@ Cost functions for localization based on photometric data and mutual information
 #include "io.h"
 
 #include "geometry/geometry.h"
-#include "camera/generic_camera.h"
-#include "utils/jacobian.h"
+#include "projection/generic_camera.h"
+#include "projection/jacobian.h"
 
 /*
 A cost function with analytic jacobian

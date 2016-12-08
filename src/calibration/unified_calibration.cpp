@@ -27,8 +27,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include <glog/logging.h>
 
 #include "calibration/calib_cost_functions.h"
-#include "camera/generic_camera.h"
-#include "camera/eucm.h"
+#include "projection/generic_camera.h"
+#include "projection/eucm.h"
     
 bool GenericCameraCalibration::compute()
 {

@@ -20,7 +20,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "eigen.h"
 #include "ceres.h"
 
-#include "camera/generic_camera.h"
+#include "projection/generic_camera.h"
 
 enum TransformationStatus {TRANSFORM_DIRECT, TRANSFORM_INVERSE};
 

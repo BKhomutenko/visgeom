@@ -20,7 +20,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "ocv.h"
 #include "timer.h"
 
-#include "camera/eucm.h"
+#include "projection/eucm.h"
 #include "reconstruction/depth_map.h"
 
 

@@ -29,7 +29,7 @@ NOTE:
 #include "eigen.h"
 #include "ocv.h"
 
-#include "camera/generic_camera.h"
+#include "projection/generic_camera.h"
 #include "reconstruction/scale_parameters.h"
 #include "reconstruction/mh_pack.h"
 #include "reconstruction/stereo_misc.h"

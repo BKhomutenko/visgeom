@@ -27,7 +27,7 @@ Depth-from-motion class for semidense depth estimation
 #include "eigen.h"
 #include "utils/filter.h"
 #include "geometry/geometry.h"
-#include "camera/eucm.h"
+#include "projection/eucm.h"
 
 #include "reconstruction/stereo_misc.h"
 #include "reconstruction/eucm_epipolar.h"

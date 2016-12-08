@@ -23,7 +23,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "ocv.h"
 #include "ceres.h"
 
-#include "camera/eucm.h"
+#include "projection/eucm.h"
 #include "reconstruction/mh_pack.h"
 
 void ScalePhotometric::computeBaseScaleSpace(const Mat32f & img1)

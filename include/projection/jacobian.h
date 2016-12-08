@@ -19,7 +19,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "eigen.h"
 
-#include "camera/generic_camera.h"
+#include "projection/generic_camera.h"
 #include "geometry/geometry.h"
 
 // A class for projection jacobian computation

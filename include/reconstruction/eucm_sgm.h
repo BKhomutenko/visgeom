@@ -30,7 +30,7 @@ NOTE:
 #include "eigen.h"
 
 #include "geometry/geometry.h"
-#include "camera/eucm.h"
+#include "projection/eucm.h"
 
 #include "reconstruction/scale_parameters.h"
 #include "reconstruction/curve_rasterizer.h"

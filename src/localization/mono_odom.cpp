@@ -26,7 +26,7 @@ Relative camera pose estimation based on photometric error and depth map
 #include "ocv.h"
 
 #include "geometry/geometry.h"
-#include "camera/generic_camera.h"
+#include "projection/generic_camera.h"
 #include "reconstruction/depth_map.h"
 #include "reconstruction/eucm_motion_stereo.h"
 

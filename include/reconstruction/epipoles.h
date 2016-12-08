@@ -27,7 +27,7 @@ Computes and keeps the epipoles or aniepipoles
 
 #include "eigen.h"
 #include "geometry/geometry.h"
-#include "camera/generic_camera.h"
+#include "projection/generic_camera.h"
 
 class StereoEpipoles
 {

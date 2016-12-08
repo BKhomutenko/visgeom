@@ -7,7 +7,7 @@
 #include "utils/json.h"
 
 #include "localization/sparse_odom.h"
-#include "camera/eucm.h"
+#include "projection/eucm.h"
 
 int main(int argc, char** argv)
 {

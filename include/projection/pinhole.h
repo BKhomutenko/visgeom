@@ -23,7 +23,7 @@ The Pinhole Camera Model
 
 #include <Eigen/Eigen>
 
-#include "camera/generic_camera.h"
+#include "projection/generic_camera.h"
 
 class Pinhole : public ICamera
 {

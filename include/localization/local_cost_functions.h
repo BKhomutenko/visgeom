@@ -27,7 +27,7 @@ Cost functions for localization based on photometric data and mutual information
 #include "ceres.h"
 
 #include "geometry/geometry.h"
-#include "camera/generic_camera.h"
+#include "projection/generic_camera.h"
 
 // to store the data for the photometric optimization
 struct PhotometricPack
