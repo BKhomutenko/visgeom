@@ -68,7 +68,7 @@ public:
     { 
     }
     
-    ~EnhancedStereo()
+    virtual ~EnhancedStereo()
     {
         delete camera1;
         camera1 = NULL;
@@ -83,8 +83,6 @@ public:
     // returns the distance between corresponding camera and the point
     double triangulate(double u1, double v1, double u2, double v2, CameraIdx camIdx = CAMERA_1) const;
     
-    //FIXME potentially put into misc file
-//    vector<int> findLocalMinima(const vector<int> & dataVec) const;
 protected:
     StereoParameters params;
     
