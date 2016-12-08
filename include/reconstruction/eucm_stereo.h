@@ -53,7 +53,7 @@ struct StereoParameters : public ScaleParameters
 
 //TODO separate the triangulation from this class
 //TODO change EnhancedCamera to ICamera
-
+//TODO move epipolar curves and epipoles here
 class EnhancedStereo
 {
 public:
