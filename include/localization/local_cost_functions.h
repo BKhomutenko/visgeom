@@ -185,3 +185,86 @@ struct MutualInformation : public FirstOrderFunction
     vector<double> _hist1;
 };
 
+// excluding the point reconstruction reduces the number of unknowns,
+// might be faster TODO check it
+// but statisically not optimal
+struct EssentialCost : ceres::SizedCostFunction<6, 6>
+{
+    EssentialCost(const Vector3d x1, const Vector3d x2);
+
+    virtual ~EssentialCost() { }
+    
+    virtual bool Evaluate(double const * const * params,
+            double * residual, double ** jacobian) const;
+    
+    vector<double> _aVec;
+};
+
+//5-point algorithm
+//a simpler solution, more variables TODO compare performance
+//TODO change from 5 to any number
+struct MonoReprojectCost : ceres::SizedCostFunction<10, 6, 5>
+{
+    MonoReprojectCost(const ICamera * camera,
+            const Vector3dVec & xVec1, const Vector2dVec & pVec2,
+            const Transf xiBaseCam):
+    _pVec2(pVec2), _xVec1(xVec1), _camera(camera->clone()), _xiBaseCam(xiBaseCam) 
+    {
+        assert(_xVec1.size() == 5);
+        assert(_pVec2.size() == 5);
+    }
+
+    virtual ~MonoReprojectCost() { delete _camera; }
+    
+    virtual bool Evaluate(double const * const * params,
+            double * residual, double ** jacobian) const;
+    
+    const ICamera * _camera;
+    const Vector3dVec _xVec1;
+    const Vector2dVec _pVec2;
+    Transf _xiBaseCam;
+    vector<double> _aVec;
+};
+
+
+struct SparseReprojectCost : ceres::CostFunction
+{
+    SparseReprojectCost(const ICamera * camera,
+            const Vector3dVec & xVec1, const Vector3dVec & xVec2,
+            const Vector2dVec & pVec2, const Transf xiBaseCam):
+    _pVec2(pVec2), _xVec1(xVec1), _xVec2(xVec2),  _camera(camera->clone()), _xiBaseCam(xiBaseCam) 
+    {
+        assert(_pVec2.size() == _xVec1.size());
+        assert(_pVec2.size() == _xVec2.size());
+        set_num_residuals(_pVec2.size() * 2);           // projection error
+        mutable_parameter_block_sizes()->push_back(6);  // 6dof transformation
+    }
+
+    virtual ~SparseReprojectCost() { delete _camera; }
+    
+    virtual bool Evaluate(double const * const * params,
+            double * residual, double ** jacobian) const;
+    
+    const ICamera * _camera;
+    const Vector3dVec _xVec1;
+    const Vector3dVec _xVec2;
+    const Vector2dVec _pVec2;
+    Transf _xiBaseCam;
+    vector<double> _aVec;
+};
+
+struct OdometryPrior : ceres::SizedCostFunction<6, 6>
+{
+    OdometryPrior(const double errV, const double errW, const double lambdaT, const double lambdaR,
+        const Transf xiOdom);
+
+    virtual ~OdometryPrior() { }
+    
+    virtual bool Evaluate(double const * const * params,
+            double * residual, double ** jacobian) const;
+    
+    
+    Vector6d _dxiPrior;
+    Matrix6d _A;
+};
+

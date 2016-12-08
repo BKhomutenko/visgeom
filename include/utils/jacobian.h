@@ -95,14 +95,17 @@ private:
     Matrix3d R21, M21;
 };
 
+
+const bool JAC_DIRECT = false;
+const bool JAC_INVERTED = true;
+
 /*
 computes the jacobian matrix dp / dxi23 if the transformation chain looks like
-T12 T23
-1 -- camera frame
-2 -- intermediate frame
-3 -- frame where the point is projected
+ X1 = T12 T23 X3 (direct)
 
-inverted means that frame 2 follows frame 3, not precede
+ X1 = T13 T32 X2 (inverse)
+
+    1 is the camera frame
 
 For example, if frames 1 and 3 coinside ,then xi13 will be Identity, and xi23 defines the camera pose
 in a certain frame 2

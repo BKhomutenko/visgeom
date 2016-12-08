@@ -19,7 +19,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 Cost functions for localization based on photometric data and mutual information
 */
 
-#include "localization/cost_functions.h"
+#include "localization/local_cost_functions.h"
 
 #include "std.h"
 #include "eigen.h"
@@ -39,7 +39,7 @@ works faster than autodiff version and works with any ICamera
 bool PhotometricCostFunction::Evaluate(double const * const * parameters,
         double * residual, double ** jacobian) const
 {
-    Transformation<double> T12(parameters[0]);
+    Transf T12(parameters[0]);
     
     // point cloud in frame 2
     vector<Vector3d> transformedPoints;
@@ -109,7 +109,7 @@ bool MutualInformation::Evaluate(double const * parameters,
     {
         if (std::isnan(parameters[i]) or std::isinf(parameters[i])) return false;
     }
-    Transformation<double> T12(parameters);
+    Transf T12(parameters);
     
     // point cloud in frame 2
     vector<Vector3d> transformedPoints;
@@ -152,7 +152,7 @@ bool MutualInformation::Evaluate(double const * parameters,
     }
     vector<double> hist12 = computeHist2d(_dataPack.valVec, valVec2);
     vector<double> hist2 = reduceHist(hist12);
-    vector<double> log12Vec(_numBins * _numBins, 0);
+    vector<double> logVec12(_numBins * _numBins, 0);
     
     // compute the cost
     *cost = 0;
@@ -164,7 +164,7 @@ bool MutualInformation::Evaluate(double const * parameters,
             const double log12 = log(p12 / hist2[idx2] / _hist1[idx1]);
             if (p12 > 0)
             {
-                log12Vec[idx2 * _numBins + idx1] = log12;
+                logVec12[idx2 * _numBins + idx1] = log12;
                 *cost -= p12*log12;
             }
         }
@@ -193,15 +193,15 @@ bool MutualInformation::Evaluate(double const * parameters,
             {
                 if (idx12 != -1)
                 {
-                    dMIdP = log12Vec[idx21 * _numBins + idx11] * share1
-                        + log12Vec[idx21 * _numBins + idx12] * (1 - share1)
-                        - log12Vec[idx22 * _numBins + idx11] * share1
-                        - log12Vec[idx22 * _numBins + idx12] * (1 - share1);
+                    dMIdP = logVec12[idx21 * _numBins + idx11] * share1
+                        + logVec12[idx21 * _numBins + idx12] * (1 - share1)
+                        - logVec12[idx22 * _numBins + idx11] * share1
+                        - logVec12[idx22 * _numBins + idx12] * (1 - share1);
                 }
                 else
                 {
-                    dMIdP = log12Vec[idx21 * _numBins + idx11]
-                        - log12Vec[idx22 * _numBins + idx11];
+                    dMIdP = logVec12[idx21 * _numBins + idx11]
+                        - logVec12[idx22 * _numBins + idx11];
                 }
             }
             double dMIdf = dMIdP * _increment * dPdf;
@@ -356,3 +356,234 @@ vector<double> MutualInformation::reduceHist(const vector<double> & hist2d) cons
     return hist;
 }
 
+bool MonoReprojectCost::Evaluate(double const * const * params,
+        double * residual, double ** jacobian) const
+{
+    //compute the transformation chain
+    Transf xiOdom(params[0]);
+    Transf xi21 = _xiBaseCam.inverseCompose(xiOdom.inverseCompose(_xiBaseCam));
+    
+    //compute the points in the camera frame
+    Vector3dVec xVec2 =_xVec1;
+    for (int i = 0; i < 5; i++)
+    {
+        xVec2[i] *= params[1][i];
+    }
+    xi21.transform(xVec2, xVec2);
+    
+    //compute the reprojection error
+    for (int i = 0; i < 5; i++)
+    {
+        Vector2d modProj;
+        if (_camera->projectPoint(xVec2[i], modProj)) 
+        {
+            Map<Vector2d> diff(residual + 2*i);
+            diff = modProj - _pVec2[i];
+        }
+        else
+        {
+            residual[2*i + 1] = residual[2*i] = DOUBLE_BIG;
+        }
+    }
+    
+    if (jacobian != NULL)
+    {
+        //odometry jacobian
+        if (jacobian[0] != NULL) 
+        {
+            InterJacobian jacobianCalculator(_camera, _xiBaseCam.inverse(),
+                                    xiOdom, JAC_INVERTED);
+            
+            for (int i = 0; i < 5; i++)
+            {
+                jacobianCalculator.dpdxi(xVec2[i], jacobian[0] + i*12,
+                                                   jacobian[0] + i*12 + 6);
+            }
+        }
+        
+        //length jacobian
+        if (jacobian[1] != NULL)
+        {
+            Matrix3d R21 = xi21.rotMat();
+            fill(jacobian[1], jacobian[1] + 50, 0);
+            for (int i = 0; i < 5; i++)
+            {
+                Matrix23drm dpdx;
+                Vector3d n2 = R21 * _xVec1[i];
+                _camera->projectionJacobian(xVec2[i], dpdx.data(), dpdx.data() + 3);
+                Vector2d dpdl = dpdx * n2;
+                jacobian[1][i*11] = dpdl[0];
+                jacobian[1][i*11 + 5] = dpdl[1];
+            }
+        }
+    }
+    return true;
+}
+
+
+bool SparseReprojectCost::Evaluate(double const * const * params,
+        double * residual, double ** jacobian) const
+{
+    //compute the transformation chain
+    Transf xiOdom(params[0]);
+    Transf xi12 = _xiBaseCam.inverseCompose(xiOdom.compose(_xiBaseCam));
+    
+    //compute the points in the camera frame
+    vector<double> lambdaVec(_xVec1.size());
+    vector<double> jacVec;
+    if (jacobian != NULL and jacobian[0] != NULL) 
+    {
+        jacVec.resize(_xVec1.size() * 6);
+        xi12.triangulateRegular(_xVec1, _xVec2, lambdaVec.data(), NULL, jacVec.data(), NULL);
+    }
+    else
+    {
+        xi12.triangulateRegular(_xVec1, _xVec2, lambdaVec.data());
+    }
+    
+    Vector3dVec xVec2 =_xVec1;
+    for (int i = 0; i < xVec2.size(); i++)
+    {
+        xVec2[i] *= lambdaVec[i];
+    }
+    xi12.inverseTransform(xVec2, xVec2);
+    
+    //compute the reprojection error
+    for (int i = 0; i < xVec2.size(); i++)
+    {
+        Vector2d modProj;
+        if (_camera->projectPoint(xVec2[i], modProj)) 
+        {
+            Map<Vector2d> diff(residual + 2*i);
+            diff = modProj - _pVec2[i];
+        }
+        else
+        {
+            residual[2*i + 1] = residual[2*i] = DOUBLE_BIG;
+        }
+    }
+    
+    if (jacobian != NULL)
+    {
+        
+        if (jacobian[0] != NULL) 
+        {
+            //odometry jacobian
+            InterJacobian jacobianCalculator(_camera, _xiBaseCam.inverse(),
+                                    xiOdom, JAC_INVERTED);
+            
+            for (int i = 0; i < xVec2.size(); i++)
+            {
+                if (residual[2*i] == DOUBLE_BIG)
+                {
+                    fill(jacobian[0] + i * 12, jacobian[0] + (i + 1) * 12, 0);
+                    continue;
+                }
+                jacobianCalculator.dpdxi(xVec2[i], jacobian[0] + i*12,
+                                                   jacobian[0] + i*12 + 6);
+            }
+            
+            //length jacobian
+            Matrix3d R21 = xi12.rotMatInv();
+            Matrix3d RcamBase = _xiBaseCam.rotMatInv();
+            
+            //jacobian given by triangulate is computed wrt ( v_1_2 | om_1_2 )
+            
+            // om_1_2 = M * r_dot
+            Matrix3d M = RcamBase * interOmegaRot(xiOdom.rot());    
+            
+            // v_2 = v_b + om_0_b x t_b_c
+            // v_1_2 = R_c_b * t_dot + Q * r_dot
+            Vector3d tBaseCam1 = RcamBase * R21.transpose() * _xiBaseCam.trans();
+            Matrix3d Q = -hat(tBaseCam1) * M;
+            for (int i = 0; i < xVec2.size(); i++)
+            {
+                if (residual[2*i] == DOUBLE_BIG) continue;
+                Matrix23drm dpdx;
+                Vector3d n2 = R21 * _xVec1[i];
+                _camera->projectionJacobian(xVec2[i], dpdx.data(), dpdx.data() + 3);
+                Vector2d dpdl = dpdx * n2;
+                Map<Covector3d> dudt(jacobian[0] + i*12);
+                Map<Covector3d> dudr(jacobian[0] + i*12 + 3);
+                Map<Covector3d> dvdt(jacobian[0] + i*12 + 6);
+                Map<Covector3d> dvdr(jacobian[0] + i*12 + 9);
+                
+                Map<Covector3d> dldv(jacVec.data() + i*6);
+                Map<Covector3d> dldw(jacVec.data() + i*6 + 3);
+                Covector3d dldt = dldv * RcamBase;
+                Covector3d dldr = dldw * M + dldv * Q;
+                dudt += dpdl[0] * dldt;
+                dudr += dpdl[0] * dldr;
+                dvdt += dpdl[1] * dldt;
+                dvdr += dpdl[1] * dldr;
+            }
+        }
+    }
+    return true;
+}
+
+OdometryPrior::OdometryPrior(const double errV, const double errW,
+        const double lambdaT, const double lambdaR,
+        const Transformation<double> xiOdom) : 
+    _A(Matrix6d::Zero())
+{
+    const double delta = xiOdom.rot().norm();
+    const double l = xiOdom.trans().norm();
+    
+    const double delta2 = delta / 2.;
+    const double l2 = l / 2.;
+    
+    const double s = sin(delta2);
+    const double c = cos(delta2);
+    
+    xiOdom.toArray(_dxiPrior.data());
+    
+    Matrix32d dfdu;
+    dfdu <<     c,     -l2 * s,  
+                s,      l2 * c, 
+                0,           1;
+    
+    Matrix2d Cu;
+    Cu <<   errV * errV * l * l,              0,
+                      0,    errW * errW * delta * delta; 
+   
+    Matrix3d lambdaMat = Matrix3d::Identity();
+    lambdaMat(0, 0) *= lambdaT * lambdaT;
+    lambdaMat(1, 1) *= lambdaT * lambdaT;
+    lambdaMat(2, 2) *= lambdaR * lambdaR;
+    Matrix3d Cx = dfdu * Cu * dfdu.transpose() + lambdaMat;
+    Matrix3d CxInv = Cx.inverse();
+    Eigen::LLT<Matrix3d> lltOfCxInv(CxInv); // compute the Cholesky decomposition of A
+    Matrix3d U = lltOfCxInv.matrixU();
+//    cout << U.transpose() * U << endl;
+//    cout << CxInv << endl;
+
+    _A.topLeftCorner<2, 2>() = U.topLeftCorner<2, 2>();
+    _A.topRightCorner<2, 1>() = U.topRightCorner<2, 1>();
+    _A(2, 2) = 1. / lambdaT;
+    _A(3, 3) = 1. / lambdaR;
+    _A(4, 4) = 1. / lambdaR;
+    _A(5, 5) = U(2, 2);
+//    cout << U << endl;
+//    cout << _A << endl;
+//        assert(false);
+}
+
+bool OdometryPrior::Evaluate(double const * const * params,
+        double * residual, double ** jacobian) const
+{
+    Map<const Vector6d> dxi(params[0]);
+    Map<Vector6d> res(residual);
+    res = _A * (dxi - _dxiPrior);
+    
+    if (jacobian != NULL)
+    {
+        //first transformation
+        if (jacobian[0] != NULL)
+        {
+            Map<Matrix6drm> jac(jacobian[0]);
+            jac = _A;
+        }
+    }
+    return true;    
+}

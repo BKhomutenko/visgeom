@@ -60,3 +60,4 @@ Matrix3<T> interOmegaRot(const Vector3<T> & v);
 #include "geometry/transformation.h"
 #include "geometry/geometry_core.h"
 
+

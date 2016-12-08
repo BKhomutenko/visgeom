@@ -485,13 +485,19 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
     const int MARGIN = LENGTH - 1;
     
     //init necessary data structures
-    EpipolarDescriptor epipolarDescriptor(params.descLength, 5, {1, 2});
+    EpipolarDescriptor epipolarDescriptor(params.descLength, 5, {1, 2, 3, 4});
     StereoEpipoles epipoles(camera1, camera2, T12);
     epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
     Transform12 = T12;
     
     //split points int toValidate and toCompute
     MHPack toValidatePack;
+    
+    if (depth.empty()) //init depth
+    {
+        depth = DepthMap(camera1, params);
+        depth.setTo(OUT_OF_RANGE, OUT_OF_RANGE, OUT_OF_RANGE);
+    }
     
     //cache toCompute descriptors
     vector<vector<uint8_t>> descriptorVec;

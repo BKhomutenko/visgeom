@@ -21,6 +21,11 @@ A template-base coordinate transformation implementation
 
 #pragma once
 
+#include "std.h"
+#include "io.h"
+
+#include "eigen.h"
+
 // Non-redundant transformation representation
 // using translation and angle-axis
 
@@ -206,6 +211,224 @@ public:
         std::copy(rotData(), rotData() + 3, data + 3);
     }
     
+    //TODO put elsewhere
+    //jac is a kinematic jacobian  l_dot = jac  *   (  v  )
+    //                                              (omega)
+    //Memory must be allocated
+    void triangulate(const Vector3Vec<T> & xVec1, const Vector3Vec<T> & xVec2,
+            T * res1, T * res2 = NULL,
+            T * jac1 = NULL, T * jac2 = NULL) //row-major
+    {
+        assert(xVec1.size() == xVec2.size());
+        assert(res1 != NULL or res2 != NULL);
+        if (jac1 != NULL)
+        {
+            assert(res1 != NULL);
+        }
+        if (jac2 != NULL)
+        {
+            assert(res2 != NULL);
+        }
+        Matrix3<T> R = rotMat();
+        for (int i = 0; i < xVec1.size(); i++)
+        {
+            const Vector3<T> & p = xVec1[i];
+            Vector3<T> q = R * xVec2[i];
+            T pq = p.dot(q);
+            T pp = p.dot(p);
+            T qq = q.dot(q);
+            T tp = mtrans.dot(p);
+            T tq = mtrans.dot(q);
+            T ppqq = pp * qq;
+            T delta = -pp * qq + pq * pq;
+            if (abs(delta) < ppqq * T(1e-6)) // max 100m for 10cm base
+            {
+                if (res1 != NULL) res1[i] = ZERO;
+                if (res2 != NULL) res2[i] = ZERO;
+                if (jac1 != NULL)
+                {
+                    fill(jac1 + i * 6, jac1 + (i + 1) * 6, ZERO); 
+                }
+                if (jac2 != NULL)
+                {
+                    fill(jac2 + i * 6, jac2 + (i + 1) * 6, ZERO); 
+                }
+            }
+            else
+            {
+                T deltaInv = T(1.) / delta;
+                T delta1, delta2;
+                if (res1 != NULL) 
+                {
+                    delta1 = (-tp * qq + tq * pq);
+                    res1[i] = delta1 * deltaInv;
+                    
+                }
+                if (res2 != NULL)
+                {
+                    delta2 = (pp * tq - pq * tp);
+                    res2[i] = delta2 * deltaInv;
+                }
+                
+                if (jac1 != NULL or jac2 != NULL)
+                {
+                    Matrix3<T> qSkew = hat(q);
+                    Vector3<T> jacDeltaOmega = 2 * pq * qSkew * p;
+                    if (jac1 != NULL)
+                    {
+                        Vector3<T> jacDelta1V = q*pq - p*qq;
+                        Vector3<T> jacDelta1Omega = qSkew * (pq * mtrans + tq * p);
+                        Map<Vector3<T>> jacLambda1V(jac1 + i * 6);
+                        Map<Vector3<T>> jacLambda1Omega(jac1 + i * 6 + 3);
+                        jacLambda1V = deltaInv * jacDelta1V;
+                        jacLambda1Omega = deltaInv * (jacDelta1Omega - res1[i] * jacDeltaOmega);
+                    }
+                    if (jac2 != NULL)
+                    {
+                        Vector3<T> jacDelta2V = q*pp - p*pq;
+                        Vector3<T> jacDelta2Omega = qSkew * (pp * mtrans - tp * p);
+                        Map<Vector3<T>> jacLambda2V(jac2 + i * 6);
+                        Map<Vector3<T>> jacLambda2Omega(jac2 + i * 6 + 3);
+                        jacLambda2V = deltaInv * jacDelta2V;
+                        jacLambda2Omega = deltaInv * (jacDelta2Omega - res2[i] * jacDeltaOmega);
+                    }
+                }
+            }
+        }
+    }
+    
+    // num / denom if denom is big enough
+    // linear extrapolation otherwise
+    T regDiv(T num, T denom, T EPS)
+    {
+        if (denom > EPS * num)
+        {
+            return num / denom;
+        }
+        else if (num == 0) // singularity, very unlikely
+        {
+            return T(2.) / EPS;
+        }
+        else
+        {
+            return T(2.) / EPS - denom / (num * EPS * EPS);
+        }
+    }
+    
+    //below a certain threshold division by delta is replaced by a linear function
+    void triangulateRegular(const Vector3Vec<T> & xVec1, const Vector3Vec<T> & xVec2,
+            T * res1, T * res2 = NULL,
+            T * jac1 = NULL, T * jac2 = NULL) //row-major
+    {
+        const T EPS(1. / 33.); // max 33m
+        assert(xVec1.size() == xVec2.size());
+        assert(res1 != NULL or res2 != NULL);
+        if (jac1 != NULL)
+        {
+            assert(res1 != NULL);
+        }
+        if (jac2 != NULL)
+        {
+            assert(res2 != NULL);
+        }
+        Matrix3<T> R = rotMat();
+        for (int i = 0; i < xVec1.size(); i++)
+        {
+            const Vector3<T> & p = xVec1[i];
+            Vector3<T> q = R * xVec2[i];
+            Vector3<T> r = p + q;
+            T pq = p.dot(q);
+            T pp = p.dot(p);
+            T qq = q.dot(q);
+            T tp = mtrans.dot(p);
+            T tq = mtrans.dot(q);
+            T tr = mtrans.dot(r);
+            T tt = mtrans.dot(mtrans);
+            T rp = r.dot(p);
+            T rq = r.dot(q);
+            T delta = tp*rq - tq*rp;
+            T delta1, delta2;
+            if (res1 != NULL) 
+            {
+                delta1 = tt * rq - tr * tq;
+                res1[i] = regDiv(delta1, delta, EPS); // max 33m
+//                if (res1[i] != res1[i])
+//                { 
+//                    std::cout << "OLOLO " << delta << " " << delta1 << std::endl;
+//                    cout << *this << endl;
+//                    cout << pp << " " << pq << " " << qq << " " << tp << " " << tq << endl;
+//                    cout << p.transpose() << "     " << q.transpose() << "   " << mtrans.transpose() << endl;
+//                    cout <<  xVec2[i].transpose() << endl << R << endl;
+//                }
+            }
+            if (res2 != NULL)
+            {
+                delta2 = tt * rp - tr * tp;
+                res2[i] = regDiv(delta2, delta, EPS); // max 33m
+            }
+            
+            if (jac1 != NULL or jac2 != NULL)
+            {
+                T deltaInv = T(1.) / delta;
+                Matrix3<T> qSkew = hat(q);
+                Vector3<T> jacDeltaV = rq * p - rp * q;
+                Vector3<T> jacDeltaOmega = qSkew * (tp * p - tq * p - rp * mtrans);
+                if (jac1 != NULL)
+                {
+                    Vector3<T> jacDelta1V = 2*rq * mtrans - tq * r - tr * q;
+                    Vector3<T> jacDelta1Omega = qSkew * (tt * p - 2 * tq * mtrans);
+                    Map<Vector3<T>> jacLambda1V(jac1 + i * 6);
+                    Map<Vector3<T>> jacLambda1Omega(jac1 + i * 6 + 3);
+                    if (delta > EPS * delta1)
+                    {
+                        jacLambda1V = deltaInv * (jacDelta1V - res1[i] * jacDeltaV);
+                        jacLambda1Omega = deltaInv * (jacDelta1Omega - res1[i] * jacDeltaOmega);
+                    }
+                    else if (delta1 == 0) //very unlikely
+                    {
+                        jacLambda1V = Vector3<T>(0, 0, 0);
+                        jacLambda1Omega = Vector3<T>(0, 0, 0);
+                    }
+                    else
+                    {
+                        const T coef = -T(1.) / (EPS * EPS);
+                        T deltaInv1 = 1. / delta1;
+                        T k = coef * deltaInv1;
+                        T k1 = coef * delta * deltaInv1 * deltaInv1;
+                        jacLambda1V = k * jacDeltaV - k1 * jacDelta1V;
+                        jacLambda1Omega = k * jacDeltaOmega - k1 * jacDelta1Omega;
+                    }
+                }
+                if (jac2 != NULL)
+                {
+                    Vector3<T> jacDelta2V = 2*rp * mtrans - tp * r - tr * p;
+                    Vector3<T> jacDelta2Omega = qSkew * (tt * p - 2 * tp * mtrans);
+                    Map<Vector3<T>> jacLambda2V(jac2 + i * 6);
+                    Map<Vector3<T>> jacLambda2Omega(jac2 + i * 6 + 3);
+                    if (delta > EPS * delta2)
+                    {
+                        jacLambda2V = deltaInv * (jacDelta2V - res2[i] * jacDeltaV);
+                        jacLambda2Omega = deltaInv * (jacDelta2Omega - res2[i] * jacDeltaOmega);
+                    }
+                    else if (delta2 == 0) //very unlikely
+                    {
+                        jacLambda2V = Vector3<T>(0, 0, 0);
+                        jacLambda2Omega = Vector3<T>(0, 0, 0);
+                    }
+                    else
+                    {
+                        const T coef = -T(1.) / (EPS * EPS);
+                        T deltaInv2 = 1. / delta2;
+                        T k = coef * deltaInv2;
+                        T k2 = coef * delta * deltaInv2 * deltaInv2;
+                        jacLambda2V = k * jacDeltaV - k2 * jacDelta2V;
+                        jacLambda2Omega = k * jacDeltaOmega - k2 * jacDelta2Omega;
+                    }
+                }
+            }
+        }
+    }
+    
     template<typename T2>
     Transformation<T2> cast() const
     {
@@ -220,23 +443,6 @@ private:
 
 };
 
-template<typename T>
-Transformation<T> transformFromData(const vector<T> & valVec)
-{
-    switch (valVec.size())
-    {
-    case 3:     //x, y, theta
-        return Transformation<T>(valVec[0], valVec[1], 0, 0, 0, valVec[2]);
-    case 6:     //full 6 dof
-        return Transformation<T>(valVec.data());
-    case 12:    //homogeneous transformation
-        Matrix3<T> R;
-        R << valVec[0], valVec[1], valVec[2],
-             valVec[4], valVec[5], valVec[6],
-             valVec[8], valVec[9], valVec[10];
-        
-        Vector3<T> t(valVec[3], valVec[7], valVec[11]);
-        return Transformation<T>(t, R);
-    }
-}
+using Transf = Transformation<double>;
+
 

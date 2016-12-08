@@ -21,7 +21,9 @@ OpenCV include and using
 
 #pragma once
 
+
 #include <opencv2/opencv.hpp>
+#include <opencv2/features2d/features2d.hpp>
 
 // Data types
 using cv::Point;
@@ -40,12 +42,18 @@ using Mat16s = cv::Mat_<int16_t>;
 using Mat32s = cv::Mat_<int32_t>;
 
 // Functions
+using cv::swap;
 using cv::imshow;
 using cv::imread;
 using cv::imwrite;
 using cv::waitKey;
-
 using cv::circle;
+
+//point features
+using cv::BRISK;
+using cv::KeyPoint;
+using cv::DMatch;
+using cv::BFMatcher;
 
 //TODO put it elsewhere
 template<typename T, typename Q>

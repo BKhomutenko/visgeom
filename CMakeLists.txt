@@ -41,7 +41,7 @@ target_link_libraries( reconstruction ${OpenCV_LIBS} )
 
 add_library( localization STATIC 
     src/localization/photometric.cpp
-    src/localization/cost_functions.cpp
+    src/localization/local_cost_functions.cpp
     src/localization/mono_odom.cpp
 )
 

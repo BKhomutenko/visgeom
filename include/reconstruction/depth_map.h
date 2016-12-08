@@ -239,6 +239,7 @@ public:
     // Performs a filtered merge on the input depths and sigmas
     static void filter(double & v1, double & s1, const double v2, const double s2);
   
+    bool empty() { return valVec.size() == 0; }
 private:
 
     void pixelMedianFilter(const int x, const int y, const int h, DepthMap & dst);

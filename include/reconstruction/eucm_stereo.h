@@ -51,6 +51,9 @@ struct StereoParameters : public ScaleParameters
     int flawCost = 7;
 };
 
+//TODO separate the triangulation from this class
+//TODO change EnhancedCamera to ICamera
+
 class EnhancedStereo
 {
 public:

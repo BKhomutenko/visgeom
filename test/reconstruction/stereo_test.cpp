@@ -182,7 +182,7 @@ int main(int argc, char** argv)
         
         imshow("out1", out1);
         imshow("out2", out2);
-        imshow("res", depthMat * 2);
+        imshow("res", depthMat/ 3);
         imshow("disp", stereo.disparity() * 256);
         cout << stereo.disparity()(350, 468) << " " << stereo.disparity()(350, 469) << endl;
         waitKey(); 

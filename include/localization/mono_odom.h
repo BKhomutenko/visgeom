@@ -40,60 +40,46 @@ class MonoOdometry
 {
 public:
     MonoOdometry(const EnhancedCamera * camera,
-                Transformation<double> xiBaseCam,
+                Transf xiBaseCam,
                 MotionStereoParameters params):
-    xiBaseCam(xiBaseCam),
+    _xiBaseCam(xiBaseCam),
     motionStereo(camera, camera, params),
     photometricLocalizer(5, camera),
-    state(EMPTY),
-    woState(EMPTY)
+    depthState(STATE_EMPTY),
+    keyframeState(STATE_EMPTY)
     {
         photometricLocalizer.setVerbosity(0);
     }
         
     ~MonoOdometry() {}
     
-    void feedImage(const Mat8u & imageNew, const double t);
+    void feedData(const Mat8u & imageNew, const Transf xiOdomNew);
     
-    void feedWheelOdometry(const Transformation<double> xiOdomNew, const double t);
-    
-    // The transformation since the last localization operation
-    // In case when the odometry can be reset on the hardware side
-    void feedWheelOdometryIncrement(const Transformation<double> xiOdomNew, const double t);
-    
-private:
-
-    void initFirstKeyFrame(const Mat8u & imageNew, const double t);
-    
+//private:
     //xiLocal is supposed to be up to date
-    void createKeyFrame(const Mat8u & imageNew, const double t);
-    
-    void computeVisualOdometry(const Mat8u & imageNew, const double t);
+    void computeVisualOdometry(const Mat8u & imageNew);
     
     void refineDepth(const Mat8u & imageNew);
-    
-    enum OdomState {EMPTY,                 // no data
-                    INIT_FIRST_FRAME,      // no good depth estimation
-                    ACTIVE,                 
-                    LOST};
+
     // memory
-    vector<Mat8u> imageVec;
-    vector<Transformation<double>> transfoVec;
+    vector<Mat8u> imageVec; //.back() is the actual key frame
+    vector<Transf> transfVec;
     vector<Matrix6d> poseCovarVec;
     
     // state
-    Transformation<double> xiLocal; // pose wrt actual keyframe
-    Transformation<double> xiOdom; // the last WO measurement
-    Transformation<double> xiBaseCam; // extrinsic calibration
+    Transf _xiLocal; // pose wrt actual keyframe
+    Transf _xiOdom; // the last WO measurement
+    Transf _xiBaseCam; // extrinsic calibration
     DepthMap depthMap; 
-    OdomState state, woState;
-    double tLocal, tOdom;
+
+    enum DataState {STATE_EMPTY, STATE_READY};
+
+    DataState depthState;
+    DataState keyframeState;
     
     //utils
     MotionStereo motionStereo;
     ScalePhotometric photometricLocalizer;
-    //TODO add WO sigma
-    //TODO add a threshold for new the KFr instantiation 
 };
 
 

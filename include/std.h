@@ -21,6 +21,7 @@ STL types and methods
 
 #pragma once
 
+#include <assert.h>
 #include <vector>
 #include <array>
 #include <map>
@@ -29,6 +30,7 @@ STL types and methods
 #include <random>
 #include <cmath>
 #include <limits>
+#include <random>
 
 // Containers
 using std::vector;
@@ -52,6 +54,9 @@ using std::cos;
 using std::exp;
 using std::log;
 using std::abs;
+
+// Random
+using std::mt19937;
 
 //constants
 const double HALF_PI = M_PI / 2;
