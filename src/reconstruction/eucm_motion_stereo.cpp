@@ -157,7 +157,7 @@ void MotionStereo::reprojectDepth(Transformation<double> T12, const Mat8u & img2
             
             vector<uint8_t> & descriptor = descriptorVec[salientPack.idxMapVec[idx]];
             
-            vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+            vector<int> costVec = compareDescriptor(descriptor, sampleVec, params.flawCost);
             
 //                int dBest = 0;
 //                int eBest = LENGTH*65535;
@@ -399,7 +399,7 @@ void MotionStereo::computeDepth(Transformation<double> T12, const Mat8u & img2, 
 //                count++;
 //                continue;
             
-            vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+            vector<int> costVec = compareDescriptor(descriptor, sampleVec, params.flawCost);
             
             if (params.verbosity > 2)
             {
@@ -601,7 +601,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
         if (imageBorder) continue;
         
         //find the best correspondence
-        vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+        vector<int> costVec = compareDescriptor(descriptor, sampleVec, params.flawCost);
         auto bestCostIter = min_element(costVec.begin(), costVec.end());
         
         //check the cost
@@ -710,7 +710,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
         
         //find the best correspondence
         const vector<uint8_t> & descriptor = descriptorVec[idx]; 
-        vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+        vector<int> costVec = compareDescriptor(descriptor, sampleVec, params.flawCost);
         auto bestCostIter = min_element(costVec.begin(), costVec.end());
         
         //check the cost

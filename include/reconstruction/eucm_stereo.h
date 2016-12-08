@@ -83,10 +83,8 @@ public:
     // returns the distance between corresponding camera and the point
     double triangulate(double u1, double v1, double u2, double v2, CameraIdx camIdx = CAMERA_1) const;
     
-    vector<int> compareDescriptor(const vector<uint8_t> & desc, const vector<uint8_t> & sampleVec) const;
-    
     //FIXME potentially put into misc file
-    vector<int> findLocalMinima(const vector<int> & dataVec) const;
+//    vector<int> findLocalMinima(const vector<int> & dataVec) const;
 protected:
     StereoParameters params;
     

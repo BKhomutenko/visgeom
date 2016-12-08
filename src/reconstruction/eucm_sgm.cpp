@@ -272,7 +272,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                     else sampleVec[i] = img2(raster.v, raster.u);
                 }
             }
-            vector<int> costVec = compareDescriptor(descriptor, sampleVec);
+            vector<int> costVec = compareDescriptor(descriptor, sampleVec, params.flawCost);
             if (y == 350 and x > 469 and x < 481)
             {
                 cout << "Point : " << x << " " << y << endl;

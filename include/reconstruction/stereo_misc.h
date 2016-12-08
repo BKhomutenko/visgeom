@@ -72,4 +72,12 @@ void triangulateRegular(const Transf xi,
         double * res1, double * res2 = NULL,
         double * jac1 = NULL, double * jac2 = NULL);
 
+/*
+dynamic algorithm for descriptor comparison
 
+returns a verctor of costs for each possible disparity value
+*/
+vector<int> compareDescriptor(const vector<uint8_t> & desc,
+        const vector<uint8_t> & sampleVec, int flawCost);
+        
+        
