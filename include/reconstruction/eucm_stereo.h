@@ -31,7 +31,7 @@ NOTE:
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 
-#include "utils/scale_parameters.h"
+#include "reconstruction/scale_parameters.h"
 #include "reconstruction/stereo_misc.h"
 
 struct StereoParameters : public ScaleParameters

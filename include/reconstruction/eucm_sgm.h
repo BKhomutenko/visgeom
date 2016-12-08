@@ -32,7 +32,7 @@ NOTE:
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 
-#include "utils/scale_parameters.h"
+#include "reconstruction/scale_parameters.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/depth_map.h"
 #include "reconstruction/eucm_epipolar.h"

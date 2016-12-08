@@ -3,7 +3,7 @@
 #include "eigen.h"
 #include "timer.h"
 #include "reconstruction/eucm_motion_stereo.h"
-#include "utils/scale_parameters.h"
+#include "reconstruction/scale_parameters.h"
 
 
 //TODO use SGM stereo as prior to the motion stereo to improve the accuacy

@@ -32,7 +32,7 @@ NOTE:
 #include "geometry/geometry.h"
 #include "camera/eucm.h"
 
-#include "utils/scale_parameters.h"
+#include "reconstruction/scale_parameters.h"
 
 
 bool EnhancedStereo::triangulate(double u1, double v1, double u2, double v2, Vector3d & X) const

@@ -25,7 +25,7 @@ Scale space for multiscale optimization
 #include "ocv.h"
 #include "io.h"
 
-#include "utils/scale_parameters.h"
+#include "reconstruction/scale_parameters.h"
 
 class BinaryScalSpace : private ScaleParameters
 {

@@ -30,8 +30,8 @@ NOTE:
 #include "ocv.h"
 
 #include "camera/generic_camera.h"
-#include "utils/scale_parameters.h"
-#include "utils/mh_pack.h"
+#include "reconstruction/scale_parameters.h"
+#include "reconstruction/mh_pack.h"
 #include "reconstruction/stereo_misc.h"
 
 
