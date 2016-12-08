@@ -4,7 +4,7 @@
 #include "io.h"
 #include "ocv.h"
 #include "timer.h"
-#include "utils/json.h"
+#include "json.h"
 
 #include "localization/sparse_odom.h"
 #include "projection/eucm.h"
@@ -40,7 +40,6 @@ int main(int argc, char** argv)
         Mat8u img = imread(prefix + fileVec[i], 0);
         odom.feedData(img, odomVec[i]);
         cout << odomVec[i] << endl;
-        cout << odom.xiLocal << endl;
         imshow("img", img);
         
     }

@@ -22,7 +22,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "ocv.h"
 #include "eigen.h"
 #include "ceres.h"
-#include "utils/json.h"
+#include "json.h"
 
 //TODO make a separate header
 

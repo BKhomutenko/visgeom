@@ -35,6 +35,7 @@ add_library( reconstruction STATIC
     src/reconstruction/eucm_motion_stereo.cpp
     src/reconstruction/eucm_epipolar.cpp
     src/reconstruction/depth_map.cpp
+    src/reconstruction/stereo_misc.cpp
 )
 
 target_link_libraries( reconstruction ${OpenCV_LIBS} )
@@ -43,6 +44,7 @@ add_library( localization STATIC
     src/localization/photometric.cpp
     src/localization/local_cost_functions.cpp
     src/localization/mono_odom.cpp
+    src/localization/sparse_odom.cpp
 )
 
 TARGET_LINK_LIBRARIES( localization reconstruction  ${OpenCV_LIBS} ${CERES_LIBRARIES})
