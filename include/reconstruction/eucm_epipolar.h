@@ -37,7 +37,18 @@ class EnhancedEpipolar
 public:
    
     EnhancedEpipolar(const EnhancedCamera * cam1, const EnhancedCamera * cam2,
-            const Transformation<double> & T12, const int numberSteps, int verbosity = 0) :
+            const int numberSteps, int verbosity = 0) :
+        // initialize the members
+        camera1(cam1->clone()),
+        camera2(cam2->clone()),
+        step(4. / numberSteps),
+        nSteps(numberSteps),
+        verbosity(verbosity)
+    {
+    }
+    
+    EnhancedEpipolar(const EnhancedCamera * cam1, const EnhancedCamera * cam2,
+            const Transf & T12, const int numberSteps, int verbosity = 0) :
         // initialize the members
         Transform12(T12),
         camera1(cam1->clone()),
@@ -57,6 +68,14 @@ public:
         camera1 = NULL;
         delete camera2;
         camera2 = NULL;
+    }
+    
+    void setTransformation(const Transf & transf)
+    {
+        assert(transf.trans().squaredNorm() > 1e-10);
+        Transform12 = transf;
+        epipoles = StereoEpipoles(camera1, camera2, transf);
+        initialize();
     }
     
     const Polynomial2 & getFirst(Vector3d X) const { return epipolar1Vec[index(X)]; }
@@ -99,7 +118,7 @@ private:
     Vector2d epipole;
     
     // pose of the first to the second camera
-    Transformation<double> Transform12;  
+    Transf Transform12;  
     EnhancedCamera *camera1, *camera2;
    
     // total number of plains

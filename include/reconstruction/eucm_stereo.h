@@ -71,7 +71,7 @@ public:
             params(parameters),
             camera1(cam1->clone()),
             camera2(cam2->clone()),
-            epipolarCurves(NULL)
+            epipolarCurves(cam1, cam2, 2000, params.verbosity)
     { 
     }
     
@@ -81,7 +81,6 @@ public:
         camera1 = NULL;
         delete camera2;
         camera2 = NULL;
-        clearEpipolar();
     }
     
     
@@ -89,8 +88,7 @@ public:
     {
         transf12 = T12; 
         triangulator.setTransformation(T12);
-        clearEpipolar();
-        epipolarCurves = new EnhancedEpipolar(camera1, camera2, T12, 2000, params.verbosity - 1);
+        epipolarCurves.setTransformation(T12);
         epipoles = StereoEpipoles(camera1, camera2, T12);
     }
     
@@ -105,20 +103,13 @@ public:
             CameraIdx camIdx = CAMERA_1) const;
     
 protected:
-
-    void clearEpipolar()
-    {
-        if (epipolarCurves != NULL)
-        {
-            delete epipolarCurves;
-            epipolarCurves = NULL;
-        }
-    }
     
-    EnhancedEpipolar * epipolarCurves;
+    EnhancedEpipolar epipolarCurves;
+    
     StereoEpipoles epipoles;
     
     StereoParameters params;
+    
     EnhancedCamera *camera1, *camera2;
     
 private:

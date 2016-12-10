@@ -126,6 +126,7 @@ public:
     int getHalfLength() { return min(4, max(params.scale - 1, 1)); }
     
     Mat32s & disparity() { return smallDisparity; }
+    
 private:
     
     std::vector<bool> maskVec;

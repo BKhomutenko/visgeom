@@ -78,7 +78,8 @@ void EnhancedEpipolar::initialize()
     // ## camera 1 ##
     // prepare reused variables
     prepareCamera(CAMERA_1);
-    
+    epipolar1Vec.clear();
+    epipolar1Vec.reserve(directionVec.size());
     for (const auto & dir : directionVec)
     {
         Vector3d plane = dir.cross(zBase);
@@ -94,7 +95,8 @@ void EnhancedEpipolar::initialize()
     
     // prepare reused variables
     prepareCamera(CAMERA_2);
-    
+    epipolar2Vec.clear();
+    epipolar2Vec.reserve(directionVec.size());
     for (const auto & dir : directionVec)
     {
         Vector3d dir2 = R21 * dir;

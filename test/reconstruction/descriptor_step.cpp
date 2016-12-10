@@ -88,10 +88,6 @@ int main(int argc, char** argv)
     {
         getline(paramFile, fileName2);
         
-        
-        
-        
-        
         img1 = imread(fileName1, 0);
         img2 = imread(fileName2, 0);
         
@@ -113,8 +109,6 @@ int main(int argc, char** argv)
                 else descStepMat(v, u) = 0;
             }
         }
-        
-        
         
         imshow("out1", img1);
         imshow("out2", img2);

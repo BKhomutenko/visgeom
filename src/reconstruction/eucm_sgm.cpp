@@ -34,7 +34,7 @@ CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser1(int idx) cons
 {
     Vector2i pt = pointPxVec1[idx];
     CurveRasterizer<int, Polynomial2> raster(pt, epipoles.getFirstPx(),
-                                            epipolarCurves->getFirst(reconstVec[idx]));
+                                            epipolarCurves.getFirst(reconstVec[idx]));
     if (epipoles.firstIsInverted()) raster.setStep(-1);
     return raster;
 }
@@ -43,7 +43,7 @@ CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser2(int idx) cons
 {
     Vector2i pinfPx = pinfPxVec[idx];
     CurveRasterizer<int, Polynomial2> raster(pinfPx, epipoles.getSecondPx(),
-             epipolarCurves->getSecond(reconstVec[idx]));
+             epipolarCurves.getSecond(reconstVec[idx]));
     if (epipoles.secondIsInverted()) raster.setStep(-1);
     return raster;
 }
