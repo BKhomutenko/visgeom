@@ -51,12 +51,8 @@ public:
     {
     }
 
-    ~MotionStereo()
-    {
-        delete camera1;
-        camera1 = NULL;
-        delete camera2;
-        camera2 = NULL;
+    virtual ~MotionStereo()
+    {    
     }    
     
     //TODO figure out how to treat the mask efficiently
@@ -84,16 +80,15 @@ public:
         (if the search distance is greater than 1)
         -withoud depth estimation. Generate new hypotheses using complete epipolar search
     */
-    void reprojectDepth(Transformation<double> T12, const Mat8u & img2, DepthMap & depth);
+    void reprojectDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
     
     //FIXME for backward compatibility, to be fixed or removed
-    void computeDepth(Transformation<double> T12, const Mat8u & img2, DepthMap & depth);
+    void computeDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
     
-    void validateDepth(Transformation<double> T12, const Mat8u & img2, DepthMap & depth);
+    void validateDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
        
 private:
     
-    EnhancedEpipolar * epipolarPtr;
     // based on the image gradient
     void computeMask()
     {

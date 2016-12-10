@@ -130,10 +130,14 @@ int main(int argc, char** argv)
         Mat8u img2 = imread(imageDir + imageName, 0);
         EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
 
+        DepthMap depthStereo;
         Mat32f distMat;
         auto t2 = clock();
-        stereo.computeStereo(img1, img2, distMat);
+        stereo.computeStereo(img1, img2, depthStereo);
         auto t3 = clock();
+        
+        depthStereo.toMat(distMat);
+        
 //        cout << double(t3 - t2) / CLOCKS_PER_SEC << endl;
         
         Transformation<double> T0Camera = T01.compose(TbaseCamera);

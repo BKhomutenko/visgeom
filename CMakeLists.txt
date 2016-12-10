@@ -30,12 +30,12 @@ target_link_libraries( calibration
 )
 
 add_library( reconstruction STATIC     
+    src/reconstruction/eucm_sgm.cpp  
     src/reconstruction/eucm_stereo.cpp
-    src/reconstruction/eucm_sgm.cpp
     src/reconstruction/eucm_motion_stereo.cpp
     src/reconstruction/eucm_epipolar.cpp
     src/reconstruction/depth_map.cpp
-    src/reconstruction/stereo_misc.cpp
+    src/reconstruction/triangulator.cpp
 )
 
 target_link_libraries( reconstruction ${OpenCV_LIBS} )

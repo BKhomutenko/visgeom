@@ -34,24 +34,18 @@ Depth-from-motion class for semidense depth estimation
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/depth_map.h"
 #include "reconstruction/epipolar_descriptor.h"
-#include "reconstruction/epipoles.h"
-#include "reconstruction/eucm_stereo.h"
 
 
 //TODO cam1, cam2 are not needed
-void MotionStereo::reprojectDepth(Transformation<double> T12, const Mat8u & img2, DepthMap & depth)
+void MotionStereo::reprojectDepth(Transf T12, const Mat8u & img2, DepthMap & depth)
 {
     
-    epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
-    StereoEpipoles epipoles(camera1, camera2, T12);
+    setTransformation(T12);
     
     const int LENGTH = params.descLength;
     const int HALF_LENGTH = LENGTH / 2;
     
-    vector<int> kernelVec, waveVec;
-    const int NORMALIZER = initKernel(kernelVec, LENGTH);
-    const int WAVE_NORM = initWave(waveVec, LENGTH);
-    EpipolarDescriptor epipolarDescriptor(LENGTH, WAVE_NORM, waveVec.data(), {1});
+    EpipolarDescriptor epipolarDescriptor(LENGTH, LENGTH * 3, {1});
     
     MHPack flatPack, salientPack;
     vector<vector<uint8_t>> descriptorVec;
@@ -64,7 +58,7 @@ void MotionStereo::reprojectDepth(Transformation<double> T12, const Mat8u & img2
             if (not camera1->reconstructPoint(pt, X)) continue;
             
             CurveRasterizer<int, Polynomial2> descRaster(round(pt), epipoles.getFirstPx(),
-                                            epipolarPtr->getFirst(X));
+                                            epipolarCurves->getFirst(X));
             if (epipoles.firstIsInverted()) descRaster.setStep(-1);
             vector<uint8_t> descriptor;
             const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
@@ -106,7 +100,6 @@ void MotionStereo::reprojectDepth(Transformation<double> T12, const Mat8u & img2
     // for the salient pack compute stereo and for corresponding pixel push new hypothesis
     Vector3dVec cloud2;
     T12.inverseTransform(salientPack.cloud, cloud2);
-    Transform12 = T12;
     int dispAcc = 0;
     int dispCount = 0;
     for (int idx = 0; idx < salientPack.imagePointVec.size(); idx++)
@@ -134,7 +127,7 @@ void MotionStereo::reprojectDepth(Transformation<double> T12, const Mat8u & img2
             
             // query 3D point must be projected into 1st frame
             CurveRasterizer<int, Polynomial2> raster(round(ptMax), round(ptMin),
-                                            epipolarPtr->getSecond(salientPack.cloud[2*idx]));
+                                            epipolarCurves->getSecond(salientPack.cloud[2*idx]));
             
             Vector2i diff = round(ptMax - ptMin);
             const int distance = min(int(diff.norm()), params.dispMax);
@@ -196,7 +189,7 @@ void MotionStereo::reprojectDepth(Transformation<double> T12, const Mat8u & img2
         
 
 
-//                auto poly1 = epipolarPtr->getSecond(salientPack.cloud[2*idx]);
+//                auto poly1 = epipolarCurves->getSecond(salientPack.cloud[2*idx]);
 //                
 //                cout << "    curve : " << poly1(ptMin[0], ptMin[1]) << " " 
 //                    << poly1(ptMax[0], ptMax[1]) <<  " " 
@@ -255,26 +248,19 @@ void MotionStereo::reprojectDepth(Transformation<double> T12, const Mat8u & img2
     }     
     cout << double(dispAcc) / dispCount << endl;
     //release dynamic objects
-    delete epipolarPtr;
-    epipolarPtr = NULL;
 }    
 
-void MotionStereo::computeDepth(Transformation<double> T12, const Mat8u & img2, DepthMap & depth)
+void MotionStereo::computeDepth(Transf T12, const Mat8u & img2, DepthMap & depth)
 {
     if (params.verbosity > 0) cout << "MotionStereo::computeDepth" << endl;
-    epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
-    StereoEpipoles epipoles(camera1, camera2, T12);
-    Transform12 = T12;
+    setTransformation(T12);
     
     if (params.verbosity > 1) cout << "    descriptor kernel selection" << endl;
     const int LENGTH = params.descLength;
     const int HALF_LENGTH = LENGTH / 2;
     
     // compute the weights for matching cost
-    vector<int> kernelVec, waveVec;
-    const int NORMALIZER = initKernel(kernelVec, LENGTH);
-    const int WAVE_NORM = initWave(waveVec, LENGTH);
-    EpipolarDescriptor epipolarDescriptor(LENGTH, LENGTH * 3, waveVec.data(), {1, 2, 3});
+    EpipolarDescriptor epipolarDescriptor(LENGTH, 3, {1, 2, 3});
     
     MHPack salientPack;
     //TODO to optimize make a continuous vector<uint8_t>
@@ -292,7 +278,7 @@ void MotionStereo::computeDepth(Transformation<double> T12, const Mat8u & img2, 
             if (not camera1->reconstructPoint(pt, X)) continue;
             
             CurveRasterizer<int, Polynomial2> descRaster(round(pt), epipoles.getFirstPx(),
-                                            epipolarPtr->getFirst(X));
+                                            epipolarCurves->getFirst(X));
             if (epipoles.firstIsInverted()) descRaster.setStep(-1);
             vector<uint8_t> descriptor;
             const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
@@ -348,7 +334,7 @@ void MotionStereo::computeDepth(Transformation<double> T12, const Mat8u & img2, 
             
             // query 3D point must be projected into 1st frame
             CurveRasterizer<int, Polynomial2> raster(ptMaxRound, ptEpipole2,
-                                            epipolarPtr->getSecond(salientPack.cloud[2*idx]));
+                                            epipolarCurves->getSecond(salientPack.cloud[2*idx]));
             if (epipoles.secondIsInverted()) raster.setStep(-1);
             
             const int distance = min(diffLength, params.dispMax) / step;
@@ -477,7 +463,7 @@ void filter(double & v1, double & s1, const double v2, const double s2)
     s1 = max(s1 * s2 / denom, 0.1);
 }
 
-void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2, DepthMap & depth)
+void MotionStereo::validateDepth(Transf T12, const Mat8u & img2, DepthMap & depth)
 {
     //constants
     const int LENGTH = params.descLength;
@@ -486,9 +472,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
     
     //init necessary data structures
     EpipolarDescriptor epipolarDescriptor(params.descLength, 5, {1, 2, 3, 4});
-    StereoEpipoles epipoles(camera1, camera2, T12);
-    epipolarPtr = new EnhancedEpipolar(T12, camera1, camera2, 2000, params.verbosity);
-    Transform12 = T12;
+    setTransformation(T12);
     
     //split points int toValidate and toCompute
     MHPack toValidatePack;
@@ -521,7 +505,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
             if (not camera1->reconstructPoint(pt, X)) continue;
             
             CurveRasterizer<int, Polynomial2> descRaster(round(pt), epipoles.getFirstPx(),
-                                            epipolarPtr->getFirst(X));
+                                            epipolarCurves->getFirst(X));
             if (epipoles.firstIsInverted()) descRaster.setStep(-1);
             vector<uint8_t> descriptor;
             const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
@@ -566,7 +550,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
         //commute the descriptor
         auto pt = round(toValidatePack.imagePointVec[idx]);
         CurveRasterizer<int, Polynomial2> descRaster(pt, epipoles.getFirstPx(),
-                                            epipolarPtr->getFirst(toValidatePack.cloud[2*idx]));        
+                                            epipolarCurves->getFirst(toValidatePack.cloud[2*idx]));        
         if (epipoles.firstIsInverted()) descRaster.setStep(-1);
         vector<uint8_t> descriptor;
         const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
@@ -575,7 +559,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
         const int distance = max(max(abs(diff[0]), abs(diff[1]))/step, 3) + MARGIN;
             
         CurveRasterizer<int, Polynomial2> raster(ptMaxRound, ptEpipole2,
-                                            epipolarPtr->getSecond(toValidatePack.cloud[2*idx]));
+                                            epipolarCurves->getSecond(toValidatePack.cloud[2*idx]));
         if (epipoles.secondIsInverted()) raster.setStep(-1);
         
         raster.setStep(step);
@@ -683,7 +667,7 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
         const int distance = params.dispMax / step + MARGIN;
             
         CurveRasterizer<int, Polynomial2> raster(pt2Round, ptEpipole2,
-                                            epipolarPtr->getSecond(toComputeCloud[idx]));
+                                            epipolarCurves->getSecond(toComputeCloud[idx]));
         if (epipoles.secondIsInverted()) raster.setStep(-1);
         
         raster.setStep(step);
@@ -760,5 +744,4 @@ void MotionStereo::validateDepth(Transformation<double> T12, const Mat8u & img2,
     
     //if the cost is OK, store the measurement
  
-    delete epipolarPtr;     
 }

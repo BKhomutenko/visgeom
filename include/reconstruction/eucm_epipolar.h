@@ -36,8 +36,8 @@ class EnhancedEpipolar
 {
 public:
    
-    EnhancedEpipolar(Transformation<double> T12, const EnhancedCamera * cam1,
-            const EnhancedCamera * cam2, const int numberSteps, int verbosity = 0) :
+    EnhancedEpipolar(const EnhancedCamera * cam1, const EnhancedCamera * cam2,
+            const Transformation<double> & T12, const int numberSteps, int verbosity = 0) :
         // initialize the members
         Transform12(T12),
         camera1(cam1->clone()),

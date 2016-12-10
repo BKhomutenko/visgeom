@@ -35,9 +35,7 @@ NOTE:
 #include "reconstruction/scale_parameters.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/depth_map.h"
-#include "reconstruction/eucm_epipolar.h"
 #include "reconstruction/epipolar_descriptor.h"
-#include "reconstruction/epipoles.h"
 #include "reconstruction/eucm_stereo.h"
 
 struct SGMParameters : public StereoParameters
@@ -60,12 +58,10 @@ class EnhancedSGM : private EnhancedStereo
 {
 public:
     
-    EnhancedSGM(Transformation<double> T12, const EnhancedCamera * cam1,
+    EnhancedSGM(Transf T12, const EnhancedCamera * cam1,
             const EnhancedCamera * cam2, const SGMParameters & parameters) :
             EnhancedStereo(cam1, cam2, parameters),
-            params(parameters),
-            epipolar(T12, cam1, cam2, 2500),
-            epipoles(cam1, cam2, T12)
+            params(parameters)
     { 
         setTransformation(T12);
         assert(params.dispMax % 2 == 0);
@@ -76,12 +72,8 @@ public:
         if (params.useUVCache) computeUVCache();
     }
     
-    ~EnhancedSGM()
+    virtual ~EnhancedSGM()
     {
-        delete camera1;
-        camera1 = NULL;
-        delete camera2;
-        camera2 = NULL;
     }
     
     // precompute coordinates for different disparities to speedup the computation
@@ -89,9 +81,6 @@ public:
     
     // An interface function
     void computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depthMap);
-    
-    // An interface function
-    void computeStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat);
     
     //// EPIPOLAR GEOMETRY
     
@@ -121,29 +110,23 @@ public:
     void reconstructDisparityMH();
     void reconstructDisparity();  // using the result of the dynamic programming
     
+    //TODO rewrite
+    void reconstructDepth(DepthMap & depth) const;
     //// MISCELLANEOUS
     
     // index of an object in a linear array corresponding to pixel [row, col] 
-    int getLinearIndex(int x, int y) { return params.xMax*y + x; }
+    int getLinearIndex(int x, int y) const { return params.xMax*y + x; }
       
-    CurveRasterizer<int, Polynomial2> getCurveRasteriser1(int idx);
-    CurveRasterizer<int, Polynomial2> getCurveRasteriser2(int idx);
+    CurveRasterizer<int, Polynomial2> getCurveRasteriser1(int idx) const;
+    CurveRasterizer<int, Polynomial2> getCurveRasteriser2(int idx) const;
     
     // reconstruction
-    //TODO move elsewhere (e.g. create a class stereo system with two cameras and a transformation)
-    void computeDepth(Mat32f & distanceMat);
-            
-    double computeDepth(int x, int y, int h = 0);
-    bool computeDepth(double & dist, double & sigma, int x, int y, int h = 0);
-    
     void fillGaps(uint8_t * const data, const int step);
     
     int getHalfLength() { return min(4, max(params.scale - 1, 1)); }
     
     Mat32s & disparity() { return smallDisparity; }
 private:
-    const EnhancedEpipolar epipolar;
-    const StereoEpipoles epipoles;
     
     std::vector<bool> maskVec;
     

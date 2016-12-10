@@ -30,19 +30,20 @@ Semi-global block matching algorithm for non-rectified images
 #include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 
-CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser1(int idx)
+CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser1(int idx) const
 {
     Vector2i pt = pointPxVec1[idx];
-    CurveRasterizer<int, Polynomial2> raster(pt, epipoles.getFirstPx(), epipolar.getFirst(reconstVec[idx]));
+    CurveRasterizer<int, Polynomial2> raster(pt, epipoles.getFirstPx(),
+                                            epipolarCurves->getFirst(reconstVec[idx]));
     if (epipoles.firstIsInverted()) raster.setStep(-1);
     return raster;
 }
 
-CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser2(int idx)
+CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser2(int idx) const
 {
     Vector2i pinfPx = pinfPxVec[idx];
     CurveRasterizer<int, Polynomial2> raster(pinfPx, epipoles.getSecondPx(),
-             epipolar.getSecond(reconstVec[idx]));
+             epipolarCurves->getSecond(reconstVec[idx]));
     if (epipoles.secondIsInverted()) raster.setStep(-1);
     return raster;
 }
@@ -65,7 +66,7 @@ void EnhancedSGM::computeReconstructed()
 
 void EnhancedSGM::computeRotated()
 {
-    Transform12.inverseRotate(reconstVec, reconstRotVec);
+    transf().inverseRotate(reconstVec, reconstRotVec);
 }
 
 //FIXME maskVec must be recomputed to discard not projected pInf
@@ -137,42 +138,79 @@ void EnhancedSGM::createBuffer()
 void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depth)
 {
     computeCurveCost(img1, img2);
+    
     computeDynamicProgramming();
+    
     if (params.hypMax == 1) reconstructDisparity();
     else reconstructDisparityMH();
+    
+    reconstructDepth(depth);    
+
+}
+
+void EnhancedSGM::reconstructDepth(DepthMap & depth) const
+{
+    if (params.verbosity > 2) 
+    {
+        cout << "EnhancedSGM::reconstructDepth(DepthMap & depth)" << endl;
+    }
     depth = DepthMap(camera1, params, params.hypMax);
-    assert((ScaleParameters)depth == (ScaleParameters)params);
     for (int h = 0; h < params.hypMax; h++)
     {
         for (int y = 0; y < params.yMax; y++)
         {
             for (int x = 0; x < params.xMax; x++)
             {
-                if (not params.salientPoints or salientBuffer(y, x)) 
-                {
-                    //FIXME temporary 
-//                    depth.at(x, y, h) =  smallDisparity(y, x*params.hypMax + h);
-                    computeDepth(depth.at(x, y, h), depth.sigma(x, y, h), x, y, h);
-                    depth.cost(x, y, h) = errorBuffer(y, x*params.dispMax + h);
-                }
-                else 
+                if (params.salientPoints and not salientBuffer(y, x)) 
                 {
                     depth.at(x, y, h) = OUT_OF_RANGE;
                     depth.sigma(x, y, h) = OUT_OF_RANGE;
-                    depth.cost(x, y, h) = 100;
+                    depth.cost(x, y, h) = OUT_OF_RANGE;
+                    continue;
                 }
+                depth.cost(x, y, h) = errorBuffer(y, x*params.dispMax + h);
+                
+                int idx = getLinearIndex(x, y);
+                if (not maskVec[idx])
+                { 
+                    depth.at(x, y, h) = OUT_OF_RANGE;
+                    depth.sigma(x, y, h) = OUT_OF_RANGE;
+                    depth.cost(x, y, h) = OUT_OF_RANGE;
+                    continue;
+                }
+                int disparity = smallDisparity(y, x*params.hypMax + h);
+                
+                // point on the first image
+                const auto & pt1 = pointVec1[idx];
+                
+                // to compute point on the second image
+                // TODO make virtual rasterizer using the cache
+                int u21, v21, u22, v22;
+                if (params.useUVCache)
+                {
+                    const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
+                    u21 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
+                    u22 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity + 1);
+                    v21 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
+                    v22 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity + 1);
+                }
+                else
+                {       
+                    CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
+                    raster.steps(disparity);
+                    u21 = raster.u;
+                    v21 = raster.v;
+                    raster.step();
+                    u22 = raster.u;
+                    v22 = raster.v;
+                }
+                
+                triangulate(pt1[0], pt1[1], u21, v21, u22, v22,
+                             depth.at(x, y, h), depth.sigma(x, y, h));
+                        
             }
         }
     }
-}
-
-//TODO remove, depricated function
-void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, Mat32f & depthMat)
-{
-    computeCurveCost(img1, img2);
-    computeDynamicProgramming();
-    reconstructDisparity();
-    computeDepth(depthMat);
 }
 
 void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
@@ -183,10 +221,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     const int HALF_LENGTH = getHalfLength();
     const int LENGTH = HALF_LENGTH * 2 + 1;
     // compute the weights for matching cost
-    vector<int> kernelVec, waveVec;
-//    const int NORMALIZER = initKernel(kernelVec, LENGTH);
-//    const int WAVE_NORM = initWave(waveVec, LENGTH);
-    EpipolarDescriptor epipolarDescriptor(LENGTH, 3, waveVec.data(), {1, 2, 4, 8});
+    EpipolarDescriptor epipolarDescriptor(LENGTH, 3, {1, 2, 4, 8});
     
     if (params.salientPoints) salientBuffer.setTo(0);
     
@@ -614,132 +649,6 @@ void EnhancedSGM::reconstructDisparityMH()
         }
         if (params.verbosity > 3) cout << "    y: " << y << endl;
     }
-}
-
-//TODO remove this function, depricated
-void EnhancedSGM::computeDepth(Mat32f & distance)
-{
-    if (params.verbosity > 0) cout << "EnhancedSGM::computeDepth(Mat32f &)" << endl;
-    distance.create(params.yMax, params.xMax);
-    for (int y = 0; y < params.yMax; y++)
-    {
-        for (int x = 0; x < params.xMax; x++)
-        {
-            distance(y, x) = computeDepth(x, y);
-        }
-    }
-}
-
-bool EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int h)
-{
-    if (params.verbosity > 3) 
-    {
-        cout << "EnhancedSGM::computeDepth(double & dist, double & sigma, int x, int y, int h)" << endl;
-    }
-    assert(h < params.hypMax);
-    
-    int idx = getLinearIndex(x, y);
-    if (not maskVec[idx])
-    { 
-        dist = OUT_OF_RANGE;
-        sigma = OUT_OF_RANGE;
-        return false;
-    
-    }
-    int disparity = smallDisparity(y, x*params.hypMax + h);
-    
-    if (disparity < 0) 
-    {
-        dist = OUT_OF_RANGE;
-        sigma = OUT_OF_RANGE;
-        return true;
-    }
-    else if (disparity == 0)
-    {
-        dist = MAX_DEPTH;
-//        dist = 1 /MAX_DEPTH; //FIXME
-        sigma = MAX_DEPTH / 7; //FIXME
-        return true;
-    }
-    // point on the first image
-    const auto & pt1 = pointVec1[idx];
-    
-    // to compute point on the second image
-    // TODO make virtual rasterizer using the cache
-    int u21, v21, u22, v22;
-    if (params.useUVCache)
-    {
-        const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
-        u21 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
-        u22 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity + 1);
-        v21 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
-        v22 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity + 1);
-    }
-    else
-    {       
-        CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
-        raster.steps(disparity);
-        u21 = raster.u;
-        v21 = raster.v;
-        raster.step();
-        u22 = raster.u;
-        v22 = raster.v;
-    }
-    
-    dist = triangulate(pt1[0], pt1[1], u21, v21);
-//    if (dist < 0)
-//    {
-//        cout << y << " " << x << "    " << dist << " " << disparity << endl;
-//        cout << pt1.transpose() << "   " << u21  << " " << v21 << endl;
-//    }
-    if (dist > MIN_DEPTH)
-    {
-        double d2 = triangulate(pt1[0], pt1[1], u22, v22);
-        
-        if (d2 > MIN_DEPTH)
-        {
-            sigma = abs(d2 - dist) * SIGMA_COEFF;
-            return true;
-        }
-    }
-    //if any of triangulations is not computed
-    dist = OUT_OF_RANGE;
-    sigma = OUT_OF_RANGE;
-    return false;
-}
-
-double EnhancedSGM::computeDepth(int x, int y, int h)
-{
-    if (params.verbosity > 3) cout << "EnhancedSGM::computeDepth(int x, int y, int h)" << endl;
-    assert(not (params.hypMax == 1 and h > 0));
-    
-    int idx = getLinearIndex(x, y);
-    if (not maskVec[idx]) return 0;
-    int disparity = smallDisparity(y, x*params.hypMax + h);
-    if (disparity < 0) 
-    {
-        return OUT_OF_RANGE;
-    }
-    
-    // to compute point on the second image
-    int u2, v2;
-    if (params.useUVCache)
-    {
-        const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
-        u2 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
-        v2 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
-    }
-    else
-    {    
-        CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
-        raster.steps(disparity);
-        u2 = raster.u;
-        v2 = raster.v;
-    }
-    // point on the first image
-    const auto & pt1 = pointVec1[idx];
-    
-    return triangulate(pt1[0], pt1[1], u2, v2);
 }
 
 

@@ -73,7 +73,7 @@ int main(int argc, char** argv)
     
     EnhancedCamera cam1(params1.data()), cam2(params2.data());
     
-    EnhancedEpipolar epipolar(TleftRight, &cam1, &cam2, 2000);
+    EnhancedEpipolar epipolar(&cam1, &cam2, TleftRight, 2000);
     
     string fileName1, fileName2;
     
@@ -81,7 +81,7 @@ int main(int argc, char** argv)
     
     const int LENGTH = 5;
     //TODO fix the constructor to avoid NULL 
-    EpipolarDescriptor epipolarDescriptor(LENGTH, 3*LENGTH, NULL, {1, 2, 3, 5, 7, 9});
+    EpipolarDescriptor epipolarDescriptor(LENGTH, 3, {1, 2, 3, 5, 7, 9});
     StereoEpipoles epipoles(&cam1, &cam2, TleftRight);
     
     while(getline(paramFile, fileName1))

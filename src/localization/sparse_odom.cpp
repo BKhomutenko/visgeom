@@ -28,7 +28,7 @@ Relative camera pose estimation based on photometric error and depth map
 
 #include "geometry/geometry.h"
 #include "projection/generic_camera.h"
-#include "reconstruction/stereo_misc.h"
+#include "reconstruction/triangulator.h"
 #include "localization/local_cost_functions.h"
     
 void SparseOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
@@ -193,7 +193,7 @@ void SparseOdometry::ransacFivePoint(const Vector3dVec & cloud1,
         
         vector<double> lambdaVec(cloud1.size());
         xiOut = xiBaseCam.inverseCompose(xiOut).compose(xiBaseCam);
-        triangulateRegular(xiOut, cloud1, cloud2, lambdaVec.data());
+        Triangulator(xiOut).computeRegular(cloud1, cloud2, lambdaVec.data());
         Vector3dVec cloudScaled;
         cloudScaled.reserve(cloud1.size());
         for (int i = 0; i < cloud1.size(); i++)

@@ -30,7 +30,7 @@ Cost functions for localization based on photometric data and mutual information
 #include "geometry/geometry.h"
 #include "projection/generic_camera.h"
 #include "projection/jacobian.h"
-#include "reconstruction/stereo_misc.h"
+#include "reconstruction/triangulator.h"
 
 /*
 A cost function with analytic jacobian
@@ -432,14 +432,15 @@ bool SparseReprojectCost::Evaluate(double const * const * params,
     //compute the points in the camera frame
     vector<double> lambdaVec(_xVec1.size());
     vector<double> jacVec;
+    Triangulator triangulator(xi12);
     if (jacobian != NULL and jacobian[0] != NULL) 
     {
         jacVec.resize(_xVec1.size() * 6);
-        triangulateRegular(xi12, _xVec1, _xVec2, lambdaVec.data(), NULL, jacVec.data(), NULL);
+        triangulator.computeRegular(_xVec1, _xVec2, lambdaVec.data(), NULL, jacVec.data(), NULL);
     }
     else
     {
-        triangulateRegular(xi12, _xVec1, _xVec2, lambdaVec.data());
+        triangulator.computeRegular(_xVec1, _xVec2, lambdaVec.data());
     }
     
     Vector3dVec xVec2 =_xVec1;

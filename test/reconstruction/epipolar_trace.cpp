@@ -178,7 +178,7 @@ int main(int argc, char** argv)
     
     epipolarDescriptor = new EpipolarDescriptor(LENGTH, 10, {1, 2});
     epipoles = new StereoEpipoles(cam1, cam2, TleftRight);
-    epipolar = new EnhancedEpipolar(TleftRight, cam1, cam2, 2000);
+    epipolar = new EnhancedEpipolar(cam1, cam2, TleftRight, 2000);
     
     string fileName1, fileName2;
     

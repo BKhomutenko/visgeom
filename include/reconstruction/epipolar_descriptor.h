@@ -35,19 +35,10 @@ NOTE:
 class EpipolarDescriptor
 {
 public:
-    //FIXME remove the old constructor
-    EpipolarDescriptor(int length, int waveThresh, const int * wave, vector<int> stepVec) :
-            LENGTH(length),
-            HALF_LENGTH(length / 2),
-            WAVE_THRESH(waveThresh*LENGTH),
-            wavePtr(wave),
-            samplingStepVec(stepVec) {}
-     
     EpipolarDescriptor(int length, int waveThresh, vector<int> stepVec) :
             LENGTH(length),
             HALF_LENGTH(length / 2),
             WAVE_THRESH(waveThresh*LENGTH),
-            wavePtr(NULL),
             samplingStepVec(stepVec) {}   
                 
     // return: the sampling step
@@ -94,7 +85,6 @@ private:
     const int LENGTH;
     const int HALF_LENGTH;
     const int WAVE_THRESH;
-    const int * const wavePtr;
     vector<int> samplingStepVec;
 };
 

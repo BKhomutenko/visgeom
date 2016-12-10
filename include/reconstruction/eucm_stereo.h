@@ -32,7 +32,9 @@ NOTE:
 #include "projection/eucm.h"
 
 #include "reconstruction/scale_parameters.h"
-#include "reconstruction/stereo_misc.h"
+#include "reconstruction/triangulator.h"
+#include "reconstruction/epipoles.h"
+#include "reconstruction/eucm_epipolar.h"
 
 struct StereoParameters : public ScaleParameters
 {
@@ -51,9 +53,14 @@ struct StereoParameters : public ScaleParameters
     int flawCost = 7;
 };
 
-//TODO separate the triangulation from this class
-//TODO change EnhancedCamera to ICamera
-//TODO move epipolar curves and epipoles here
+/*
+dynamic algorithm for descriptor comparison
+
+returns a verctor of costs for each possible disparity value
+*/
+vector<int> compareDescriptor(const vector<uint8_t> & desc,
+        const vector<uint8_t> & sampleVec, int flawCost);
+
 class EnhancedStereo
 {
 public:
@@ -64,7 +71,7 @@ public:
             params(parameters),
             camera1(cam1->clone()),
             camera2(cam2->clone()),
-            Transform12(1, 0, 0, 0, 0, 0)
+            epipolarCurves(NULL)
     { 
     }
     
@@ -74,19 +81,48 @@ public:
         camera1 = NULL;
         delete camera2;
         camera2 = NULL;
+        clearEpipolar();
     }
     
-    void setTransformation(const Transformation<double> & T12) { Transform12 = T12; }
     
-    bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X) const;
+    void setTransformation(const Transf & T12) 
+    {
+        transf12 = T12; 
+        triangulator.setTransformation(T12);
+        clearEpipolar();
+        epipolarCurves = new EnhancedEpipolar(camera1, camera2, T12, 2000, params.verbosity - 1);
+        epipoles = StereoEpipoles(camera1, camera2, T12);
+    }
     
-    // returns the distance between corresponding camera and the point
+    const Transf & transf() const { return transf12; }
+    
+//    bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X) const;
+    
     double triangulate(double u1, double v1, double u2, double v2, CameraIdx camIdx = CAMERA_1) const;
     
-protected:
-    StereoParameters params;
+    bool triangulate(const double u1, const double v1, const double u21, const double v21,
+            const double u22, const double v22, double & d, double & sigma,
+            CameraIdx camIdx = CAMERA_1) const;
     
-    Transformation<double> Transform12;  // pose of camera 2 wrt camera 1
+protected:
+
+    void clearEpipolar()
+    {
+        if (epipolarCurves != NULL)
+        {
+            delete epipolarCurves;
+            epipolarCurves = NULL;
+        }
+    }
+    
+    EnhancedEpipolar * epipolarCurves;
+    StereoEpipoles epipoles;
+    
+    StereoParameters params;
     EnhancedCamera *camera1, *camera2;
+    
+private:
+    Triangulator triangulator;
+    Transf transf12;  // pose of camera 2 wrt camera 1
 };
 

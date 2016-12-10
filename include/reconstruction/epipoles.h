@@ -32,7 +32,11 @@ Computes and keeps the epipoles or aniepipoles
 class StereoEpipoles
 {
 public:
-    StereoEpipoles(const ICamera * camera1, const ICamera * camera2, const Transformation<double> & Transform12)
+
+    StereoEpipoles() {}
+    
+    StereoEpipoles(const ICamera * camera1, const ICamera * camera2,
+            const Transf & Transform12)
     {
         if (camera1->projectPoint(Transform12.trans(), epipole1))
         {
@@ -53,11 +57,9 @@ public:
             camera2->projectPoint(-Transform12.transInv(), epipole2);
             epipoleInverted2 = true;
         }
-        cout << "Epipoles' inversion " << epipoleInverted1 << " " << epipoleInverted2 << endl;
         
         epipolePx1 = round(epipole1);
         epipolePx2 = round(epipole2);
-        cout << "Epipoles : " << epipolePx1.transpose() << " " << epipolePx2.transpose() << endl;
     
     }
     
