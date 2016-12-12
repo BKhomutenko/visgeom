@@ -89,7 +89,6 @@ public:
         transf12 = T12; 
         triangulator.setTransformation(T12);
         epipolarCurves.setTransformation(T12);
-        epipoles = StereoEpipoles(camera1, camera2, T12);
     }
     
     const Transf & transf() const { return transf12; }
@@ -102,11 +101,11 @@ public:
             const double u22, const double v22, double & d, double & sigma,
             CameraIdx camIdx = CAMERA_1) const;
     
+    const StereoEpipoles & epipoles() const { return epipolarCurves.getEpipoles(); }
+    
 protected:
     
     EnhancedEpipolar epipolarCurves;
-    
-    StereoEpipoles epipoles;
     
     StereoParameters params;
     

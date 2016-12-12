@@ -62,7 +62,7 @@ public:
         initialize();
     }
     
-    ~EnhancedEpipolar()
+    virtual ~EnhancedEpipolar()
     {
         delete camera1;
         camera1 = NULL;
@@ -86,6 +86,8 @@ public:
     void traceEpipolarLine(int u, int v, Mat & out, CameraIdx camIdx, int count = 150) const;
     
     void initialize();
+    
+    const StereoEpipoles & getEpipoles() const { return epipoles; }
     
 private:
     

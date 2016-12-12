@@ -86,7 +86,16 @@ public:
     void computeDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
     
     void validateDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
-       
+    
+    
+    //do it point by point to make it possible to use the same function to project forward
+    void matchNoPrior();
+    
+    void matchWithPrior();
+    
+    //check the points' descriptors and select the good ones
+    void selectPoints();
+           
 private:
     
     // based on the image gradient
