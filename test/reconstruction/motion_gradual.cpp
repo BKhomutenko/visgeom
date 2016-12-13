@@ -74,9 +74,7 @@ int main(int argc, char** argv)
 
     
     
-    MotionStereoParameters stereoParams;
-    stereoParams.verbosity = 1;
-    stereoParams.descLength = 5;
+    
     
     SGMParameters stereoParams2;
     stereoParams2.salientPoints = false;
@@ -87,8 +85,7 @@ int main(int argc, char** argv)
     paramFile >> stereoParams2.v0;
     paramFile >> stereoParams2.dispMax;
     paramFile >> stereoParams2.scale;
-    stereoParams.descLength = (stereoParams2.scale / 2 + 1) * 2 + 1;
-    stereoParams.dispMax = 6;
+    
     paramFile.ignore();
     string imageDir;
     getline(paramFile, imageDir);
@@ -112,6 +109,11 @@ int main(int argc, char** argv)
     EnhancedCamera camera(params.data());
     DepthMap depth;
     depth.setDefault();
+    
+    MotionStereoParameters stereoParams(stereoParams2);
+    stereoParams.verbosity = 1;
+    stereoParams.descLength = 5;
+    stereoParams.dispMax = 10;
     
     MotionStereo stereo(&camera, &camera, stereoParams);
     stereo.setBaseImage(img1);
@@ -155,9 +157,8 @@ int main(int argc, char** argv)
 
 //        depth.setDefault();
         timer.reset();
-        DepthMap depth2 = depth;
-        stereo.validateDepth(TleftRight, img2, depth2);
-        depth.merge(depth2);
+        DepthMap depth2 = stereo.compute(TleftRight, img2, depth);
+        depth = depth2;
         cout << timer.elapsed() << endl; 
         depth.toInverseMat(res);
         depth.sigmaToMat(sigmaRes);

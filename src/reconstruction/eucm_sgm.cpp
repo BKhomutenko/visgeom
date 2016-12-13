@@ -32,18 +32,18 @@ Semi-global block matching algorithm for non-rectified images
 
 CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser1(int idx) const
 {
-    Vector2i pt = pointPxVec1[idx];
+    Vector2i pt = _pointPxVec1[idx];
     CurveRasterizer<int, Polynomial2> raster(pt, epipoles().getFirstPx(),
-                                            epipolarCurves.getFirst(reconstVec[idx]));
+                                            _epipolarCurves.getFirst(_reconstVec[idx]));
     if (epipoles().firstIsInverted()) raster.setStep(-1);
     return raster;
 }
 
 CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser2(int idx) const
 {
-    Vector2i pinfPx = pinfPxVec[idx];
-    CurveRasterizer<int, Polynomial2> raster(pinfPx, epipoles().getSecondPx(),
-             epipolarCurves.getSecond(reconstVec[idx]));
+    Vector2i _pinfPx = _pinfPxVec[idx];
+    CurveRasterizer<int, Polynomial2> raster(_pinfPx, epipoles().getSecondPx(),
+             _epipolarCurves.getSecond(_reconstVec[idx]));
     if (epipoles().secondIsInverted()) raster.setStep(-1);
     return raster;
 }
@@ -51,52 +51,52 @@ CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser2(int idx) cons
 //TODO reconstruct the depth points, not everything
 void EnhancedSGM::computeReconstructed()
 {
-    pointVec1.reserve(params.yMax*params.xMax);
-    pointPxVec1.reserve(params.yMax*params.xMax);
-    for (int y = 0; y < params.yMax; y++)
+    _pointVec1.reserve(_params.yMax*_params.xMax);
+    _pointPxVec1.reserve(_params.yMax*_params.xMax);
+    for (int y = 0; y < _params.yMax; y++)
     {
-        for (int x = 0; x < params.xMax; x++)
+        for (int x = 0; x < _params.xMax; x++)
         {
-            pointVec1.emplace_back(params.uConv(x), params.vConv(y));
-            pointPxVec1.emplace_back(params.uConv(x), params.vConv(y));
+            _pointVec1.emplace_back(_params.uConv(x), _params.vConv(y));
+            _pointPxVec1.emplace_back(_params.uConv(x), _params.vConv(y));
         }
     }
-    camera1->reconstructPointCloud(pointVec1, reconstVec, maskVec);
+    _camera1->reconstructPointCloud(_pointVec1, _reconstVec, _maskVec);
 }
 
 void EnhancedSGM::computeRotated()
 {
-    transf().inverseRotate(reconstVec, reconstRotVec);
+    transf().inverseRotate(_reconstVec, _reconstRotVec);
 }
 
-//FIXME maskVec must be recomputed to discard not projected pInf
+//FIXME _maskVec must be recomputed to discard not projected pInf
 void EnhancedSGM::computePinf()
 {
-    camera2->projectPointCloud(reconstRotVec, pinfVec);
-    pinfPxVec.resize(pinfVec.size());
-    for (int i = 0; i < pinfVec.size(); i++)
+    _camera2->projectPointCloud(_reconstRotVec, _pinfVec);
+    _pinfPxVec.resize(_pinfVec.size());
+    for (int i = 0; i < _pinfVec.size(); i++)
     {
-        if (not maskVec[i]) continue;
-        pinfPxVec[i] = round(pinfVec[i]);
+        if (not _maskVec[i]) continue;
+        _pinfPxVec[i] = round(_pinfVec[i]);
     }
 }
 
 void EnhancedSGM::computeUVCache()
 {
-    for (int y = 0; y < params.yMax; y++)
+    for (int y = 0; y < _params.yMax; y++)
     {
-        for (int x = 0; x < params.xMax; x++)
+        for (int x = 0; x < _params.xMax; x++)
         {
             int idx = getLinearIndex(x, y);
             CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
             raster.steps(-DISPARITY_MARGIN);
-            const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
-            int32_t * uPtr = (int32_t *)uCache.row(y).data + x*uvCacheStep;
-            int32_t * vPtr = (int32_t *)vCache.row(y).data + x*uvCacheStep;
-            for (int i = 0; i  < uvCacheStep; i++, raster.step(), uPtr++, vPtr++)
+            const int u_vCacheStep = _params.dispMax + 2 * DISPARITY_MARGIN;
+            int32_t * uPtr = (int32_t *)_uCache.row(y).data + x*u_vCacheStep;
+            int32_t * vPtr = (int32_t *)_vCache.row(y).data + x*u_vCacheStep;
+            for (int i = 0; i  < u_vCacheStep; i++, raster.step(), uPtr++, vPtr++)
             {
-                if (raster.v < 0 or raster.v >= params.vMax 
-                    or raster.u < 0 or raster.u >= params.uMax)
+                if (raster.v < 0 or raster.v >= _params.vMax 
+                    or raster.u < 0 or raster.u >= _params.uMax)
                 {
                     // coordinate is out of the image
                     *uPtr = -1;
@@ -115,23 +115,23 @@ void EnhancedSGM::computeUVCache()
 
 void EnhancedSGM::createBuffer()
 {
-    if (params.verbosity > 1) cout << "EnhancedSGM::createBuffer" << endl;
-    assert(params.hypMax > 0);
-    int bufferWidth = params.xMax*params.dispMax;
-    errorBuffer.create(params.yMax, bufferWidth);
-    tableauLeft.create(params.yMax, bufferWidth);
-    tableauRight.create(params.yMax, bufferWidth);
-    tableauTop.create(params.yMax, bufferWidth);
-    tableauBottom.create(params.yMax, bufferWidth);
-    smallDisparity.create(params.yMax, params.xMax * params.hypMax);
-    finalErrorMat.create(params.yMax, params.xMax * params.hypMax);
-    if (params.imageBasedCost) costBuffer.create(params.yMax, params.xMax);
-    if (params.salientPoints) salientBuffer.create(params.yMax, params.xMax);
-    uCache.create(params.yMax, params.xMax * (params.dispMax + 2*DISPARITY_MARGIN));
-    vCache.create(params.yMax, params.xMax * (params.dispMax + 2*DISPARITY_MARGIN));
-    if (params.verbosity > 2) 
+    if (_params.verbosity > 1) cout << "EnhancedSGM::createBuffer" << endl;
+    assert(_params.hypMax > 0);
+    int bufferWidth = _params.xMax*_params.dispMax;
+    _errorBuffer.create(_params.yMax, bufferWidth);
+    _tableauLeft.create(_params.yMax, bufferWidth);
+    _tableauRight.create(_params.yMax, bufferWidth);
+    _tableauTop.create(_params.yMax, bufferWidth);
+    _tableauBottom.create(_params.yMax, bufferWidth);
+    _smallDisparity.create(_params.yMax, _params.xMax * _params.hypMax);
+    _finalErrorMat.create(_params.yMax, _params.xMax * _params.hypMax);
+    if (_params.imageBasedCost) _costBuffer.create(_params.yMax, _params.xMax);
+    if (_params.salientPoints) _salientBuffer.create(_params.yMax, _params.xMax);
+    _uCache.create(_params.yMax, _params.xMax * (_params.dispMax + 2*DISPARITY_MARGIN));
+    _vCache.create(_params.yMax, _params.xMax * (_params.dispMax + 2*DISPARITY_MARGIN));
+    if (_params.verbosity > 2) 
     {
-        cout << "    small disparity size: " << smallDisparity.size() << endl;
+        cout << "    small disparity size: " << _smallDisparity.size() << endl;
     }
 }
 
@@ -141,7 +141,7 @@ void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap
     
     computeDynamicProgramming();
     
-    if (params.hypMax == 1) reconstructDisparity();
+    if (_params.hypMax == 1) reconstructDisparity();
     else reconstructDisparityMH();
     
     reconstructDepth(depth);    
@@ -150,49 +150,49 @@ void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap
 
 void EnhancedSGM::reconstructDepth(DepthMap & depth) const
 {
-    if (params.verbosity > 2) 
+    if (_params.verbosity > 2) 
     {
         cout << "EnhancedSGM::reconstructDepth(DepthMap & depth)" << endl;
     }
-    depth = DepthMap(camera1, params, params.hypMax);
-    for (int h = 0; h < params.hypMax; h++)
+    depth = DepthMap(_camera1, _params, _params.hypMax);
+    for (int h = 0; h < _params.hypMax; h++)
     {
-        for (int y = 0; y < params.yMax; y++)
+        for (int y = 0; y < _params.yMax; y++)
         {
-            for (int x = 0; x < params.xMax; x++)
+            for (int x = 0; x < _params.xMax; x++)
             {
-                if (params.salientPoints and not salientBuffer(y, x)) 
+                if (_params.salientPoints and not _salientBuffer(y, x)) 
                 {
                     depth.at(x, y, h) = OUT_OF_RANGE;
                     depth.sigma(x, y, h) = OUT_OF_RANGE;
                     depth.cost(x, y, h) = OUT_OF_RANGE;
                     continue;
                 }
-                depth.cost(x, y, h) = errorBuffer(y, x*params.dispMax + h);
+                depth.cost(x, y, h) = _errorBuffer(y, x*_params.dispMax + h);
                 
                 int idx = getLinearIndex(x, y);
-                if (not maskVec[idx])
+                if (not _maskVec[idx])
                 { 
                     depth.at(x, y, h) = OUT_OF_RANGE;
                     depth.sigma(x, y, h) = OUT_OF_RANGE;
                     depth.cost(x, y, h) = OUT_OF_RANGE;
                     continue;
                 }
-                int disparity = smallDisparity(y, x*params.hypMax + h);
+                int disparity = _smallDisparity(y, x*_params.hypMax + h);
                 
                 // point on the first image
-                const auto & pt1 = pointVec1[idx];
+                const auto & pt1 = _pointVec1[idx];
                 
                 // to compute point on the second image
                 // TODO make virtual rasterizer using the cache
                 int u21, v21, u22, v22;
-                if (params.useUVCache)
+                if (_params.useUVCache)
                 {
-                    const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
-                    u21 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
-                    u22 = uCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity + 1);
-                    v21 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity);
-                    v22 = vCache(y, x*uvCacheStep + DISPARITY_MARGIN + disparity + 1);
+                    const int u_vCacheStep = _params.dispMax + 2 * DISPARITY_MARGIN;
+                    u21 = _uCache(y, x*u_vCacheStep + DISPARITY_MARGIN + disparity);
+                    u22 = _uCache(y, x*u_vCacheStep + DISPARITY_MARGIN + disparity + 1);
+                    v21 = _vCache(y, x*u_vCacheStep + DISPARITY_MARGIN + disparity);
+                    v22 = _vCache(y, x*u_vCacheStep + DISPARITY_MARGIN + disparity + 1);
                 }
                 else
                 {       
@@ -215,80 +215,76 @@ void EnhancedSGM::reconstructDepth(DepthMap & depth) const
 
 void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 {
-    if (params.verbosity > 0) cout << "EnhancedSGM::computeCurveCost" << endl;
+    if (_params.verbosity > 0) cout << "EnhancedSGM::computeCurveCost" << endl;
     
-    
-    const int HALF_LENGTH = getHalfLength();
-    const int LENGTH = HALF_LENGTH * 2 + 1;
     // compute the weights for matching cost
-    EpipolarDescriptor epipolarDescriptor(LENGTH, 3, {1, 2, 4, 8});
     
-    if (params.salientPoints) salientBuffer.setTo(0);
+    if (_params.salientPoints) _salientBuffer.setTo(0);
     
-    for (int y = 0; y < params.yMax; y++)
+    for (int y = 0; y < _params.yMax; y++)
     {
-        for (int x = 0; x < params.xMax; x++)
+        for (int x = 0; x < _params.xMax; x++)
         {
             int idx = getLinearIndex(x, y);
-            if (params.verbosity > 4) 
+            if (_params.verbosity > 4) 
             {
                 cout << "    x: " << x << " y: " << y << "  idx: " << idx; 
-                cout << "  mask: " << maskVec[idx] <<  endl;
+                cout << "  mask: " << _maskVec[idx] <<  endl;
             }
-            if (not maskVec[idx])
+            if (not _maskVec[idx])
             {
-                uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;            
+                uint8_t * outPtr = _errorBuffer.row(y).data + x*_params.dispMax;            
                 *outPtr = 0;
-                fill(outPtr + 1, outPtr + params.dispMax, 255);
+                fill(outPtr + 1, outPtr + _params.dispMax, 255);
                 continue;
             }
             // compute the local image descriptor,
             // a piece of the epipolar curve on the first image
             vector<uint8_t> descriptor;
             CurveRasterizer<int, Polynomial2> descRaster = getCurveRasteriser1(idx);
-            const int step = epipolarDescriptor.compute(img1, descRaster, descriptor);
+            const int step = _epipolarDescriptor.compute(img1, descRaster, descriptor);
             if (step < 1) 
             {
                 //TODO make a function
-                uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;            
+                uint8_t * outPtr = _errorBuffer.row(y).data + x*_params.dispMax;            
                 *outPtr = 0;
-                fill(outPtr + 1, outPtr + params.dispMax, 255);
+                fill(outPtr + 1, outPtr + _params.dispMax, 255);
                 continue;
             }
-            if (params.imageBasedCost) 
+            if (_params.imageBasedCost) 
             {
                 switch (step)
                 {
                 case 1:
-                    costBuffer(y, x) = params.lambdaJump;
+                    _costBuffer(y, x) = _params.lambdaJump;
                     break;
                 case 2:
-                    costBuffer(y, x) = params.lambdaJump * 3;
+                    _costBuffer(y, x) = _params.lambdaJump * 3;
                     break;
                 default:
-                    costBuffer(y, x) = params.lambdaJump * 6;
+                    _costBuffer(y, x) = _params.lambdaJump * 6;
                     break;
                 }
             }
             
             //TODO revise the criterion (step == 1)
-            if (params.salientPoints and step <= 2)
+            if (_params.salientPoints and step <= 2)
             {
-                salientBuffer(y, x) = 1;
+                _salientBuffer(y, x) = 1;
             }
-            const int nSteps = ( params.dispMax  + step - 1 ) / step; 
+            const int nSteps = ( _params.dispMax  + step - 1 ) / step; 
                
             //sample the curve 
-            vector<uint8_t> sampleVec(nSteps + LENGTH - 1, 0);
+            vector<uint8_t> sampleVec(nSteps + MARGIN, 0);
             
-            if (params.useUVCache)
+            if (_params.useUVCache)
             {
-                const int uvCacheStep = params.dispMax + 2 * DISPARITY_MARGIN;
-                int32_t * uPtr = (int32_t *)uCache.row(y).data + x*uvCacheStep;
-                int32_t * vPtr = (int32_t *)vCache.row(y).data + x*uvCacheStep;
+                const int u_vCacheStep = _params.dispMax + 2 * DISPARITY_MARGIN;
+                int32_t * uPtr = (int32_t *)_uCache.row(y).data + x*u_vCacheStep;
+                int32_t * vPtr = (int32_t *)_vCache.row(y).data + x*u_vCacheStep;
                 uPtr += DISPARITY_MARGIN - HALF_LENGTH * step;
                 vPtr += DISPARITY_MARGIN - HALF_LENGTH * step;
-                for (int i = 0; i  < nSteps + LENGTH - 1; i++, uPtr += step, vPtr += step)
+                for (int i = 0; i  < nSteps + MARGIN; i++, uPtr += step, vPtr += step)
                 {
                     if (*uPtr < 0 or *vPtr < 0) sampleVec[i] = 0;
                     else sampleVec[i] = img2(*vPtr, *uPtr);
@@ -300,14 +296,14 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 raster.setStep(step); 
                 raster.steps(-HALF_LENGTH);           
                 
-                for (int i = 0; i  < nSteps + LENGTH - 1; i++, raster.step())
+                for (int i = 0; i  < nSteps + MARGIN; i++, raster.step())
                 {
                     if (raster.v < 0 or raster.v >= img2.rows 
                         or raster.u < 0 or raster.u >= img2.cols) sampleVec[i] = 0;
                     else sampleVec[i] = img2(raster.v, raster.u);
                 }
             }
-            vector<int> costVec = compareDescriptor(descriptor, sampleVec, params.flawCost);
+            vector<int> costVec = compareDescriptor(descriptor, sampleVec, _params.flawCost);
             if (y == 350 and x > 469 and x < 481)
             {
                 cout << "Point : " << x << " " << y << endl;
@@ -336,20 +332,20 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 //            int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
             
             // fill up the cost buffer
-            uint8_t * outPtr = errorBuffer.row(y).data + x*params.dispMax;
+            uint8_t * outPtr = _errorBuffer.row(y).data + x*_params.dispMax;
             auto costIter = costVec.begin() + HALF_LENGTH;
             for (int d = 0; d < nSteps; d++, outPtr += step)
             {
 //                int sum2 = filter(kernelVec.begin(), kernelVec.end(), sampleVec.begin() + d, 0);
-//                int bias = min(params.maxBias, max(-params.maxBias, (sum2 - sum1) / LENGTH));
+//                int bias = min(_params.maxBias, max(-_params.maxBias, (sum2 - sum1) / LENGTH));
 //                int acc =  biasedAbsDiff(kernelVec.begin(), kernelVec.end(),
 //                                descriptor.begin(), sampleVec.begin() + d, bias);
 //                *outPtr = acc / NORMALIZER;
 
-                *outPtr = *costIter / LENGTH;
+                *outPtr = *costIter / _params.descLength;
                 ++costIter;
             }
-            if (step > 1) fillGaps(errorBuffer.row(y).data + x*params.dispMax, step);
+            if (step > 1) fillGaps(_errorBuffer.row(y).data + x*_params.dispMax, step);
         }
     }
 }
@@ -362,13 +358,13 @@ void EnhancedSGM::fillGaps(uint8_t * const data, const int step)
     switch (step)
     {
     case 2:
-        for (base = 2; base < params.dispMax; base += 2)
+        for (base = 2; base < _params.dispMax; base += 2)
         {
             data[base - 1] = (data[base - 2] + data[base]) / 2;
         }
         break;
     case 3:
-        for (base = 3; base < params.dispMax; base += 3)
+        for (base = 3; base < _params.dispMax; base += 3)
         {
             const uint8_t & val1 = data[base - 3];
             const uint8_t & val2 = data[base];
@@ -377,7 +373,7 @@ void EnhancedSGM::fillGaps(uint8_t * const data, const int step)
         }
         break;
     default:
-        for (base = step; base < params.dispMax; base += step)
+        for (base = step; base < _params.dispMax; base += step)
         {
             const uint8_t & val1 = data[base - step];
             const uint8_t & val2 = data[base];
@@ -391,7 +387,7 @@ void EnhancedSGM::fillGaps(uint8_t * const data, const int step)
     //for the rest just constant extrapolation
     base -= step;
     const uint8_t & val = data[base];
-    for (int i = base + 1 ; i < params.dispMax; i++)
+    for (int i = base + 1 ; i < _params.dispMax; i++)
     {
         data[i] = val;
     }
@@ -400,100 +396,100 @@ void EnhancedSGM::fillGaps(uint8_t * const data, const int step)
 void EnhancedSGM::computeDynamicStep(const int32_t* inCost, const uint8_t * error, int32_t * outCost)
 {
     int bestCost = inCost[0];
-    for (int i = 1; i < params.dispMax; i++)
+    for (int i = 1; i < _params.dispMax; i++)
     {
         bestCost = min(bestCost, inCost[i]);
     }
     int & val0 = outCost[0];
     val0 = inCost[0];
-    val0 = min(val0, inCost[1] + params.lambdaStep);
-    val0 = min(val0, bestCost + jumpCost);
+    val0 = min(val0, inCost[1] + _params.lambdaStep);
+    val0 = min(val0, bestCost + _jumpCost);
     val0 += error[0];
-    for (int i = 1; i < params.dispMax-1; i++)
+    for (int i = 1; i < _params.dispMax-1; i++)
     {
         int & val = outCost[i];
         val = inCost[i];
-        val = min(val, inCost[i + 1] + params.lambdaStep);
-        val = min(val, inCost[i - 1] + params.lambdaStep);
-        val = min(val, bestCost + jumpCost);
+        val = min(val, inCost[i + 1] + _params.lambdaStep);
+        val = min(val, inCost[i - 1] + _params.lambdaStep);
+        val = min(val, bestCost + _jumpCost);
         val += error[i];
     }
-    int & vald = outCost[params.dispMax - 1];
-    vald = inCost[params.dispMax - 1];
-    vald = min(vald, inCost[params.dispMax - 2] + params.lambdaStep);
-    vald = min(vald, bestCost + jumpCost);
-    vald += error[params.dispMax - 1];
+    int & vald = outCost[_params.dispMax - 1];
+    vald = inCost[_params.dispMax - 1];
+    vald = min(vald, inCost[_params.dispMax - 2] + _params.lambdaStep);
+    vald = min(vald, bestCost + _jumpCost);
+    vald += error[_params.dispMax - 1];
 }
 
 void EnhancedSGM::computeDynamicProgramming()
 {
-    if (params.verbosity > 0) cout << "EnhancedSGM::computeDynamicProgramming" << endl;
-    if (params.verbosity > 1) cout << "    left" << endl;
+    if (_params.verbosity > 0) cout << "EnhancedSGM::computeDynamicProgramming" << endl;
+    if (_params.verbosity > 1) cout << "    left" << endl;
     
-    if (not params.imageBasedCost) jumpCost = params.lambdaJump;
+    if (not _params.imageBasedCost) _jumpCost = _params.lambdaJump;
     
-    // left tableau init
-    for (int y = 0; y < params.yMax; y++)
+    // left _tableau init
+    for (int y = 0; y < _params.yMax; y++)
     {
-        int32_t * tableauRow = (int32_t *)(tableauLeft.row(y).data);
-        uint8_t * errorRow = errorBuffer.row(y).data;
+        int32_t * _tableauRow = (int32_t *)(_tableauLeft.row(y).data);
+        uint8_t * errorRow = _errorBuffer.row(y).data;
         // init the first row
-        copy(errorRow, errorRow + params.dispMax, tableauRow);
-        // fill up the tableau
-        for (int x = 1; x < params.xMax; x++)
+        copy(errorRow, errorRow + _params.dispMax, _tableauRow);
+        // fill up the _tableau
+        for (int x = 1; x < _params.xMax; x++)
         {
-            if (params.imageBasedCost) jumpCost = costBuffer(y, x);
-            computeDynamicStep(tableauRow + (x - 1)*params.dispMax,
-                    errorRow + x*params.dispMax, tableauRow + x*params.dispMax);
+            if (_params.imageBasedCost) _jumpCost = _costBuffer(y, x);
+            computeDynamicStep(_tableauRow + (x - 1)*_params.dispMax,
+                    errorRow + x*_params.dispMax, _tableauRow + x*_params.dispMax);
         }
     }
-    if (params.verbosity > 1) cout << "    right" << endl;  
-    // right tableau init
-    for (int y = 0; y < params.yMax; y++)
+    if (_params.verbosity > 1) cout << "    right" << endl;  
+    // right _tableau init
+    for (int y = 0; y < _params.yMax; y++)
     {
-        int32_t * tableauRow = (int32_t *)(tableauRight.row(y).data);
-        uint8_t * errorRow = errorBuffer.row(y).data;
-        int base = (params.xMax - 1) * params.dispMax;
-        copy(errorRow + base, errorRow + base + params.dispMax, tableauRow + base);
+        int32_t * _tableauRow = (int32_t *)(_tableauRight.row(y).data);
+        uint8_t * errorRow = _errorBuffer.row(y).data;
+        int base = (_params.xMax - 1) * _params.dispMax;
+        copy(errorRow + base, errorRow + base + _params.dispMax, _tableauRow + base);
         
-        for (int x = params.xMax - 2; x >= 0; x--)
+        for (int x = _params.xMax - 2; x >= 0; x--)
         {
-            if (params.imageBasedCost) jumpCost = costBuffer(y, x);
-            computeDynamicStep(tableauRow + (x + 1)*params.dispMax, 
-                    errorRow + x*params.dispMax, tableauRow + x*params.dispMax);
+            if (_params.imageBasedCost) _jumpCost = _costBuffer(y, x);
+            computeDynamicStep(_tableauRow + (x + 1)*_params.dispMax, 
+                    errorRow + x*_params.dispMax, _tableauRow + x*_params.dispMax);
         }
     }
-    if (params.verbosity > 1) cout << "    top" << endl;
-    // top-down tableau init
-    for (int x = 0; x < params.xMax; x++)
+    if (_params.verbosity > 1) cout << "    top" << endl;
+    // top-down _tableau init
+    for (int x = 0; x < _params.xMax; x++)
     {
-        auto tableauCol = tableauTop(Rect(x*params.dispMax, 0, params.dispMax, params.yMax));
-        auto errorCol = errorBuffer(Rect(x*params.dispMax, 0, params.dispMax, params.yMax));
-        copy(errorCol.data, errorCol.data + params.dispMax, (int*)(tableauCol.data));
-        for (int y = 1; y < params.yMax; y++)
+        auto _tableauCol = _tableauTop(Rect(x*_params.dispMax, 0, _params.dispMax, _params.yMax));
+        auto errorCol = _errorBuffer(Rect(x*_params.dispMax, 0, _params.dispMax, _params.yMax));
+        copy(errorCol.data, errorCol.data + _params.dispMax, (int*)(_tableauCol.data));
+        for (int y = 1; y < _params.yMax; y++)
         {
-            if (params.imageBasedCost) jumpCost = costBuffer(y, x);
-            computeDynamicStep((int32_t*)(tableauCol.row(y-1).data), 
+            if (_params.imageBasedCost) _jumpCost = _costBuffer(y, x);
+            computeDynamicStep((int32_t*)(_tableauCol.row(y-1).data), 
                     errorCol.row(y).data,
-                    (int32_t*)(tableauCol.row(y).data));
+                    (int32_t*)(_tableauCol.row(y).data));
         }
     }
-    if (params.verbosity > 1) cout << "    bottom" << endl;
-    // bottom-up tableau init
-    for (int x = 0; x < params.xMax; x++)
+    if (_params.verbosity > 1) cout << "    bottom" << endl;
+    // bottom-up _tableau init
+    for (int x = 0; x < _params.xMax; x++)
     {
-        auto tableauCol = tableauBottom(Rect(x*params.dispMax, 0, params.dispMax, params.yMax));
-        auto errorCol = errorBuffer(Rect(x*params.dispMax, 0, params.dispMax, params.yMax));
-        int vLast = params.yMax - 1;
+        auto _tableauCol = _tableauBottom(Rect(x*_params.dispMax, 0, _params.dispMax, _params.yMax));
+        auto errorCol = _errorBuffer(Rect(x*_params.dispMax, 0, _params.dispMax, _params.yMax));
+        int vLast = _params.yMax - 1;
         copy(errorCol.row(vLast).data, 
-                errorCol.row(vLast).data + params.dispMax, 
-                (int32_t*)(tableauCol.row(vLast).data));
-        for (int y = params.yMax - 2; y >= 0; y--)
+                errorCol.row(vLast).data + _params.dispMax, 
+                (int32_t*)(_tableauCol.row(vLast).data));
+        for (int y = _params.yMax - 2; y >= 0; y--)
         {
-            if (params.imageBasedCost) jumpCost = costBuffer(y, x);
-            computeDynamicStep((int32_t*)(tableauCol.row(y+1).data), 
+            if (_params.imageBasedCost) _jumpCost = _costBuffer(y, x);
+            computeDynamicStep((int32_t*)(_tableauCol.row(y+1).data), 
                     errorCol.row(y).data,
-                    (int32_t*)(tableauCol.row(y).data));
+                    (int32_t*)(_tableauCol.row(y).data));
         }
     }
     
@@ -501,32 +497,32 @@ void EnhancedSGM::computeDynamicProgramming()
 
 void EnhancedSGM::reconstructDisparity()
 {
-    if (params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparity" << endl;
+    if (_params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparity" << endl;
 //    int sizeAcc = 0;
 //    int sizeCount = 0;
-    for (int y = 0; y < params.yMax; y++)
+    for (int y = 0; y < _params.yMax; y++)
     {
-        int32_t* dynRow1 = (int32_t*)(tableauLeft.row(y).data);
-        int32_t* dynRow2 = (int32_t*)(tableauRight.row(y).data);
-        int32_t* dynRow3 = (int32_t*)(tableauTop.row(y).data);
-        int32_t* dynRow4 = (int32_t*)(tableauBottom.row(y).data);
-        uint8_t* errRow = errorBuffer.row(y).data;
-        for (int x = 0; x < params.xMax; x++)
+        int32_t* dynRow1 = (int32_t*)(_tableauLeft.row(y).data);
+        int32_t* dynRow2 = (int32_t*)(_tableauRight.row(y).data);
+        int32_t* dynRow3 = (int32_t*)(_tableauTop.row(y).data);
+        int32_t* dynRow4 = (int32_t*)(_tableauBottom.row(y).data);
+        uint8_t* errRow = _errorBuffer.row(y).data;
+        for (int x = 0; x < _params.xMax; x++)
         {
-            if (params.salientPoints and salientBuffer(y, x) == 0)
+            if (_params.salientPoints and _salientBuffer(y, x) == 0)
             {
-                smallDisparity(y, x) = -1;
+                _smallDisparity(y, x) = -1;
                 continue;
             }
-            int32_t & bestDisp = smallDisparity(y, x);
-            int32_t & bestCost = finalErrorMat(y, x);
+            int32_t & bestDisp = _smallDisparity(y, x);
+            int32_t & bestCost = _finalErrorMat(y, x);
             bestCost = INT32_MAX;
             bestDisp = -1;
-            for (int d = 0; d < params.dispMax; d++)
+            for (int d = 0; d < _params.dispMax; d++)
             {
-                int base = x * params.dispMax;
+                int base = x * _params.dispMax;
                 const int & err = errRow[base + d];
-                if (err > params.maxError) continue;
+                if (err > _params.maxError) continue;
                 int cost = dynRow1[base + d] + dynRow2[base + d] 
                         + dynRow3[base + d] + dynRow4[base + d] - 2*err;
                 if ( bestCost > cost)
@@ -535,32 +531,32 @@ void EnhancedSGM::reconstructDisparity()
                     bestCost = cost;
                 }
             }
-            if (params.verbosity > 4) cout << "    x: " << x << " best error: " << finalErrorMat(y, x) << endl;
+            if (_params.verbosity > 4) cout << "    x: " << x << " best error: " << _finalErrorMat(y, x) << endl;
         }
-        if (params.verbosity > 3) cout << "    y: " << y << endl;
+        if (_params.verbosity > 3) cout << "    y: " << y << endl;
     }
 }
 
 void EnhancedSGM::reconstructDisparityMH()
 {
-    if (params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparityMH" << endl;
-    const int hypShift = params.xMax*params.yMax;
+    if (_params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparityMH" << endl;
+    const int hypShift = _params.xMax*_params.yMax;
 //    int sizeAcc = 0;
 //    int sizeCount = 0;
-    for (int y = 0; y < params.yMax; y++)
+    for (int y = 0; y < _params.yMax; y++)
     {
-        int32_t* dynRow1 = (int32_t*)(tableauLeft.row(y).data);
-        int32_t* dynRow2 = (int32_t*)(tableauRight.row(y).data);
-        int32_t* dynRow3 = (int32_t*)(tableauTop.row(y).data);
-        int32_t* dynRow4 = (int32_t*)(tableauBottom.row(y).data);
-        uint8_t* errRow = errorBuffer.row(y).data;
-        for (int x = 0; x < params.xMax; x++)
+        int32_t* dynRow1 = (int32_t*)(_tableauLeft.row(y).data);
+        int32_t* dynRow2 = (int32_t*)(_tableauRight.row(y).data);
+        int32_t* dynRow3 = (int32_t*)(_tableauTop.row(y).data);
+        int32_t* dynRow4 = (int32_t*)(_tableauBottom.row(y).data);
+        uint8_t* errRow = _errorBuffer.row(y).data;
+        for (int x = 0; x < _params.xMax; x++)
         {
-            if (params.salientPoints and salientBuffer(y, x) == 0)
+            if (_params.salientPoints and _salientBuffer(y, x) == 0)
             {
-                for (int hypIdx = 0; hypIdx < params.hypMax; hypIdx++)
+                for (int hypIdx = 0; hypIdx < _params.hypMax; hypIdx++)
                 {
-                    smallDisparity(y, x * params.hypMax + hypIdx) = -1;
+                    _smallDisparity(y, x * _params.hypMax + hypIdx) = -1;
                 }
                 continue;
             }
@@ -570,9 +566,9 @@ void EnhancedSGM::reconstructDisparityMH()
             
             //compute the cost vector
 //            vector<int> costVec;
-//            costVec.reserve(params.dispMax);
-//            int base = x * params.dispMax;
-//            for (int d = 0; d < params.dispMax; d++)
+//            costVec.reserve(_params.dispMax);
+//            int base = x * _params.dispMax;
+//            for (int d = 0; d < _params.dispMax; d++)
 //            {
 //                costVec.push_back(dynRow1[base + d] + dynRow2[base + d] 
 //                            + dynRow3[base + d] + dynRow4[base + d] - 2*errRow[base + d]);
@@ -592,23 +588,23 @@ void EnhancedSGM::reconstructDisparityMH()
 //            sort(indexedCostVec.begin(), indexedCostVec.end());
             sizeAcc += indexedCostVec.size();
             sizeCount++;
-            partial_sort(indexedCostVec.begin(), indexedCostVec.begin() + params.hypMax, indexedCostVec.end());
+            partial_sort(indexedCostVec.begin(), indexedCostVec.begin() + _params.hypMax, indexedCostVec.end());
             for (int hypIdx = 0; hypIdx < minIdxVec.size(); hypIdx++)
             {
-                smallDisparity(y, x * params.hypMax + hypIdx) = indexedCostVec[hypIdx].second;
-                finalErrorMat(y, x * params.hypMax + hypIdx) = indexedCostVec[hypIdx].first;
+                _smallDisparity(y, x * _params.hypMax + hypIdx) = indexedCostVec[hypIdx].second;
+                _finalErrorMat(y, x * _params.hypMax + hypIdx) = indexedCostVec[hypIdx].first;
             }*/
-            for (int hypIdx = 0; hypIdx < params.hypMax; hypIdx++)
+            for (int hypIdx = 0; hypIdx < _params.hypMax; hypIdx++)
             {
-                int32_t & bestDisp = smallDisparity(y, x * params.hypMax + hypIdx);
-                int32_t & bestErr = finalErrorMat(y, x * params.hypMax + hypIdx);
+                int32_t & bestDisp = _smallDisparity(y, x * _params.hypMax + hypIdx);
+                int32_t & bestErr = _finalErrorMat(y, x * _params.hypMax + hypIdx);
                 bestErr = INT32_MAX;
                 bestDisp = -1;
                 int acc1 = -1, acc2 = -1, acc3 = -1;
-                for (int d = 0; d < params.dispMax; d++)
+                for (int d = 0; d < _params.dispMax; d++)
                 {
-                    int base = x * params.dispMax;
-                    if (errRow[base + d] > params.maxError) continue;
+                    int base = x * _params.dispMax;
+                    if (errRow[base + d] > _params.maxError) continue;
                     acc1 = acc2;
                     acc2 = acc3;
                     acc3 = dynRow1[base + d] + dynRow2[base + d] 
@@ -629,25 +625,25 @@ void EnhancedSGM::reconstructDisparityMH()
                     if ( bestErr > acc2 and ( acc2 > minCost or 
                             (acc2 == minCost and d2 != minCostDisp) ) )
                     {
-                        if (hypIdx > 0 and acc2 > minCost + params.maxHypDiff) continue;
+                        if (hypIdx > 0 and acc2 > minCost + _params.maxHypDiff) continue;
                         bestDisp = d2;
                         bestErr = acc2;
                     }
                 }
                 if (bestDisp == -1)
                 {
-                    for (int h2Idx = hypIdx + 1; h2Idx < params.hypMax; h2Idx++)
+                    for (int h2Idx = hypIdx + 1; h2Idx < _params.hypMax; h2Idx++)
                     {
-                        smallDisparity(y, x * params.hypMax + h2Idx) = -1;
+                        _smallDisparity(y, x * _params.hypMax + h2Idx) = -1;
                     } 
                     break;
                 }
                 minCost = bestErr;
                 minCostDisp = bestDisp;
             }
-            if (params.verbosity > 4) cout << "    x: " << x << " best error: " << finalErrorMat(y, x) << endl;
+            if (_params.verbosity > 4) cout << "    x: " << x << " best error: " << _finalErrorMat(y, x) << endl;
         }
-        if (params.verbosity > 3) cout << "    y: " << y << endl;
+        if (_params.verbosity > 3) cout << "    y: " << y << endl;
     }
 }
 

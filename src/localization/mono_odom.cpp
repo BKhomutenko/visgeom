@@ -99,7 +99,7 @@ void MonoOdometry::refineDepth(const Mat8u & imageNew)
     Transf xiCam12 = _xiBaseCam.inverseCompose(_xiLocal).compose(_xiBaseCam);
     double base = xiCam12.trans().norm();
     if (base < MIN_STEREO_BASE) return; 
-    motionStereo.validateDepth(xiCam12, imageNew, depthMap);
+    depthMap = motionStereo.compute(xiCam12, imageNew, depthMap);
     if (depthState == STATE_EMPTY and base > MIN_INIT_DIST) depthState = STATE_READY;
 }
     

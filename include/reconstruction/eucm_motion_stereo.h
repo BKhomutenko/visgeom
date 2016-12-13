@@ -34,10 +34,11 @@ Depth-from-motion class for semidense depth estimation
 #include "reconstruction/eucm_stereo.h"
 
 //TODO add errorMax threshold
-struct MotionStereoParameters : StereoParameters
+struct MotionStereoParameters : public StereoParameters
 {
-    int descLength = 5;
-    int gradientThresh = 3;
+    MotionStereoParameters() {}
+    MotionStereoParameters(const StereoParameters & stereoParams) : StereoParameters(stereoParams) {}
+    int gradientThresh = 2;
 };
 
 
@@ -45,9 +46,9 @@ class MotionStereo : private EnhancedStereo
 {
 public:
     MotionStereo(const EnhancedCamera * cam1, 
-        const EnhancedCamera * cam2, MotionStereoParameters parameters) :
-        EnhancedStereo(cam1, cam2, parameters),
-        params(parameters)
+        const EnhancedCamera * cam2, const MotionStereoParameters & params) :
+        EnhancedStereo(cam1, cam2, params),
+        _params(params)
     {
     }
 
@@ -58,7 +59,7 @@ public:
     //TODO figure out how to treat the mask efficiently
     void setBaseImage(const Mat8u & image)
     {
-        image.copyTo(img1);
+        image.copyTo(_img1);
         computeMask();
     }
        
@@ -82,37 +83,65 @@ public:
     */
     void reprojectDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
     
-    //FIXME for backward compatibility, to be fixed or removed
-    void computeDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
+    DepthMap compute(Transf T12, const Mat8u & img2, const DepthMap & depth);
     
-    void validateDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
+    DepthMap compute(Transf T12, const Mat8u & img2);
     
+    /*
+    initializez:
+        int         gu,     gv;
+        Vector3d    gX;
+        vector<uint8_t>     gdescriptor;
+        int         gstep;
+    */
+    bool selectPoint(int x, int y);
     
-    //do it point by point to make it possible to use the same function to project forward
-    void matchNoPrior();
+    /*
+    initializez:
+        Vector2d    gptStart;
+        int         gdispMax;
+    */
+    bool computeUncertainty(double d, double s);
     
-    void matchWithPrior();
+    /*
+    initializez:
+        vector<uint8_t>     gsampleVec;
+        vector<int>         guVec,  gvVec;
+    */
+    bool sampleImage(const Mat8u & img2);
     
-    //check the points' descriptors and select the good ones
-    void selectPoints();
-           
+    void reconstructFirst(double & dist, double & sigma, double & cost);
+    
+    void reconstructSecond(DepthMap & depth);
 private:
     
     // based on the image gradient
     void computeMask()
     {
         Mat16s gradx, grady;
-        Sobel(img1, gradx, CV_16S, 1, 0, 1);
-        Sobel(img1, grady, CV_16S, 0, 1, 1);
+        Sobel(_img1, gradx, CV_16S, 1, 0, 1);
+        Sobel(_img1, grady, CV_16S, 0, 1, 1);
         Mat16s gradAbs = abs(gradx) + abs(grady);
         GaussianBlur(gradAbs, gradAbs, Size(7, 7), 0, 0);
         Mat8u gradAbs8u;
         gradAbs.convertTo(gradAbs8u, CV_8U);
-        threshold(gradAbs8u, maskMat, params.gradientThresh, 128, CV_THRESH_BINARY);
+        threshold(gradAbs8u, _maskMat, _params.gradientThresh, 128, CV_THRESH_BINARY);
     }
    
-    Mat8u img1;    
-    Mat8u maskMat; //TODO compute mask
-    const MotionStereoParameters params;
+    Mat8u _img1;    
+    Mat8u _maskMat;
+    const MotionStereoParameters _params;
+
+    
+    //g for global variables
+    int gu, gv;
+    Vector3d gX;
+    vector<uint8_t> gdescriptor;
+    int gstep;
+    Vector2d gptStart;
+    int gdispMax;
+    
+    vector<uint8_t> gsampleVec;
+    vector<int> guVec, gvVec;
 };
 

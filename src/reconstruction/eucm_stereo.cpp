@@ -127,12 +127,12 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
 double EnhancedStereo::triangulate(double u1, double v1, double u2,
         double v2, CameraIdx camIdx) const
 {
-    if (params.verbosity > 3) cout << "EnhancedStereo::triangulate" << endl;
+    if (_params.verbosity > 3) cout << "EnhancedStereo::triangulate" << endl;
     Vector3d p, q;
-    if (not camera1->reconstructPoint(Vector2d(u1, v1), p) or 
-        not camera2->reconstructPoint(Vector2d(u2, v2), q) )
+    if (not _camera1->reconstructPoint(Vector2d(u1, v1), p) or 
+        not _camera2->reconstructPoint(Vector2d(u2, v2), q) )
     {
-        if (params.verbosity > 2) 
+        if (_params.verbosity > 2) 
         {
             cout << "    not reconstructed " << Vector2d(u1, v1).transpose(); 
             cout << " # " << Vector2d(u2, v2).transpose() << endl;
@@ -142,12 +142,12 @@ double EnhancedStereo::triangulate(double u1, double v1, double u2,
     double lambda;
     if (camIdx == CAMERA_1)
     {
-        triangulator.computeRegular(p, q, &lambda);
+        _triangulator.computeRegular(p, q, &lambda);
         return p.norm() * lambda; //TODO change to lambda only?
     }
     else
     {
-        triangulator.computeRegular(p, q, NULL, &lambda);
+        _triangulator.computeRegular(p, q, NULL, &lambda);
         return q.norm() * lambda; //TODO change to lambda only?
     }
 }
@@ -155,13 +155,13 @@ double EnhancedStereo::triangulate(double u1, double v1, double u2,
 bool EnhancedStereo::triangulate(const double u1, const double v1, const double u21, const double v21,
         const double u22, const double v22, double & d, double & sigma, CameraIdx camIdx) const
 {
-    if (params.verbosity > 3) cout << "EnhancedStereo::triangulate" << endl;
+    if (_params.verbosity > 3) cout << "EnhancedStereo::triangulate" << endl;
     Vector3d p, q1, q2;
-    if (not camera1->reconstructPoint(Vector2d(u1, v1), p) or 
-        not camera2->reconstructPoint(Vector2d(u21, v21), q1) or 
-        not camera2->reconstructPoint(Vector2d(u22, v22), q2))
+    if (not _camera1->reconstructPoint(Vector2d(u1, v1), p) or 
+        not _camera2->reconstructPoint(Vector2d(u21, v21), q1) or 
+        not _camera2->reconstructPoint(Vector2d(u22, v22), q2))
     {
-        if (params.verbosity > 2) 
+        if (_params.verbosity > 2) 
         {
             cout << "    not reconstructed " << Vector2d(u1, v1).transpose(); 
             cout << " # " << Vector2d(u21, v21).transpose() << endl;
@@ -172,16 +172,16 @@ bool EnhancedStereo::triangulate(const double u1, const double v1, const double 
     double lambda1, lambda2;
     if (camIdx == CAMERA_1)
     {
-        triangulator.computeRegular(p, q1, &lambda1);
-        triangulator.computeRegular(p, q2, &lambda2);
+        _triangulator.computeRegular(p, q1, &lambda1);
+        _triangulator.computeRegular(p, q2, &lambda2);
         double pnorm = p.norm();
         lambda1 *= pnorm; //TODO change to lambda only?
         lambda2 *= pnorm; 
     }
     else
     {
-        triangulator.computeRegular(p, q1, &lambda1);
-        triangulator.computeRegular(p, q2, &lambda2);
+        _triangulator.computeRegular(p, q1, NULL, &lambda1);
+        _triangulator.computeRegular(p, q2, NULL, &lambda2);
         lambda1 *= q1.norm(); //TODO change to lambda only?
         lambda2 *= q2.norm(); 
     }

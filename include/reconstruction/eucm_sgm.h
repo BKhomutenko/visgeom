@@ -35,7 +35,6 @@ NOTE:
 #include "reconstruction/scale_parameters.h"
 #include "reconstruction/curve_rasterizer.h"
 #include "reconstruction/depth_map.h"
-#include "reconstruction/epipolar_descriptor.h"
 #include "reconstruction/eucm_stereo.h"
 
 struct SGMParameters : public StereoParameters
@@ -59,9 +58,9 @@ class EnhancedSGM : private EnhancedStereo
 public:
     
     EnhancedSGM(Transf T12, const EnhancedCamera * cam1,
-            const EnhancedCamera * cam2, const SGMParameters & parameters) :
-            EnhancedStereo(cam1, cam2, parameters),
-            params(parameters)
+            const EnhancedCamera * cam2, const SGMParameters & params) :
+            EnhancedStereo(cam1, cam2, params),
+            _params(params)
     { 
         setTransformation(T12);
         assert(params.dispMax % 2 == 0);
@@ -115,7 +114,7 @@ public:
     //// MISCELLANEOUS
     
     // index of an object in a linear array corresponding to pixel [row, col] 
-    int getLinearIndex(int x, int y) const { return params.xMax*y + x; }
+    int getLinearIndex(int x, int y) const { return _params.xMax*y + x; }
       
     CurveRasterizer<int, Polynomial2> getCurveRasteriser1(int idx) const;
     CurveRasterizer<int, Polynomial2> getCurveRasteriser2(int idx) const;
@@ -123,36 +122,34 @@ public:
     // reconstruction
     void fillGaps(uint8_t * const data, const int step);
     
-    int getHalfLength() { return min(4, max(params.scale - 1, 1)); }
-    
-    Mat32s & disparity() { return smallDisparity; }
+    Mat32s & disparity() { return _smallDisparity; }
     
 private:
     
-    std::vector<bool> maskVec;
+    std::vector<bool> _maskVec;
     
-    Vector2dVec pointVec1;  // the depth points on the image 1
-    Vector3dVec reconstVec;  // reconstruction of every pixel by cam1
-    Vector3dVec reconstRotVec;  // reconstVec rotated into the second frame
-    Vector2dVec pinfVec;  // projection of reconstRotVec by cam2
+    Vector2dVec _pointVec1;  // the depth points on the image 1
+    Vector3dVec _reconstVec;  // reconstruction of every pixel by cam1
+    Vector3dVec _reconstRotVec;  // reconstVec rotated into the second frame
+    Vector2dVec _pinfVec;  // projection of reconstRotVec by cam2
     
     // discretized version
-    Vector2iVec pointPxVec1;
-    Vector2iVec pinfPxVec;
+    Vector2iVec _pointPxVec1;
+    Vector2iVec _pinfPxVec;
     
     // to be able to change the jump cost
-    int jumpCost;
+    int _jumpCost;
     
     const int DISPARITY_MARGIN = 20;
-    Mat32s uCache, vCache;
-    Mat8u errorBuffer;
-    Mat8u costBuffer; //TODO maybe merge with salientBuffer
-    Mat8u salientBuffer; 
-    Mat32s tableauLeft, tableauRight; //FIXME check the type through the code
-    Mat32s tableauTop, tableauBottom;
-    Mat32s smallDisparity;
-    Mat32s finalErrorMat;
+    Mat32s _uCache, _vCache;
+    Mat8u _errorBuffer;
+    Mat8u _costBuffer; //TODO maybe merge with salientBuffer
+    Mat8u _salientBuffer; 
+    Mat32s _tableauLeft, _tableauRight; //FIXME check the type through the code
+    Mat32s _tableauTop, _tableauBottom;
+    Mat32s _smallDisparity;
+    Mat32s _finalErrorMat;
     
-    const SGMParameters params;
+    const SGMParameters _params;
 };
 

@@ -34,10 +34,14 @@ NOTE:
 #include "reconstruction/scale_parameters.h"
 #include "reconstruction/triangulator.h"
 #include "reconstruction/epipoles.h"
+#include "reconstruction/epipolar_descriptor.h"
 #include "reconstruction/eucm_epipolar.h"
 
 struct StereoParameters : public ScaleParameters
 {
+    StereoParameters() {}
+    StereoParameters(const ScaleParameters & scaleParams) : ScaleParameters(scaleParams) {}
+    
     int dispMax = 48;
   
     int maxError = 25;
@@ -49,8 +53,13 @@ struct StereoParameters : public ScaleParameters
     int hypMax = 1;
     int maxHypDiff = 10;
     
-    //for descriptor matching
+    //for descriptor matching, depends on the image noise
     int flawCost = 7;
+    
+    //descriptor computation parameters
+    int descLength = 5;
+    vector<int> scaleVec = {1, 2, 3, 5};
+    int descRespThresh = 3;
 };
 
 /*
@@ -66,32 +75,41 @@ class EnhancedStereo
 public:
     
     EnhancedStereo(const EnhancedCamera * cam1, const EnhancedCamera * cam2,
-            const StereoParameters & parameters) :
-            // initialize members
-            params(parameters),
-            camera1(cam1->clone()),
-            camera2(cam2->clone()),
-            epipolarCurves(cam1, cam2, 2000, params.verbosity)
+            const StereoParameters & params) :
+        _params(params),
+        _camera1(cam1->clone()),
+        _camera2(cam2->clone()),
+        _epipolarCurves(cam1, cam2, 2000, params.verbosity),
+        _epipolarDescriptor(params.descLength, params.descRespThresh, params.scaleVec),
+        HALF_LENGTH(params.descLength / 2),
+        MARGIN(params.descLength - 1)
     { 
+        assert(params.descLength % 2 == 1);
     }
     
     virtual ~EnhancedStereo()
     {
-        delete camera1;
-        camera1 = NULL;
-        delete camera2;
-        camera2 = NULL;
+        delete _camera1;
+        _camera1 = NULL;
+        delete _camera2;
+        _camera2 = NULL;
     }
     
     
     void setTransformation(const Transf & T12) 
     {
-        transf12 = T12; 
-        triangulator.setTransformation(T12);
-        epipolarCurves.setTransformation(T12);
+        _transf12 = T12; 
+        _R12 = T12.rotMat();
+        _R21 = T12.rotMatInv();
+        _t12 = T12.trans();
+        _triangulator.setTransformation(T12);
+        _epipolarCurves.setTransformation(T12);
     }
     
-    const Transf & transf() const { return transf12; }
+    const Transf & transf() const { return _transf12; }
+    const Matrix3d & R12() const { return _R12; }
+    const Matrix3d & R21() const { return _R21; }
+    const Vector3d & t12() const { return _t12; }
     
 //    bool triangulate(double u1, double v1, double u2, double v2, Vector3d & X) const;
     
@@ -101,18 +119,22 @@ public:
             const double u22, const double v22, double & d, double & sigma,
             CameraIdx camIdx = CAMERA_1) const;
     
-    const StereoEpipoles & epipoles() const { return epipolarCurves.getEpipoles(); }
+    const StereoEpipoles & epipoles() const { return _epipolarCurves.getEpipoles(); }
     
 protected:
     
-    EnhancedEpipolar epipolarCurves;
+    EnhancedCamera *_camera1, *_camera2;
+    StereoParameters _params;
+    EnhancedEpipolar _epipolarCurves;
+    EpipolarDescriptor _epipolarDescriptor;
     
-    StereoParameters params;
-    
-    EnhancedCamera *camera1, *camera2;
+    const int HALF_LENGTH;
+    const int MARGIN;
     
 private:
-    Triangulator triangulator;
-    Transf transf12;  // pose of camera 2 wrt camera 1
+    Triangulator _triangulator;
+    Transf _transf12;  // pose of camera 2 wrt camera 1
+    Matrix3d _R12, _R21;
+    Vector3d _t12;    
 };
 

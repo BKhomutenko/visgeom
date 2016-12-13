@@ -78,6 +78,9 @@ int main(int argc, char** argv)
     paramFile >> stereoParams.scale;
     paramFile.ignore();
     string fileName1, fileName2;
+    
+    
+    
     while(getline(paramFile, fileName1))
     {
         getline(paramFile, fileName2);
@@ -98,6 +101,13 @@ int main(int argc, char** argv)
     //    img2lap.copyTo(img2);
     ////    
         
+        stereoParams.u0 = 0;
+        stereoParams.v0 = 0;
+        stereoParams.uMax = img1.cols;
+        stereoParams.vMax = img1.rows;
+        stereoParams.setEqualMargin();
+        stereoParams.setYMargin(330);
+        
         Timer timer;
         EnhancedCamera camera1(params1.data()), camera2(params2.data());
         MotionStereo stereo(&camera1, &camera2, stereoParams);
@@ -117,15 +127,7 @@ int main(int argc, char** argv)
         
         
         
-        ScaleParameters scaleParams;
-        scaleParams.scale = stereoParams.scale;
         
-        scaleParams.u0 = 0;
-        scaleParams.v0 = 0;
-        scaleParams.uMax = img1.cols;
-        scaleParams.vMax = img1.rows;
-        scaleParams.setEqualMargin();
-        scaleParams.setYMargin(330);
 
     //    scaleParams.u0 = 700;
     //    scaleParams.v0 = 200;
@@ -134,11 +136,9 @@ int main(int argc, char** argv)
     //    scaleParams.setYMargin(700);
     //    scaleParams.setXMargin(400);
         
-        DepthMap depth(&camera1, scaleParams);
-        depth.setTo(0, 0);
         Mat32f res;
         timer.reset();
-        stereo.validateDepth(TleftRight, img2, depth);
+        DepthMap depth = stereo.compute(TleftRight, img2);
         cout << timer.elapsed() << endl;
         timer.reset();
 
@@ -147,6 +147,7 @@ int main(int argc, char** argv)
         imshow("out1", img1);
         imshow("out2", img2);
         imshow("res", res);
+                
         waitKey(); 
     }
     return 0;

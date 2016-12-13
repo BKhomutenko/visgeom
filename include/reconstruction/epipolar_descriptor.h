@@ -35,7 +35,7 @@ NOTE:
 class EpipolarDescriptor
 {
 public:
-    EpipolarDescriptor(int length, int waveThresh, vector<int> stepVec) :
+    EpipolarDescriptor(int length, int waveThresh, const vector<int> & stepVec) :
             LENGTH(length),
             HALF_LENGTH(length / 2),
             WAVE_THRESH(waveThresh*LENGTH),
