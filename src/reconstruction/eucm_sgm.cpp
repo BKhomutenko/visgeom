@@ -51,14 +51,15 @@ CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser2(int idx) cons
 //TODO reconstruct the depth points, not everything
 void EnhancedSGM::computeReconstructed()
 {
-    _pointVec1.reserve(_params.yMax*_params.xMax);
-    _pointPxVec1.reserve(_params.yMax*_params.xMax);
+    _pointVec1.resize(_params.yMax*_params.xMax);
+    _pointPxVec1.resize(_params.yMax*_params.xMax);
     for (int y = 0; y < _params.yMax; y++)
     {
         for (int x = 0; x < _params.xMax; x++)
         {
-            _pointVec1.emplace_back(_params.uConv(x), _params.vConv(y));
-            _pointPxVec1.emplace_back(_params.uConv(x), _params.vConv(y));
+            int idx = getLinearIndex(x, y);
+            _pointVec1[idx] = Vector2d(_params.uConv(x), _params.vConv(y));
+            _pointPxVec1[idx] = Vector2i(_params.uConv(x), _params.vConv(y));
         }
     }
     _camera1->reconstructPointCloud(_pointVec1, _reconstVec, _maskVec);
@@ -88,6 +89,7 @@ void EnhancedSGM::computeUVCache()
         for (int x = 0; x < _params.xMax; x++)
         {
             int idx = getLinearIndex(x, y);
+            if (not _maskVec[idx]) continue;
             CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
             raster.steps(-DISPARITY_MARGIN);
             const int u_vCacheStep = _params.dispMax + 2 * DISPARITY_MARGIN;
@@ -118,6 +120,7 @@ void EnhancedSGM::createBuffer()
     if (_params.verbosity > 1) cout << "EnhancedSGM::createBuffer" << endl;
     assert(_params.hypMax > 0);
     int bufferWidth = _params.xMax*_params.dispMax;
+    _stepBuffer.create(_params.yMax, _params.xMax);
     _errorBuffer.create(_params.yMax, bufferWidth);
     _tableauLeft.create(_params.yMax, bufferWidth);
     _tableauRight.create(_params.yMax, bufferWidth);
@@ -186,13 +189,14 @@ void EnhancedSGM::reconstructDepth(DepthMap & depth) const
                 // to compute point on the second image
                 // TODO make virtual rasterizer using the cache
                 int u21, v21, u22, v22;
+                int step = _stepBuffer(y, x);
                 if (_params.useUVCache)
                 {
                     const int u_vCacheStep = _params.dispMax + 2 * DISPARITY_MARGIN;
                     u21 = _uCache(y, x*u_vCacheStep + DISPARITY_MARGIN + disparity);
-                    u22 = _uCache(y, x*u_vCacheStep + DISPARITY_MARGIN + disparity + 1);
+                    u22 = _uCache(y, x*u_vCacheStep + DISPARITY_MARGIN + disparity + step);
                     v21 = _vCache(y, x*u_vCacheStep + DISPARITY_MARGIN + disparity);
-                    v22 = _vCache(y, x*u_vCacheStep + DISPARITY_MARGIN + disparity + 1);
+                    v22 = _vCache(y, x*u_vCacheStep + DISPARITY_MARGIN + disparity + step);
                 }
                 else
                 {       
@@ -200,7 +204,7 @@ void EnhancedSGM::reconstructDepth(DepthMap & depth) const
                     raster.steps(disparity);
                     u21 = raster.u;
                     v21 = raster.v;
-                    raster.step();
+                    raster.steps(step);
                     u22 = raster.u;
                     v22 = raster.v;
                 }
@@ -243,6 +247,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
             vector<uint8_t> descriptor;
             CurveRasterizer<int, Polynomial2> descRaster = getCurveRasteriser1(idx);
             const int step = _epipolarDescriptor.compute(img1, descRaster, descriptor);
+            _stepBuffer(y, x) = step;
             if (step < 1) 
             {
                 //TODO make a function
