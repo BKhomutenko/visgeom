@@ -18,6 +18,39 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "reconstruction/eucm_stereo.h"
 
 
+EnhancedStereo::EnhancedStereo(const EnhancedCamera * cam1, const EnhancedCamera * cam2,
+        const StereoParameters & params) :
+    _params(params),
+    _camera1(cam1->clone()),
+    _camera2(cam2->clone()),
+    _epipolarCurves(cam1, cam2, 2000, params.verbosity),
+    _epipolarDescriptor(params.descLength, params.descRespThresh, params.scaleVec),
+    HALF_LENGTH(params.descLength / 2),
+    MARGIN(params.descLength - 1),
+    _triangulator(1e-3)
+{ 
+    assert(params.descLength % 2 == 1);
+}
+
+EnhancedStereo::~EnhancedStereo()
+{
+    delete _camera1;
+    _camera1 = NULL;
+    delete _camera2;
+    _camera2 = NULL;
+}
+
+
+void EnhancedStereo::setTransformation(const Transf & T12) 
+{
+    _transf12 = T12; 
+    _R12 = T12.rotMat();
+    _R21 = T12.rotMatInv();
+    _t12 = T12.trans();
+    _triangulator.setTransformation(T12);
+    _epipolarCurves.setTransformation(T12);
+}
+
 int computeError(int v, int thMin, int thMax)
 {
     return max(0, max(thMin - v, v - thMax));

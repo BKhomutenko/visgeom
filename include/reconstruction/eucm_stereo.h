@@ -75,37 +75,11 @@ class EnhancedStereo
 public:
     
     EnhancedStereo(const EnhancedCamera * cam1, const EnhancedCamera * cam2,
-            const StereoParameters & params) :
-        _params(params),
-        _camera1(cam1->clone()),
-        _camera2(cam2->clone()),
-        _epipolarCurves(cam1, cam2, 2000, params.verbosity),
-        _epipolarDescriptor(params.descLength, params.descRespThresh, params.scaleVec),
-        HALF_LENGTH(params.descLength / 2),
-        MARGIN(params.descLength - 1)
-    { 
-        assert(params.descLength % 2 == 1);
-    }
+            const StereoParameters & params);
     
-    virtual ~EnhancedStereo()
-    {
-        delete _camera1;
-        _camera1 = NULL;
-        delete _camera2;
-        _camera2 = NULL;
-    }
+    virtual ~EnhancedStereo();
     
-    
-    void setTransformation(const Transf & T12) 
-    {
-        _transf12 = T12; 
-        _R12 = T12.rotMat();
-        _R21 = T12.rotMatInv();
-        _t12 = T12.trans();
-        _triangulator.setTransformation(T12);
-        _epipolarCurves.setTransformation(T12);
-    }
-    
+    void setTransformation(const Transf & T12);    
     const Transf & transf() const { return _transf12; }
     const Matrix3d & R12() const { return _R12; }
     const Matrix3d & R21() const { return _R21; }

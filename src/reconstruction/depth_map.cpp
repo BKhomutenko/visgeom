@@ -848,64 +848,51 @@ void DepthMap::pixelAverageFilter(const Vector3iVec & matches, DepthMap & dst)
     dst.sigma(base[0], base[1], base[2]) = sum_s / matches.size();
 }
 
+//works only for the first hypothesis so far
+//TODO implement for multi-hyp case
 void DepthMap::filterNoise()
 {
-    const int minMatches = 2;
+    const int minMatches = 3;
 
     // Create copy of current depthmap, to avoid flow
-    DepthMap newDepth = *this;
+    DepthMap myCopy = *this;
 
+    const array<int, 8> dxArr =  {-1,  0,  1,  1,  1,  0, -1, -1};
+    const array<int, 8> dyArr  = { 1,  1,  1,  0, -1, -1, -1,  0};
+    
+    const int CENTRAL_WEIGHT = 3;
     // Three loops to loop through every hypothesis
-    for (int y = 0; y < yMax; ++y)
+    for (int y = 1; y < yMax - 1; ++y)
     {
-        for (int x = 0; x < xMax; ++x)
+        for (int x = 1; x < xMax - 1; ++x)
         {
-            for (int h = 0; h < hMax; ++h)
+            double depthVal = myCopy.at(x, y);
+            if (depthVal == OUT_OF_RANGE) continue;
+            double sigmaVal = myCopy.sigma(x, y);
+            int countFilled = 0, countMatches = 0;
+            double acc = depthVal * CENTRAL_WEIGHT;
+            for (int i = 0; i < 8; i++)
             {
-                // Check if hypothesis matches at least minMatches neighbour hyps
-                Vector3iVec matches;
-                matches.emplace_back(x, y, h); // Store current hypothesis
-                const double d = at(x, y, h);
-                if( d < MIN_DEPTH ) continue;
-                const double s = sigma(x, y, h);
-                for (int y1 = max(0, y-1); y1 < min(yMax, y+2); ++y1 )
-                {
-                    for (int x1 = max(0, x-1); x1 < min(xMax, x+2); ++x1 )
-                    {
-                        if ( (y1==y) and (x1==x) ) continue;
-                        for (int h1 = 0; h1 < hMax; ++h1)
-                        {
-                            const double & d1 = at(x1,y1,h1);
-                            if(d1 < MIN_DEPTH) break;
-                            else if( match(d, s, d1, sigma(x1,y1,h1)) )
-                            {
-                                // if (d<1) cout << "Position: x: " << x << " y: " << y << " x1: " << x1 << " y1: " << y1 << endl;
-                                matches.emplace_back(x1,y1,h1);
-                                break; //break out of h1 loop, go to next pixel
-                            }
-                        }
-                    }
-                }
-                // If does not match minimum requirement, then median filter
-                if (matches.size() < minMatches + 1)
-                {
-                    at(x, y, h) = OUT_OF_RANGE;
-                    sigma(x, y, h) = OUT_OF_RANGE;
-                    cost(x, y, h) = DEFAULT_COST_DEPTH;
-                    // pixelMedianFilter(x, y, h, newDepth);
-                }
-                // if (d < 1.0)
-                // {
-                //     cout << "d: " << d << ", matches: " << matches.size() << endl;
-                // }
-                // If it does match at least 2, then average
-                // else pixelAverageFilter(matches, newDepth);
+                double neighDepthVal = myCopy.at(x + dxArr[i], y + dyArr[i]);
+                double neighSigmaVal = myCopy.sigma(x + dxArr[i], y + dyArr[i]);
+                if (neighDepthVal == OUT_OF_RANGE) continue;
+                countFilled++;
+                if (abs(depthVal - neighDepthVal) > 2.5*max(sigmaVal, neighSigmaVal)) continue;
+                countMatches++;
+                acc += neighDepthVal;
             }
-            sortHypStack(x, y);
+            if (countMatches < minMatches and countMatches < countFilled or countFilled < 2)
+            {
+                at(x, y) = OUT_OF_RANGE;
+                sigma(x, y) = OUT_OF_RANGE;
+            }
+            else
+            {
+                at(x, y) = acc / (countMatches + CENTRAL_WEIGHT);
+            }
         }
     }
 
-    // *this = newDepth;
 }
 
 void DepthMap::merge(const DepthMap & depth2)

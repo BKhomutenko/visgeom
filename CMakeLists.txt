@@ -203,6 +203,8 @@ target_link_libraries( mi_test
 )
 
 if(CMAKE_COMPILER_IS_GNUCXX)
-    set(CMAKE_CXX_FLAGS "-O2 -Wno-deprecated")        ## Optimize
+    set(CMAKE_CXX_FLAGS "-Wno-deprecated -O2")        ## Optimize
     set(CMAKE_EXE_LINKER_FLAGS "-s")  ## Strip binary
+
+#    set(CMAKE_CXX_FLAGS "-Wno-deprecated -ggdb")        ## DEBUG    
 endif()

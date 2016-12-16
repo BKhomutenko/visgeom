@@ -53,6 +53,7 @@ struct SGMParameters : public StereoParameters
     bool useUVCache = true;
 };
 
+//TODO revamp, take MotionStereo as a model
 class EnhancedSGM : private EnhancedStereo
 {
 public:
@@ -145,10 +146,12 @@ private:
     Mat8u _errorBuffer;
     Mat8u _costBuffer; //TODO maybe merge with salientBuffer
     Mat8u _salientBuffer; 
+    Mat8u _stepBuffer;
     Mat32s _tableauLeft, _tableauRight; //FIXME check the type through the code
     Mat32s _tableauTop, _tableauBottom;
     Mat32s _smallDisparity;
     Mat32s _finalErrorMat;
+    
     
     const SGMParameters _params;
 };

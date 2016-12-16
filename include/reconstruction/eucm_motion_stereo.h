@@ -83,31 +83,15 @@ public:
     */
     void reprojectDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
     
-    DepthMap compute(Transf T12, const Mat8u & img2, const DepthMap & depth);
+    DepthMap compute(Transf T12, const Mat8u & img2, const DepthMap & depth, int arg = 0);
     
     DepthMap compute(Transf T12, const Mat8u & img2);
     
-    /*
-    initializez:
-        int         gu,     gv;
-        Vector3d    gX;
-        vector<uint8_t>     gdescriptor;
-        int         gstep;
-    */
+   
     bool selectPoint(int x, int y);
     
-    /*
-    initializez:
-        Vector2d    gptStart;
-        int         gdispMax;
-    */
     bool computeUncertainty(double d, double s);
     
-    /*
-    initializez:
-        vector<uint8_t>     gsampleVec;
-        vector<int>         guVec,  gvVec;
-    */
     bool sampleImage(const Mat8u & img2);
     
     void reconstructFirst(double & dist, double & sigma, double & cost);
@@ -134,13 +118,27 @@ private:
 
     
     //g for global variables
+    
+    enum GlobalFlags : uint32_t {
+        GLB_UV = 1,
+        GLB_X = 2,
+        GLB_DESCRIPTOR = 4,
+        GLB_STEP = 8,
+        GLB_START_POINT = 16,
+        GLB_DISP_MAX = 32,
+        GLB_SAMPLE_VEC = 64,
+        GLB_UV_VEC = 128
+    };
+    
+    uint32_t flags;
+    
     int gu, gv;
     Vector3d gX;
-    vector<uint8_t> gdescriptor;
-    int gstep;
     Vector2d gptStart;
     int gdispMax;
+    int gstep;
     
+    vector<uint8_t> gdescriptor;
     vector<uint8_t> gsampleVec;
     vector<int> guVec, gvVec;
 };

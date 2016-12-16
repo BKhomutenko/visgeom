@@ -106,7 +106,7 @@ int main(int argc, char** argv)
         stereoParams.uMax = img1.cols;
         stereoParams.vMax = img1.rows;
         stereoParams.setEqualMargin();
-        stereoParams.setYMargin(330);
+//        stereoParams.setYMargin(330);
         
         Timer timer;
         EnhancedCamera camera1(params1.data()), camera2(params2.data());
@@ -142,11 +142,14 @@ int main(int argc, char** argv)
         cout << timer.elapsed() << endl;
         timer.reset();
 
-        depth.toInverseMat(res);    
+//        depth.filterNoise();
+        cout << timer.elapsed() << endl;
         
+        depth.toInverseMat(res);    
+//        medianBlur(res, res, 5);
         imshow("out1", img1);
         imshow("out2", img2);
-        imshow("res", res);
+        imshow("res", res / 10);
                 
         waitKey(); 
     }

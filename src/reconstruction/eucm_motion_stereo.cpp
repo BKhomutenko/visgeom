@@ -261,14 +261,15 @@ bool MotionStereo::selectPoint(int x, int y)
 {
     gu = _params.uConv(x);
     gv = _params.vConv(y);
+    flags |= GLB_UV;
     
     //--Check point's saliency
-    
     if (_maskMat(gv, gu) < _params.gradientThresh) return false;
     
     Vector2d pt(gu, gv);
     
     if (not _camera1->reconstructPoint(pt, gX)) return false;
+    flags |= GLB_X;
     
     CurveRasterizer<int, Polynomial2> descRaster(round(pt), epipoles().getFirstPx(),
                                 _epipolarCurves.getFirst(gX));
@@ -276,13 +277,17 @@ bool MotionStereo::selectPoint(int x, int y)
     
     gstep = _epipolarDescriptor.compute(_img1, descRaster, gdescriptor);
     if (gstep < 1 or not _epipolarDescriptor.goodResp()) return false;
-    
+    flags |= GLB_STEP | GLB_DESCRIPTOR;
     return true;
 }
 
 
 bool MotionStereo::computeUncertainty(double d, double s)
 {
+    //TODO replace assert?
+    uint32_t neededFlag = GLB_X;
+    assert( (flags & neededFlag) ^ neededFlag == 0);
+    
     Vector3d Xmax;
     
     if (d == OUT_OF_RANGE)  // no prior
@@ -291,25 +296,30 @@ bool MotionStereo::computeUncertainty(double d, double s)
         Xmax = R21() * gX;
         if (not _camera2->projectPoint(Xmax, gptStart)) return false;
         gdispMax = _params.dispMax;
+        flags |= GLB_START_POINT | GLB_DISP_MAX;
     }
     else // there is a prior
     {
         gX.normalize();
-        Xmax = gX * (d + 2.5 * s);
-        Vector3d Xmin = gX * max(d - 2.5 * s, MIN_DEPTH);
+        Xmax = gX * (d + 2 * s);
+        Vector3d Xmin = gX * max(d - 2 * s, MIN_DEPTH);
         Xmax = R21() * (Xmax - t12());
         Xmin = R21() * (Xmin - t12());
         Vector2d ptFin;
         if (not _camera2->projectPoint(Xmax, gptStart)) return false;
         if (not _camera2->projectPoint(Xmin, ptFin)) return false;
-        double delta = (ptFin - gptStart).norm();
-        gdispMax = min( _params.dispMax, int(delta) + 1);
+        int delta = round((ptFin - gptStart).norm());
+        gdispMax = min( _params.dispMax, delta + 1);
+        flags |= GLB_START_POINT | GLB_DISP_MAX;
     }
     return true;
 }
 
 bool MotionStereo::sampleImage(const Mat8u & img2)
 {
+    uint32_t neededFlag = GLB_START_POINT | GLB_DISP_MAX | GLB_STEP | GLB_X;
+    assert(flags & neededFlag == neededFlag);
+    
     Vector2i ptStartRound = round(gptStart);
     if ((ptStartRound - epipoles().getSecondPx()).squaredNorm() < 2500) return false;
     int distance = gdispMax / gstep + MARGIN;
@@ -340,26 +350,74 @@ bool MotionStereo::sampleImage(const Mat8u & img2)
         guVec.push_back(raster.u);
         gvVec.push_back(raster.v);
     }
+    flags |= GLB_SAMPLE_VEC | GLB_UV_VEC;
     return true;
 }
 
 void MotionStereo::reconstructFirst(double & dist, double & sigma, double & cost)
 {
+    uint32_t neededFlag = GLB_SAMPLE_VEC | GLB_UV | GLB_UV_VEC | GLB_DESCRIPTOR;
+    assert(flags & neededFlag == neededFlag);
+    
     vector<int> costVec = compareDescriptor(gdescriptor, gsampleVec, _params.flawCost);
     auto bestCostIter = min_element(costVec.begin(), costVec.end());
+    
+//    if (gu < 550 and gu > 450 and gv > 280 and gv < 380 )
+//    {
+//        cout << gu << "   " << gv << endl;
+//        cout << "depth: " << dist
+//            << " +-" << sigma
+//            << endl;
+//        cout << "samples:" << endl;
+//        for (auto & x : gsampleVec)
+//        {
+//            cout << " " << int(x);
+//        }
+//        cout << endl;
+//        cout << "coordinates:" << endl;
+//        for (auto & x : guVec)
+//        {
+//            cout << " " << int(x);
+//        }
+//        cout << endl;
+//        for (auto & x : gvVec)
+//        {
+//            cout << " " << int(x);
+//        }
+//        cout << endl;
+//        cout << "descriptor:" << endl;
+//        for (auto & x : gdescriptor)
+//        {
+//            cout << " " << int(x);
+//        }
+//        cout << endl;
+//        cout << "cost:" << endl;
+//        for (auto & x : costVec)
+//        {
+//            cout << " " << int(x);
+//        }
+//        cout << endl<< endl;
+//    }
     
     if (*bestCostIter < _params.maxError)
     {
         int dBest = bestCostIter - costVec.begin();
         triangulate(gu, gv, guVec[dBest], gvVec[dBest], guVec[dBest + 1], gvVec[dBest + 1],
                 dist, sigma, CAMERA_1); 
-                //TODO does not work for CAMERA_2 yet
+//        if (sigma > 1 and gu < 600 and gu > 400 and gv > 300 and gv < 550 )
+//        {
+//            cout << sigma << " " << dist << endl;
+//            cout    << gu << " " << gv << " " 
+//                    <<  guVec[dBest] << " "  << gvVec[dBest] << " " 
+//                     << guVec[dBest + 1] << " "  << gvVec[dBest + 1] << endl;
+//        }
         cost = *bestCostIter;
     }
 }
 
 void MotionStereo::reconstructSecond(DepthMap & depth)
 {
+    uint32_t neededFlag = GLB_SAMPLE_VEC | GLB_UV | GLB_UV_VEC | GLB_DESCRIPTOR;
     vector<int> costVec = compareDescriptor(gdescriptor, gsampleVec, _params.flawCost);
     auto bestCostIter = min_element(costVec.begin(), costVec.end());
     
@@ -392,6 +450,7 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2)
     {
         for (int x = 0; x < depthOut.xMax; x++)
         {
+            flags = 0;
             if (not selectPoint(x, y)) continue;
             
             if (not computeUncertainty(OUT_OF_RANGE, OUT_OF_RANGE)) continue;
@@ -404,28 +463,42 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2)
     return depthOut;
 }
 
-DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & depthIn)
+DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & depthIn, int arg)
 {
     //init necessary data structures
     setTransformation(T12);
     assert(ScaleParameters(depthIn) == ScaleParameters(_params));
     DepthMap depthOut = depthIn;
-
+//    depthOut.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
+    int count1 = 0, count2 = 0, count3 = 0, count4 = 0;
     //for each point
     for (int y = 0; y < depthOut.yMax; y++)
     {
         for (int x = 0; x < depthOut.xMax; x++)
         {
-            if (not selectPoint(x, y)) continue;
+//            depthOut.at(x, y) *= 2;
+//            if (arg != 0 and depthIn.at(x, y) != OUT_OF_RANGE) continue;
+            flags = 0;
+            if (not selectPoint(x, y)) { count1++; continue;}
             
-            if (not computeUncertainty(depthIn.at(x, y), depthIn.sigma(x, y))) continue;
+            if (not computeUncertainty(depthIn.at(x, y), depthIn.sigma(x, y))) { count2++; continue;}
             
-            if (gdispMax < 4) continue;   // the uncertainty is too small
+            if (gdispMax / gstep < 2) 
+            {
+                count3++;
+                depthOut.at(x, y) = depthIn.at(x, y);
+                depthOut.sigma(x, y) = depthIn.sigma(x, y);
+                continue;  
+            }  // the uncertainty is too small
             
-            if (not sampleImage(img2)) continue;
+            if (not sampleImage(img2)) { count4++; continue;}
             
             reconstructFirst(depthOut.at(x, y), depthOut.sigma(x, y), depthOut.cost(x, y));
         }
     }
+    cout << count1 << endl;
+    cout << count2 << endl;
+    cout << count3 << endl;
+    cout << count4 << endl;
     return depthOut;
 }

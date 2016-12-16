@@ -104,16 +104,22 @@ int main(int argc, char** argv)
     stereoParams2.uMax = img1.cols;
     stereoParams2.vMax = img1.rows;
     stereoParams2.setEqualMargin();
+//    stereoParams2.salientPoints = true;
     
     int counter = 2;
     EnhancedCamera camera(params.data());
     DepthMap depth;
     depth.setDefault();
     
+//    stereoParams2.dispMax = 40;
+//    stereoParams2.descRespThresh = 2;
+//    stereoParams2.scaleVec = vector<int>{1};
+    
     MotionStereoParameters stereoParams(stereoParams2);
     stereoParams.verbosity = 1;
     stereoParams.descLength = 5;
-    stereoParams.dispMax = 10;
+//    stereoParams.descRespThresh = 2;
+//    stereoParams.scaleVec = vector<int>{1};
     
     MotionStereo stereo(&camera, &camera, stereoParams);
     stereo.setBaseImage(img1);
@@ -134,6 +140,7 @@ int main(int argc, char** argv)
     
     Timer timer;
     stereoSG.computeStereo(img1, img2, depth);
+    depth.filterNoise();
     cout << timer.elapsed() << endl; 
     Mat32f res, sigmaRes;
     Mat32f res2, sigmaRes2;
@@ -142,6 +149,7 @@ int main(int argc, char** argv)
     imshow("res" + to_string(counter), res2 *0.12);
     imshow("sigma " + to_string(counter), sigmaRes2*20);
     cv::waitKey(0);
+    
     counter++;
     while (getline(paramFile, imageInfo))
     {
@@ -157,15 +165,21 @@ int main(int argc, char** argv)
 
 //        depth.setDefault();
         timer.reset();
-        DepthMap depth2 = stereo.compute(TleftRight, img2, depth);
+        cout << TleftRight << endl;
+        DepthMap depth2 = stereo.compute(TleftRight, img2, depth, counter - 3);
         depth = depth2;
+        depth.filterNoise();
         cout << timer.elapsed() << endl; 
         depth.toInverseMat(res);
         depth.sigmaToMat(sigmaRes);
 //        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
-        imshow("res " + to_string(counter), res *0.12);
+        
         imshow("sigma " + to_string(counter), sigmaRes*20);
+        imshow("d sigma " + to_string(counter), (sigmaRes - sigmaRes2)*20  + 0.5);
+//        cout << (sigmaRes - sigmaRes2)(Rect(150, 150, 15, 15)) << endl;
+        imshow("res " + to_string(counter), res *0.12);
         counter++; 
+        waitKey();
     }
     waitKey();
     return 0;
