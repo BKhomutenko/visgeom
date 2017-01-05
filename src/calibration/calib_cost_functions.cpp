@@ -117,8 +117,8 @@ bool GenericProjectionJac::Evaluate(double const * const * params,
 OdometryPrior::OdometryPrior(const double errV, const double errW, const double lambda,
         const Transformation<double> xi1,
         const Transformation<double> xi2) : 
-_dxiPrior(),
-_A(Matrix6d::Zero())
+    _dxiPrior(),
+    _A(Matrix6d::Zero())
 {
     auto xi12 = xi1.inverseCompose(xi2);
     
@@ -149,11 +149,16 @@ _A(Matrix6d::Zero())
     _A.topLeftCorner<2, 2>() = U.topLeftCorner<2, 2>();
     _A.topRightCorner<2, 1>() = U.topRightCorner<2, 1>();
     _A(2, 2) = 1. / lambda;
-    _A(3, 3) = 1. / lambda;
-    _A(4, 4) = 1. / lambda;
-    _A(5, 5) = U(2, 2);
+    
+    Matrix3d B = Matrix3d::Zero();
+    B(0, 0) = 1. / lambda;
+    B(1, 1) = 1. / lambda;
+    B(2, 2) = U(2, 2);
+    
+    _A.bottomRightCorner<3, 3>() = B * interOmegaRot(xi12.rot());
 }
 
+//TODO check whether the interaction matrix calculation is redundand here
 bool OdometryPrior::Evaluate(double const * const * params,
         double * residual, double ** jacobian) const
 {

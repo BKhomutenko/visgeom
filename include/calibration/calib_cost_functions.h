@@ -85,6 +85,8 @@ struct TransformationPrior : ceres::SizedCostFunction<6, 6>
         {
             _A(i, i) = stiffness[i];
         }
+        Transf xi12(xi);
+        _A.bottomRightCorner<3, 3>() = _A.bottomRightCorner<3, 3>() * interOmegaRot(xi12.rot());
     }
 
     virtual ~TransformationPrior() { }
