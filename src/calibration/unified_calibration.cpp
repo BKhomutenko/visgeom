@@ -36,7 +36,7 @@ bool GenericCameraCalibration::compute()
     Solver::Options options;
 //        options.check_gradients = true;
     options.gradient_check_relative_precision = 1e-2;
-    options.max_num_iterations = 250;
+    options.max_num_iterations = 1000;
     options.function_tolerance = 1e-10;
     options.gradient_tolerance = 1e-10;
     options.parameter_tolerance = 1e-10;
@@ -44,7 +44,7 @@ bool GenericCameraCalibration::compute()
 //        options.minimizer_progress_to_stdout = true;
     Solver::Summary summary;
     Solve(options, &globalProblem, &summary);
-    cout << summary.FullReport() << endl;
+    cout << summary.BriefReport() << endl;
     
     cout << "Intrinsic parameters :" << endl;
     for (auto & x : intrinsicMap)
@@ -146,16 +146,22 @@ void GenericCameraCalibration::initTransformChainInfo(const ptree & node)
     transNameVec.clear();
     transStatusVec.clear();
     cameraName = node.get<string>("camera");
-    cout << cameraName << endl;
+    cout <<"Camera : " <<  cameraName << endl;
+    cout <<"Transformations : ";
     for (auto & transInfo : node.get_child("transform_chain"))
     {
         transNameVec.push_back(transInfo.second.get<string>("name"));
-        cout << transNameVec.back() <<  " ";
+        cout << transNameVec.back();
         if (transInfo.second.get<bool>("direct")) 
         {
             transStatusVec.push_back(TRANSFORM_DIRECT);
         }
-        else transStatusVec.push_back(TRANSFORM_INVERSE);
+        else
+        {
+            transStatusVec.push_back(TRANSFORM_INVERSE);
+            cout << "_inv";
+        }
+        cout <<  "   ";
     }
     cout << endl;
 }
@@ -194,10 +200,8 @@ void GenericCameraCalibration::initGrid(const ptree & node)
 void GenericCameraCalibration::getInitTransform(Transformation<double> & xi,
             const string & initName, int gridIdx)
 {
-    cout << "transformExtract" << endl;
     for (int i = 0; i < transNameVec.size(); i++)
     {
-        cout << xi << endl;
         const string & name = transNameVec[i];
         if (name == initName) break;
         else if (transStatusVec[i] == TRANSFORM_DIRECT)
@@ -211,7 +215,6 @@ void GenericCameraCalibration::getInitTransform(Transformation<double> & xi,
     }
     for (int i = transNameVec.size() - 1; i >= 0; i--)
     {
-        cout << xi << endl;
         const string & name = transNameVec[i];
         if (name == initName)
         {
@@ -382,28 +385,28 @@ void GenericCameraCalibration::addGridResidualBlocks()
         switch (ptrVec.size())
         {
         case 0:
-            globalProblem.AddResidualBlock(costFunction, NULL,
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
                  intrinsicMap[cameraName].data());
             break;
         case 1:
-            globalProblem.AddResidualBlock(costFunction, NULL,
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
                     ptrVec[0], intrinsicMap[cameraName].data());
             break;
         case 2:
-            globalProblem.AddResidualBlock(costFunction, NULL,
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
                     ptrVec[0], ptrVec[1], intrinsicMap[cameraName].data());
             break;
         case 3:
-            globalProblem.AddResidualBlock(costFunction, NULL,
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
                     ptrVec[0], ptrVec[1], ptrVec[2], intrinsicMap[cameraName].data());
             break;
         case 4:
-            globalProblem.AddResidualBlock(costFunction, NULL,
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
                     ptrVec[0], ptrVec[1], ptrVec[2],
                     ptrVec[3], intrinsicMap[cameraName].data());
             break;
         case 5:
-            globalProblem.AddResidualBlock(costFunction, NULL,
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
                     ptrVec[0], ptrVec[1], ptrVec[2],
                     ptrVec[3], ptrVec[4], intrinsicMap[cameraName].data());
             break;
