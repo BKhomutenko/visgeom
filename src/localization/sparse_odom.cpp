@@ -151,7 +151,7 @@ double SparseOdometry::computeTransfSparse(const Vector3dVec & xVec1, const Vect
 //        cout << summary.BriefReport() << endl;
     if (report) cout << summary.FullReport() << endl;
     xiOut = Transf(xiArr.data());
-    return summary.final_cost; // chi2 test, 16 variables, 2% confidence
+    return summary.final_cost; 
 }
     
 void SparseOdometry::ransacFivePoint(const Vector3dVec & cloud1,
@@ -162,7 +162,8 @@ void SparseOdometry::ransacFivePoint(const Vector3dVec & cloud1,
     //define constants
     int maxIteration = 50;
     double thresh = 3;
-    int inlierCount = 5;
+    const int numRansacPoints = 2;
+    int inlierCount = numRansacPoints;
     
     vector<int> indexVec;
     for (int idx = 0; idx < cloud1.size(); idx++)
@@ -180,7 +181,7 @@ void SparseOdometry::ransacFivePoint(const Vector3dVec & cloud1,
         shuffle(indexVec.begin(), indexVec.end(), g);
         Vector3dVec xSampleVec1, xSampleVec2;
         Vector2dVec pSampleVec2;
-        for (auto iter = indexVec.begin(); iter != indexVec.begin() + 5; ++iter)
+        for (auto iter = indexVec.begin(); iter != indexVec.begin() + numRansacPoints; ++iter)
         {
             xSampleVec1.push_back(cloud1[*iter]);
             xSampleVec2.push_back(cloud2[*iter]);
@@ -189,7 +190,8 @@ void SparseOdometry::ransacFivePoint(const Vector3dVec & cloud1,
         
         // fit the model
         Transf xiOut;
-        if (not computeTransfSparse(xSampleVec1, xSampleVec2, pSampleVec2, xiOdom, xiOut)) continue;
+        //TODO // chi2 test, 16 variables, 2% confidence
+        computeTransfSparse(xSampleVec1, xSampleVec2, pSampleVec2, xiOdom, xiOut);
         
         vector<double> lambdaVec(cloud1.size());
         xiOut = xiBaseCam.inverseCompose(xiOut).compose(xiBaseCam);
