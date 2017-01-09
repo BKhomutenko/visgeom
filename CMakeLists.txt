@@ -21,6 +21,7 @@ include_directories(include)
 add_library( calibration STATIC     
     src/calibration/unified_calibration.cpp
     src/calibration/calib_cost_functions.cpp
+    src/calibration/trajectory_generation.cpp
 )
 
 target_link_libraries( calibration 
@@ -61,6 +62,14 @@ target_link_libraries( calib
     ${Boost_LIBRARIES}
 )
 
+add_executable( optim_trajectory
+    test/calibration/trajectory.cpp
+)
+
+target_link_libraries( optim_trajectory
+    calibration
+    ${CERES_LIBRARIES}
+)
 ### RECONSTRUCTION ###
 
 add_executable( stereo 

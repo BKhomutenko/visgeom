@@ -60,6 +60,8 @@ using Eigen::Vector2i;
 using Eigen::Vector3i;
 using Eigen::Map;
 
+using Eigen::JacobiSVD;
+
 template<typename T>
 using Vector3Vec = std::vector<Vector3<T>>;
 template<typename T>

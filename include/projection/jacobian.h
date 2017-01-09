@@ -54,7 +54,7 @@ V = L_uTheta * dxi/dt
 class CameraJacobian
 {
 public:
-    CameraJacobian(const ICamera * camera, const Transformation<double> & T12) :
+    CameraJacobian(const ICamera * camera, const Transf & T12) :
         _camera(camera->clone()),
         R21( T12.rotMatInv() ),
         M21( R21 * interOmegaRot(T12.rot()) ) {}
@@ -114,7 +114,7 @@ class InterJacobian
 {
 public:
     InterJacobian(const ICamera * camera,
-            const Transformation<double> & xi13, const Transformation<double> & xi23, bool inverted) :
+            const Transf & xi13, const Transf & xi23, bool inverted) :
     _camera(camera->clone()),
     R12( xi13.rotMat() * xi23.rotMatInv() ),
     t13( xi13.trans() ),
@@ -169,6 +169,4 @@ private:
     Vector3d t13;
     //R12 IS NOT NECESSARILY A ROTATION MATRIX
 };
-
-
 
