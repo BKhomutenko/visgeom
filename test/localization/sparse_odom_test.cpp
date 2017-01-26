@@ -39,8 +39,10 @@ void testJacobian(const vector<Vector3d> & xVec1, Transf xi12,
     MyJacMat jacMat((xVec1.size() * 2), 6);
     double * param = transfArr.data(), * jac = jacMat.data();
     projectionCost->Evaluate(&param, residual.data(), &jac);
-    JacobiSVD<MyJacMat> svd(jacMat);
+    JacobiSVD<MyJacMat> svd(jacMat, Eigen::ComputeThinV);
+    cout << xi12 << endl;
     cout << svd.singularValues() << endl;
+    cout << svd.matrixV() << endl;
     cout << residual << endl;
 }
 
@@ -75,7 +77,7 @@ int main(int argc, char** argv)
     xVec1.emplace_back(1, 1, 5);
     xVec1.emplace_back(-1, .5, 4);
     
-    Transf xi12(0.1, 0.1, 0.1, 0.1, 0.1, 0.1);
+    Transf xi12(0.1, 0.1, 0.1, 0.1, 0.1, 0.3);
     
     testJacobian(xVec1, xi12, &camera);
     

@@ -140,7 +140,7 @@ double SparseOdometry::computeTransfSparse(const Vector3dVec & xVec1, const Vect
     problem.AddResidualBlock(projectionCost, NULL, xiArr.data());
     
     Solver::Options options;
-//        options.check_gradients = true;
+        options.check_gradients = true;
     Solver::Summary summary;
 //        options.function_tolerance = 1e-8;
 //        options.gradient_tolerance = 1e-8;
