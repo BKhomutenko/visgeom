@@ -219,6 +219,29 @@ public:
         return Transformation<T2>(trans, rot);
     }
     
+    //TODO check
+    Matrix<T, 6, 6> screwTransf() const
+    {
+        Matrix3<T> R = rotMat();
+        Matrix<T, 6, 6> res;
+        res.template topLeftCorner<3, 3>() = R;
+        res.template topRightCorner<3, 3>() = hat(mtrans) * R;
+        res.template bottomLeftCorner<3, 3>() = Matrix3<T>::Zero();
+        res.template bottomRightCorner<3, 3>() = R;
+        return res;
+    }
+    
+    Matrix<T, 6, 6> screwTransfInv() const
+    {
+        Matrix3<T> R = rotMatInv();
+        Matrix<T, 6, 6> res;
+        res.template topLeftCorner<3, 3>() = R;
+        res.template topRightCorner<3, 3>() = -R * hat(mtrans);
+        res.template bottomLeftCorner<3, 3>() = Matrix3<T>::Zero();
+        res.template bottomRightCorner<3, 3>() = R;
+        return res;
+    }
+    
 private:
     Vector3<T> mrot;
     Vector3<T> mtrans;
