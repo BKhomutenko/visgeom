@@ -30,11 +30,13 @@ class ITrajectory
 public:
     ITrajectory() {}
     virtual ~ITrajectory() {}
-    virtual vector<Transf> compute(const double * params) const = 0;
+    virtual void compute(const double * params, vector<Transf> & trajVec, 
+            vector<Matrix6d> & covVec) const = 0;
     virtual int paramSize() const = 0;
+    
 };
 
-const double DIFF_EPS = 1e-6; //FIXME
+const double DIFF_EPS = 1e-8; //FIXME
 
 struct TrajectoryQuality : FirstOrderFunction
 {
@@ -55,7 +57,7 @@ struct TrajectoryQuality : FirstOrderFunction
     
     ITrajectory * _traj;
     Transf _xiCam;
-    Matrix6d _infoVis;  // invers of Covariance_vis
+    Matrix6d _covVis;  // invers of Covariance_vis
     Matrix6d _hessPrior;  // L^T * C_prior^-1 * L   --  the regularization term
 };
 

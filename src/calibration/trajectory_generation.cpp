@@ -23,16 +23,9 @@ TrajectoryQuality::TrajectoryQuality(ITrajectory * traj, Transf xiCam,
         const Matrix6d & CovVis, const Matrix6d & CovPrior) : 
     _traj(traj),
     _xiCam(xiCam),
-    _infoVis(CovVis.inverse())
+    _covVis(CovVis),
+    _hessPrior(CovPrior.inverse())
 {
-    Matrix6d infoPrior = CovPrior.inverse();
-    Matrix3d M = interOmegaRot(xiCam.rot());
-    Matrix3d Mt = M.transpose();
-    
-    _hessPrior.topLeftCorner<3, 3>() = infoPrior.topLeftCorner<3, 3>();  
-    _hessPrior.topRightCorner<3, 3>() = infoPrior.topRightCorner<3, 3>() * M;
-    _hessPrior.bottomLeftCorner<3, 3>() = Mt * infoPrior.bottomLeftCorner<3, 3>();
-    _hessPrior.bottomRightCorner<3, 3>() = Mt * infoPrior.bottomRightCorner<3, 3>() * M;
 }
     
 bool TrajectoryQuality::Evaluate(const double * params,
@@ -56,21 +49,17 @@ bool TrajectoryQuality::Evaluate(const double * params,
 
 double TrajectoryQuality::EvaluateCost(const double * params) const
 {
-    vector<Transf> xiOdomVec = _traj->compute(params);
+    vector<Transf> xiOdomVec;
+    vector<Matrix6d> covOdomVec;
+    _traj->compute(params, xiOdomVec, covOdomVec);
     Matrix6d H = _hessPrior;
-    for (auto & xi : xiOdomVec)
+    for (int i = 0; i < xiOdomVec.size(); i++)
     {
-        Transf xiOrigCam = xi.compose(_xiCam);
-        Transf xiVis = _xiCam.inverseCompose(xiOrigCam);
-        Matrix3d RcamOrig = xiOrigCam.rotMatInv();
-        Matrix3d RorigCam = RcamOrig.transpose();
-        Matrix6d infoOrig;
-        infoOrig.topLeftCorner<3, 3>() = RorigCam * _infoVis.topLeftCorner<3, 3>() * RcamOrig;
-        infoOrig.topRightCorner<3, 3>() = RorigCam * _infoVis.topRightCorner<3, 3>() * RcamOrig;
-        infoOrig.bottomLeftCorner<3, 3>() = RorigCam * _infoVis.bottomLeftCorner<3, 3>() * RcamOrig;
-        infoOrig.bottomRightCorner<3, 3>() = RorigCam * _infoVis.bottomRightCorner<3, 3>() * RcamOrig;
-        Matrix6d jac = dxi1xi2dxi1(_xiCam, xiVis) - dxi1xi2dxi2(xi, _xiCam);
-        H += jac.transpose() * infoOrig * jac;
+        Matrix6d LcamOdom = _xiCam.screwTransfInv();
+        Matrix6d C = _covVis + LcamOdom * covOdomVec[i] * LcamOdom.transpose();
+        Transf xiVis = _xiCam.inverseCompose(xiOdomVec[i]).compose(_xiCam);
+        Matrix6d J = xiVis.screwTransfInv() - Matrix6d::Identity();
+        H += (J.transpose() * C.inverse() * J) / xiOdomVec.size();
     }
     JacobiSVD<Matrix6d> svd(H);
     double res = 0;

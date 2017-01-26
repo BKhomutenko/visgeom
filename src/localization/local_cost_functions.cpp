@@ -479,10 +479,12 @@ bool SparseReprojectCost::Evaluate(double const * const * params,
                 if (residual[2*i] == DOUBLE_BIG)
                 {
                     fill(jacobian[0] + i * 12, jacobian[0] + (i + 1) * 12, 0);
-                    continue;
                 }
-                jacobianCalculator.dpdxi(xVec2[i], jacobian[0] + i*12,
+                else
+                {
+                    jacobianCalculator.dpdxi(xVec2[i], jacobian[0] + i*12,
                                                    jacobian[0] + i*12 + 6);
+                }
             }
             
             //length jacobian
@@ -540,7 +542,7 @@ OdometryPrior::OdometryPrior(const double errV, const double errW,
     
     xiOdom.toArray(_dxiPrior.data());
     
-    Matrix32d dfdu;
+    Matrixd<3, 2> dfdu;
     dfdu <<     c,     -l2 * s,  
                 s,      l2 * c, 
                 0,           1;

@@ -133,7 +133,7 @@ OdometryPrior::OdometryPrior(const double errV, const double errW, const double 
     
     xi12.toArray(_dxiPrior.data());
     
-    Matrix32d dfdu;
+    Matrixd<3, 2> dfdu;
     dfdu <<     c,     -l2 * s,  
                 s,      l2 * c, 
                 0,           1;

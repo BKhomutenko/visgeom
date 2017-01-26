@@ -39,14 +39,16 @@ using Vector3 = Eigen::Matrix<T, 3, 1>;
 template<typename T>
 using Matrix3 = Eigen::Matrix<T, 3, 3>;
 
+template<int R, int C>
+using Matrixd = Eigen::Matrix<double, R, C>;
+
+
 using Covector2d = Eigen::Matrix<double, 1, 2>;
 using Covector3d = Eigen::Matrix<double, 1, 3>;
 using Covector6d = Eigen::Matrix<double, 1, 6>;
 using Matrix23drm = Eigen::Matrix<double, 2, 3, Eigen::RowMajor>;
-using Matrix32d = Eigen::Matrix<double, 3, 2>;
 using Matrix6d = Eigen::Matrix<double, 6, 6>;
 using Matrix6drm = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>;
-using Matrix56d = Eigen::Matrix<double, 5, 6>;
 using Matrix5d = Eigen::Matrix<double, 5, 5>;
 using Eigen::Matrix;
 using Eigen::Vector2d;
