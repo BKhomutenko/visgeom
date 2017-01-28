@@ -263,8 +263,8 @@ struct OdometryPrior : ceres::SizedCostFunction<6, 6>
     virtual bool Evaluate(double const * const * params,
             double * residual, double ** jacobian) const;
     
-    
-    Vector6d _dxiPrior;
+    Transf _xiPrior;
     Matrix6d _A;
+    Matrix6d _J;
 };
 

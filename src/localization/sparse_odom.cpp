@@ -34,7 +34,8 @@ Relative camera pose estimation based on photometric error and depth map
 void SparseOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
 {
     Transf dxi = xiBaseCam.inverseCompose(xiOdom.inverseCompose(xiOdomNew)).compose(xiBaseCam);
-    if (dxi.trans().norm() < MIN_STEREO_BASE and not keypointVec1.empty()) return;
+    //FIXME for debug
+//    if (dxi.trans().norm() < MIN_STEREO_BASE and not keypointVec1.empty()) return;
     
     keypointVec2.clear();
     detector.detect(imageNew, keypointVec2);
@@ -55,8 +56,8 @@ void SparseOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
             if (match.distance > distThresh) continue;
             
             goodMatchVec.push_back(match);
-            auto pt1 = keypointVec1[match.queryIdx].pt;
-            auto pt2 = keypointVec2[match.trainIdx].pt;
+            const auto & pt1 = keypointVec1[match.queryIdx].pt;
+            const auto & pt2 = keypointVec2[match.trainIdx].pt;
             
 //                if (norm(pt1 - pt2) < 3) continue;
             
@@ -70,10 +71,10 @@ void SparseOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
         
         //RANSAC
         vector<bool> inlierMask;
-        ransacFivePoint(reconstVec1, reconstVec2, pointVec2,
+        ransacNPoints(reconstVec1, reconstVec2, pointVec2,
                 xiOdom.inverseCompose(xiOdomNew), inlierMask);
         
-        if (1) //to display the RANSAC result
+        if (0) //to display the RANSAC result
         {
             Mat img_matches;
             drawMatches( imageNew, keypointVec1, imageNew, keypointVec2,
@@ -94,7 +95,7 @@ void SparseOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
                 }
             }
             imshow("lines", lineMat);
-            
+            waitKey();
         }
         
         
@@ -109,12 +110,9 @@ void SparseOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
             xInlierVec2.push_back(reconstVec2[i]);
             pInlierVec2.push_back(pointVec2[i]);
         }
-        Transf xiOut;
         computeTransfSparse(xInlierVec1, xInlierVec2, pInlierVec2, 
-                xiOdom.inverseCompose(xiOdomNew), xiOut, true);
-        cout << xiOut << endl;
-        cout << xiOdom.compose(xiOut) << endl;
-        waitKey();
+                xiOdom.inverseCompose(xiOdomNew), xiIncr, true);
+        xiLocal = xiLocal.compose(xiIncr);
     }
     
     //refresh state
@@ -140,7 +138,7 @@ double SparseOdometry::computeTransfSparse(const Vector3dVec & xVec1, const Vect
     problem.AddResidualBlock(projectionCost, NULL, xiArr.data());
     
     Solver::Options options;
-        options.check_gradients = true;
+//        options.check_gradients = true;
     Solver::Summary summary;
 //        options.function_tolerance = 1e-8;
 //        options.gradient_tolerance = 1e-8;
@@ -154,15 +152,14 @@ double SparseOdometry::computeTransfSparse(const Vector3dVec & xVec1, const Vect
     return summary.final_cost; 
 }
     
-void SparseOdometry::ransacFivePoint(const Vector3dVec & cloud1,
+void SparseOdometry::ransacNPoints(const Vector3dVec & cloud1,
     const Vector3dVec & cloud2, const Vector2dVec & ptVec2,
     const Transf xiOdom, vector<bool> & inlierMask)
 {
     assert(cloud1.size() == cloud2.size());
     //define constants
-    int maxIteration = 50;
+    int maxIteration = 100;
     double thresh = 3;
-    const int numRansacPoints = 2;
     int inlierCount = numRansacPoints;
     
     vector<int> indexVec;

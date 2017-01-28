@@ -114,14 +114,31 @@ int main(int argc, char** argv)
     
     testJacobian(xVec1, xi12, &camera);
     
+    /************************/
+    cout << "Test the jacobian rank for 6 points" << endl;
+    
+    xVec1.clear();
+    xVec1.emplace_back(1, 1, 5);
+    xVec1.emplace_back(-1, 1, 4);
+    xVec1.emplace_back(1, -1, 5);
+    xVec1.emplace_back(-1, -1, 4);
+    xVec1.emplace_back(-1, 0, 3);
+    xVec1.emplace_back(1, 0, 5);
+    
+    testJacobian(xVec1, xi12, &camera);
+    
+    /****************************/
     cout << "odometry test" << endl;
     SparseOdometry odom(&camera, xiBaseCam);
-    for (int i = 0; i < fileVec.size(); i++)
+    for (int i = 0; i < fileVec.size(); i += 10)
     {
         cout << i << endl;
         Mat8u img = imread(prefix + fileVec[i], 0);
         odom.feedData(img, odomVec[i]);
         cout << odomVec[i] << endl;
+        cout << odom.getIntegrated() << endl;
+        cout << odom.getIncrement() << endl;
+        
         imshow("img", img);
         
     }
