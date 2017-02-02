@@ -32,7 +32,7 @@ Relative camera pose estimation based on photometric error and depth map
 //TODO make a parameter structure
 //const double MIN_INIT_DIST = 0.25;   // minimal distance traveled befor VO is used
 //const double MIN_STEREO_BASE = 0.20; // minimal acceptable stereo base
-const int distThresh = 100; // Feature matching threshold
+ // Feature matching threshold
 
 class SparseOdometry
 {
@@ -88,6 +88,7 @@ private:
     BRISK detector;
 //    cv::ORB detector;
     
+    const int distThresh = 100;
 };
 
 

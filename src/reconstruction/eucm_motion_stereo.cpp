@@ -491,6 +491,9 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & 
                 continue;  
             }  // the uncertainty is too small
             
+            //TODO if the uncertainty is small, fuse the two measurements 
+            // replace the old one otherwise
+            
             if (not sampleImage(img2)) { count4++; continue;}
             
             reconstructFirst(depthOut.at(x, y), depthOut.sigma(x, y), depthOut.cost(x, y));
