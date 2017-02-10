@@ -483,7 +483,7 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & 
             
             if (not computeUncertainty(depthIn.at(x, y), depthIn.sigma(x, y))) { count2++; continue;}
             
-            if (gdispMax / gstep < 2) 
+            if (gdispMax / gstep < 3) 
             {
                 count3++;
                 depthOut.at(x, y) = depthIn.at(x, y);

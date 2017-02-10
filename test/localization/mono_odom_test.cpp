@@ -7,6 +7,7 @@
 #include "json.h"
 
 #include "reconstruction/eucm_sgm.h"
+#include "reconstruction/eucm_motion_stereo.h"
 #include "reconstruction/depth_map.h"
 
 #include "localization/photometric.h"
@@ -37,7 +38,8 @@ int main(int argc, char** argv)
     
     SparseOdometry odom(&camera, xiBaseCam);
     
-    const int idx1 = 0, idx2 = 25, idx3 = 25;
+    const int idx1 = 0, idx2 = 20, idx3 = 21;
+    cout << prefix + fileVec[idx1] << endl;
     Mat8u img1 = imread(prefix + fileVec[idx1], 0);
     Mat8u img2 = imread(prefix + fileVec[idx2], 0);
     odom.feedData(img1, odomVec[idx1]);
@@ -63,20 +65,41 @@ int main(int argc, char** argv)
     DepthMap depth;
     Mat32f depthMat;
     stereo.computeStereo(img1, img2, depth);
+    cout << "stereo's done" << endl;
     depth.toInverseMat(depthMat);
     imshow("out1", img2);
     imshow("res", depthMat);
     
-    Mat8u img3 = imread(prefix + fileVec[idx2], 0);
+    
     
     ScalePhotometric photometricLocalizer(5, &camera);
     
-    Transf xi23(xiBaseCam.inverseCompose(odomVec[idx2]).compose(xiBaseCam));
+    photometricLocalizer.setXiBaseCam(xiBaseCam);
     photometricLocalizer.computeBaseScaleSpace(img1);
-    photometricLocalizer.depth() = depth; //TODO make a method setDepth()
-    photometricLocalizer.computePose(img3, xi23);
-    cout <<xiBaseCam.compose(xi23).composeInverse(xiBaseCam) << endl;
-    cout << odomVec[idx1].inverseCompose(odomVec[idx2]) << endl;
-    waitKey();
+    photometricLocalizer.setDepth(depth);
+    
+    MotionStereoParameters stereoMotionParams(stereoParams);
+    
+    MotionStereo mstereo(&camera, &camera, stereoMotionParams);
+    mstereo.setBaseImage(img1);
+    DepthMap d2 = depth;
+    for (int i = 0; i < 30; i++)
+    {
+        cout << "Idx : " << i << endl;
+        Mat8u img3 = imread(prefix + fileVec[i], 0);
+        Transf xi13(odomVec[idx1].inverseCompose(odomVec[i]));
+        cout << xi13 << endl;
+        photometricLocalizer.computePose(img3, xi13);
+        cout << xi13 << endl; 
+        if (i > 20)
+        {
+            Transf xiCam12 = xiBaseCam.inverseCompose(xi13).compose(xiBaseCam);
+            d2 = mstereo.compute(xiCam12, img3, d2);
+            d2.toInverseMat(depthMat); 
+            imshow("res2", depthMat);
+            waitKey();
+        }
+    }
+    
 }
 

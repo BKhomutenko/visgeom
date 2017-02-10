@@ -65,6 +65,7 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
     }
     vector<int> reconstIdxVec;
     depthMap.reconstruct(imagePointVec, reconstIdxVec, dataPack.cloud);
+    _xiBaseCam.transform(dataPack.cloud, dataPack.cloud);
     for (auto & idx : reconstIdxVec)
     {
         dataPack.idxVec.push_back(packIdxVec[idx]);
@@ -98,7 +99,7 @@ void ScalePhotometric::computePose(int scaleIdx, Transformation<double> & T12)
     scaleSpace2.setActiveScale(scaleIdx);
     array<double, 6> pose = T12.toArray();
     Problem problem;
-    PhotometricCostFunction * costFunction = new PhotometricCostFunction(camPtr2, dataPack,
+    PhotometricCostFunction * costFunction = new PhotometricCostFunction(camPtr2, _xiBaseCam, dataPack,
                                             scaleSpace2.get(), scaleSpace2.getActiveScale());
     problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), pose.data());
     
@@ -159,13 +160,13 @@ array<double, 6> ScalePhotometric::covarianceEigenValues(const int scaleIdx,
     if (baseValues)
     {
         //FIXME must be camPtr1
-        costFunction = new PhotometricCostFunction(camPtr2, dataPack,
+        costFunction = new PhotometricCostFunction(camPtr2, _xiBaseCam, dataPack,
                                 scaleSpace1.get(), scaleSpace1.getActiveScale());
     }
     else
     {
         scaleSpace2.setActiveScale(scaleIdx);
-        costFunction = new PhotometricCostFunction(camPtr2, dataPack,
+        costFunction = new PhotometricCostFunction(camPtr2, _xiBaseCam, dataPack,
                                 scaleSpace2.get(), scaleSpace2.getActiveScale());
     }
     cout << "Cost function is created" << endl;

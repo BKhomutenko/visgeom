@@ -40,21 +40,20 @@ works faster than autodiff version and works with any ICamera
 bool PhotometricCostFunction::Evaluate(double const * const * parameters,
         double * residual, double ** jacobian) const
 {
-    Transf T12(parameters[0]);
-    
+    Transf xiBase(parameters[0]);
+    Transf xiCam = xiBase.compose(_xiBaseCam);
     // point cloud in frame 2
     vector<Vector3d> transformedPoints;
-    T12.inverseTransform(_dataPack.cloud, transformedPoints);
+    xiCam.inverseTransform(_dataPack.cloud, transformedPoints);
     
     // init the image interpolation
     ceres::BiCubicInterpolator<Grid2D> imageInterpolator(_imageGrid);
     
     bool computeJac = (jacobian != NULL and jacobian[0] != NULL);
-    
     if (computeJac)
     {
         // L_uTheta
-        CameraJacobian jacobianCalculator(_camera, T12);
+        CameraJacobian jacobianCalculator(_camera, xiBase, _xiBaseCam);
         for (int i = 0; i < transformedPoints.size(); i++)
         {
             Vector2d pt;
@@ -101,8 +100,9 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
     }
     return true;
 }
-    
-    
+
+
+
 bool MutualInformation::Evaluate(double const * parameters,
         double * cost, double * gradient) const
 {
