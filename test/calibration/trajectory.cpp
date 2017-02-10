@@ -21,6 +21,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "geometry/geometry.h"
 #include "calibration/trajectory_generation.h"
+#include "projection/eucm.h"
 
 class CircularTrajectory : public ITrajectory
 {
@@ -90,15 +91,15 @@ public:
 
 int main(int argc, char** argv) 
 {
-    int circleCount = 1;
+    int circleCount = 3;
     vector<double> paramVec;
     for (int i = 0; i < circleCount; i++)
     {
-        paramVec.push_back(i * 0.01 + 0.016);
-        paramVec.push_back(0.01);
+        paramVec.push_back(i * 0.01 + 0.03);
+        paramVec.push_back(0.02);
     }
-    Transf xiCam(0.2, 0, 0.3, 1.2, 1.2, 1.2);
-    double numberSteps = 100;
+    
+    double numberSteps = 10;
     CircularTrajectory * traj = new CircularTrajectory(numberSteps, circleCount);
     vector<Transf> xiOdomVec;
     vector<Matrix6d> covOdomVec;
@@ -110,6 +111,69 @@ int main(int argc, char** argv)
 //        cout << covOdomVec[i] << endl << endl;
 //    }
     
+    
+    
+    //generate the board
+    Vector3dVec board;
+    const int N = 5, M = 8;
+    double step = 0.1;
+    for (int i = 0; i < N; i++)
+    {
+        for (int j = 0; j < M; j++)
+        {
+            board.emplace_back(step * i, step * j, 0);
+        }
+    }
+    
+    Transf xiBoard(2, -0.5, 0.5, 0, -M_PI / 2, 0);
+    Transf xiCam(0.2, 0, 0.3, 1.2, 1.2, 1.2);
+    
+//    Transf xiCam2(0, 0, 0, 0, 0, 0);
+    
+    vector<double> camParams{0.5, 1, 250,  250,  500, 400};
+    EnhancedCamera cam(1000, 800, camParams.data());
+    TrajectoryVisualQuality * quality = new TrajectoryVisualQuality(
+                                                traj, &cam, xiCam, xiBoard, board,
+                                                Matrix6d::Identity(), Matrix2d::Identity());
+    
+    //////////////////////////////////
+    //Test the visual covariance
+    //////////////////////////////////
+    Matrix6d C = quality->visualCov(Transf(0.1, 0.1, 0, 0, 0, .1).compose(xiCam));
+    cout << C << endl << endl;
+    cout << C.inverse() << endl;
+    
+    cout << quality->imageLimitsCost(Transf(0.1, 0.1, 0, 0, 0, 1.2).compose(xiCam)) << endl;
+    
+    ceres::GradientProblem problem(quality);
+
+    ceres::GradientProblemSolver::Options options;
+    options.max_num_iterations = 500;
+    options.minimizer_progress_to_stdout = true;
+    ceres::GradientProblemSolver::Summary summary;
+    ceres::Solve(options, problem, paramVec.data(), &summary);
+    
+    std::cout << summary.FullReport() << endl;
+    
+    for (int i = 0; i < circleCount; i++)
+    {
+        cout << paramVec[i * 2] << "   " << paramVec[i * 2 + 1] << endl;
+    }
+    
+    traj->compute(paramVec.data(), xiOdomVec, covOdomVec);
+    
+    for (int i = 0; i < xiOdomVec.size(); i++)
+    {
+        cout << xiOdomVec[i] << endl;
+//        cout << covOdomVec[i].diagonal().transpose() << endl << endl;
+    }
+    
+    return 0;
+    //////////////////////////////////
+    //optimize the trajectory (gradient descent)
+    //////////////////////////////////
+    
+//    Transf xiCam(0.2, 0, 0.3, 1.2, 1.2, 1.2);
     TrajectoryQuality * costFunction = new TrajectoryQuality(
                                             traj,
                                             xiCam,
