@@ -23,6 +23,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "ceres.h"
 #include "json.h"
 
+#include "projection/generic_camera.h"
 #include "geometry/geometry.h"
 
 class ITrajectory
@@ -58,9 +59,42 @@ struct TrajectoryQuality : FirstOrderFunction
     ITrajectory * _traj;
     Transf _xiCam;
     Matrix6d _covVis;  // invers of Covariance_vis
-    Matrix6d _hessPrior;  // L^T * C_prior^-1 * L   --  the regularization term
+    Matrix6d _hessPrior;  // C_prior^-1   --  the regularization term
 };
 
+//Takes into account the field-of-view constraint and the visual localization quality
+struct TrajectoryVisualQuality : FirstOrderFunction
+{
+    // the class takes the ownership of traj
+    TrajectoryVisualQuality(ITrajectory * traj, const ICamera * camera,
+            Transf xiCam, Transf xiBoard, const Vector3dVec & board,
+            const Matrix6d & CovPrior, const Matrix2d & CovPt);
+    
+    virtual bool Evaluate(const double * params,
+            double * residual, double * jacobian) const;
+    
+    Matrix6d visualCov(const Transf & camPose) const;
+    
+    //TODO to think how to regularize for different cameras
+    //This function is adapted for fisheye cameras
+    double imageLimitsCost(const Transf & camPose) const;
+    
+    double EvaluateCost(const double * params) const;
+    
+    virtual int NumParameters() const { return _traj->paramSize(); }
+    virtual ~TrajectoryVisualQuality()
+    {
+        delete _traj;
+        delete _camera;
+    }
+    
+    ICamera * _camera;
+    ITrajectory * _traj;
+    Transf _xiCam, _xiBoard;
+    Vector3dVec _board;
+    Matrix2d _ptStiffness;  // A^T * A = C_pt^-1
+    Matrix6d _hessPrior;  // C_prior^-1   --  the regularization term
+};
 
 //TODO put lesewhere
 // Transformation jacobian

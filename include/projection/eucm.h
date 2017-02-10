@@ -245,6 +245,9 @@ public:
         }
     }
     
+    virtual double getCenterU() { return params[4]; }
+    virtual double getCenterV() { return params[5]; }
+    
     virtual EnhancedCamera * clone() const { return new EnhancedCamera(width, height, params.data()); }
     
     virtual ~EnhancedCamera() {}

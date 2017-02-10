@@ -37,7 +37,11 @@ public:
 
     /// projects 3D points onto the original image
     virtual bool projectPoint(const Vector3d & src, Vector2d & dst) const = 0;
-
+    
+    virtual double getCenterU() { return width / 2; }
+    
+    virtual double getCenterV() { return height / 2; }
+    
     //TODO implement the projection and distortion Jacobian
     virtual bool projectionJacobian(const Vector3d & src,
             double * dudx, double * dvdx) const {return false;}
