@@ -310,6 +310,7 @@ bool MotionStereo::computeUncertainty(double d, double s)
         if (not _camera2->projectPoint(Xmin, ptFin)) return false;
         int delta = round((ptFin - gptStart).norm());
         gdispMax = min( _params.dispMax, delta + 1);
+        ptStartRound = round(gptStart);
         flags |= GLB_START_POINT | GLB_DISP_MAX;
     }
     return true;
@@ -320,7 +321,6 @@ bool MotionStereo::sampleImage(const Mat8u & img2)
     uint32_t neededFlag = GLB_START_POINT | GLB_DISP_MAX | GLB_STEP | GLB_X;
     assert(flags & neededFlag == neededFlag);
     
-    Vector2i ptStartRound = round(gptStart);
     if ((ptStartRound - epipoles().getSecondPx()).squaredNorm() < 2500) return false;
     int distance = gdispMax / gstep + MARGIN;
     
@@ -399,7 +399,7 @@ void MotionStereo::reconstructFirst(double & dist, double & sigma, double & cost
 //        cout << endl<< endl;
 //    }
     
-    if (*bestCostIter < _params.maxError)
+    if (*bestCostIter < _params.maxError and *bestCostIter < 2*cost)
     {
         int dBest = bestCostIter - costVec.begin();
         triangulate(gu, gv, guVec[dBest], gvVec[dBest], guVec[dBest + 1], gvVec[dBest + 1],
@@ -411,7 +411,7 @@ void MotionStereo::reconstructFirst(double & dist, double & sigma, double & cost
 //                    <<  guVec[dBest] << " "  << gvVec[dBest] << " " 
 //                     << guVec[dBest + 1] << " "  << gvVec[dBest + 1] << endl;
 //        }
-        cost = *bestCostIter;
+        cost = cost * 0.7 +  (*bestCostIter) * 0.3; //FIXME experimental
     }
 }
 
@@ -426,15 +426,35 @@ void MotionStereo::reconstructSecond(DepthMap & depth)
         int dBest = bestCostIter - costVec.begin();
         int x = depth.xConv(guVec[dBest]);
         int y = depth.yConv(gvVec[dBest]);
-        
+        if (not depth.isValid(x, y)) return;
         double & dist = depth.at(x, y);
         double & sigma = depth.sigma(x, y); 
         double & cost = depth.cost(x, y);
         
+        double distOld = dist;
+        double sigmaOld = sigma;
+        
         triangulate(gu, gv, guVec[dBest], gvVec[dBest], guVec[dBest + 1], gvVec[dBest + 1],
                 dist, sigma, CAMERA_2); 
-                //TODO does not work for CAMERA_2 yet
-        cost = *bestCostIter;
+        
+        if (distOld != OUT_OF_RANGE)
+        {
+            if (distOld < dist - sigma - sigmaOld) 
+            {
+                //the old measurement is significantly closer to the camera
+                dist = distOld;
+                sigma = sigmaOld;
+                return;
+            }
+            else if (distOld < dist + sigma + sigmaOld) 
+            {
+                // two measurements match
+                double koef = 1. / (sigma + sigmaOld);
+                dist = (dist * sigmaOld + distOld * sigma) * koef;
+                sigma = (sigmaOld * sigma) * koef;
+            }
+        }
+        cost = cost * 0.7 +  (*bestCostIter) * 0.3; //FIXME experimental
     }
 }
 
@@ -463,13 +483,16 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2)
     return depthOut;
 }
 
-DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & depthIn, int arg)
+DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & depthIn, CameraIdx camIdx)
 {
     //init necessary data structures
     setTransformation(T12);
     assert(ScaleParameters(depthIn) == ScaleParameters(_params));
     DepthMap depthOut = depthIn;
-//    depthOut.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
+    if (camIdx == CAMERA_2)
+    {
+        depthOut.setTo(OUT_OF_RANGE, OUT_OF_RANGE);
+    }
     int count1 = 0, count2 = 0, count3 = 0, count4 = 0;
     //for each point
     for (int y = 0; y < depthOut.yMax; y++)
@@ -483,12 +506,28 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & 
             
             if (not computeUncertainty(depthIn.at(x, y), depthIn.sigma(x, y))) { count2++; continue;}
             
-            if (gdispMax / gstep < 3) 
+            if (gdispMax / gstep < 2) 
             {
-                count3++;
-                depthOut.at(x, y) = depthIn.at(x, y);
-                depthOut.sigma(x, y) = depthIn.sigma(x, y);
-                continue;  
+                if (camIdx == CAMERA_1)
+                { 
+                    count3++;
+                    depthOut.at(x, y) = depthIn.at(x, y);
+                    depthOut.sigma(x, y) = depthIn.sigma(x, y);
+                    depthOut.cost(x, y) = depthIn.cost(x, y);
+                    continue;  
+                }
+                else if (camIdx == CAMERA_2)
+                {
+                    
+                    int x2 = depthOut.xConv(ptStartRound[0]);
+                    int y2 = depthOut.yConv(ptStartRound[1]);
+                    if (not depthOut.isValid(x2, y2)) continue;
+                    count3++;
+                    depthOut.at(x2, y2) = triangulate(gu, gv, ptStartRound[0], ptStartRound[1], CAMERA_2); 
+                    depthOut.sigma(x2, y2) = depthIn.sigma(x, y);
+                    depthOut.cost(x2, y2) = depthIn.cost(x, y);
+                    continue;  
+                }
             }  // the uncertainty is too small
             
             //TODO if the uncertainty is small, fuse the two measurements 
@@ -496,7 +535,15 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & 
             
             if (not sampleImage(img2)) { count4++; continue;}
             
-            reconstructFirst(depthOut.at(x, y), depthOut.sigma(x, y), depthOut.cost(x, y));
+            //TODO reject outliers
+            if (camIdx == CAMERA_1)
+            { 
+                reconstructFirst(depthOut.at(x, y), depthOut.sigma(x, y), depthOut.cost(x, y));
+            }
+            else if (camIdx == CAMERA_2)
+            {
+                reconstructSecond(depthOut);
+            }
         }
     }
     cout << count1 << endl;
@@ -505,3 +552,5 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & 
     cout << count4 << endl;
     return depthOut;
 }
+
+

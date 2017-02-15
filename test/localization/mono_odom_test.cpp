@@ -38,7 +38,7 @@ int main(int argc, char** argv)
     
     SparseOdometry odom(&camera, xiBaseCam);
     
-    const int idx1 = 0, idx2 = 20, idx3 = 21;
+    const int idx1 = 25, idx2 = 70, idx3 = 80;
     cout << prefix + fileVec[idx1] << endl;
     Mat8u img1 = imread(prefix + fileVec[idx1], 0);
     Mat8u img2 = imread(prefix + fileVec[idx2], 0);
@@ -73,8 +73,11 @@ int main(int argc, char** argv)
     
     
     ScalePhotometric photometricLocalizer(5, &camera);
+    photometricLocalizer.setVerbosity(1);
     
     photometricLocalizer.setXiBaseCam(xiBaseCam);
+    imshow("img1", img1);
+    waitKey();
     photometricLocalizer.computeBaseScaleSpace(img1);
     photometricLocalizer.setDepth(depth);
     
@@ -83,7 +86,10 @@ int main(int argc, char** argv)
     MotionStereo mstereo(&camera, &camera, stereoMotionParams);
     mstereo.setBaseImage(img1);
     DepthMap d2 = depth;
-    for (int i = 0; i < 30; i++)
+    
+    
+    //TODO implement the whole localization loop
+    for (int i = idx1; i < idx1 + 50; i++)
     {
         cout << "Idx : " << i << endl;
         Mat8u img3 = imread(prefix + fileVec[i], 0);
@@ -91,15 +97,32 @@ int main(int argc, char** argv)
         cout << xi13 << endl;
         photometricLocalizer.computePose(img3, xi13);
         cout << xi13 << endl; 
-        if (i > 20)
+        if (i > idx1 + 20)
         {
             Transf xiCam12 = xiBaseCam.inverseCompose(xi13).compose(xiBaseCam);
             d2 = mstereo.compute(xiCam12, img3, d2);
+            d2.filterNoise();
+            photometricLocalizer.setDepth(d2);
             d2.toInverseMat(depthMat); 
+            //FIXME rewrite with Mat8u
+            Mat32f img3f, img3fWrapped;
+            img3.convertTo(img3f, CV_32F);
+            photometricLocalizer.wrapImage(img3f, img3fWrapped, xi13);
+            imshow("wrapped", img3fWrapped/256);
             imshow("res2", depthMat);
+            
+            //TODO for every new keyframe do SGBM
+            
+            DepthMap d3 = mstereo.compute(xiCam12, img3, d2, CAMERA_2);
+            d3.filterNoise();
+            d3.toInverseMat(depthMat); 
+            imshow("res3", depthMat);
             waitKey();
+            waitKey(50);
         }
+        
     }
     
+    return 0;
 }
 

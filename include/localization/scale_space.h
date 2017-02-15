@@ -58,7 +58,7 @@ public:
     
     void generate(const Mat8u & img)
     {
-        cvtColor(img, imgVec[0], CV_32F);
+        img.convertTo(imgVec[0], CV_32F);
         propagate();
     }
 

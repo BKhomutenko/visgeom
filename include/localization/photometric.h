@@ -61,13 +61,13 @@ public:
     DepthMap & depth() { return depthMap; }
     void setDepth(const DepthMap & newDepth) { depthMap = newDepth; }
     
-    void computeBaseScaleSpace(const Mat32f & img1);
+    void computeBaseScaleSpace(const Mat8u & img1);
     
-    void computePose(const Mat32f & img2, Transf & T12);
+    void computePose(const Mat8u & img2, Transf & T12);
     
     void setVerbosity(int newVerbosity) { verbosity = newVerbosity; }
     
-    void computePoseMI(const Mat32f & img2, Transf & T12);
+    void computePoseMI(const Mat8u & img2, Transf & T12);
 
     //TODO make enum for choosing the camera
     array<double, 6> covarianceEigenValues(const int scaleIdx, 
