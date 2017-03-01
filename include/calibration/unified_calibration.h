@@ -49,6 +49,7 @@ protected:
     map<string, vector<Array6d>> sequenceTransformMap;
     map<string, TransformInfo> transformInfoMap;
     map<string, ICamera*> cameraMap;
+    map<string, bool> cameraConstantMap; //TODO make a structure
     Problem globalProblem;
     
     //temporary variables
@@ -103,14 +104,8 @@ public:
     
     
     
-    bool addResiduals(const string & infoFileName)
-    {
-        read_json(infoFileName, root);
-        parseTransforms();
-        parseCameras();
-        parseData();
-    }
-    
+    bool addResiduals(const string & infoFileName);
+        
     bool extractGridProjection(const string & fileName, Vector2dVec & projection, bool checkExtraction);
 
     Transformation<double> estimateInitialGrid(const string & cameraName,

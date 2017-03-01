@@ -63,7 +63,12 @@ public:
     void dpdxi(const Vector3d & X2, double * dudxi, double * dvdxi)
     {
         Matrix23drm projJac;
-        _camera->projectionJacobian(X2, projJac.data(), projJac.data() + 3);
+        if (not _camera->projectionJacobian(X2, projJac.data(), projJac.data() + 3))
+        {
+            fill(dudxi, dudxi + 6, 0.);
+            fill(dvdxi, dvdxi + 6, 0.);
+            return;
+        }
         
         Map<Covector3d> dudtr(dudxi);
         Map<Covector3d> dudrot(dudxi + 3);
@@ -80,8 +85,11 @@ public:
     void dfdxi(const Vector3d & X2, const Covector2d & grad, double * dfdxi)
     {
         Matrix23drm projJac;
-        _camera->projectionJacobian(X2, projJac.data(), projJac.data() + 3);
-        
+        if (not _camera->projectionJacobian(X2, projJac.data(), projJac.data() + 3))
+        {
+            fill(dfdxi, dfdxi + 6, 0.);
+            return;
+        }
         Covector3d dfdX = grad * projJac;
         
         Map<Covector3d> dfdtr(dfdxi);

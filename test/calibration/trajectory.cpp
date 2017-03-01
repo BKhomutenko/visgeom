@@ -23,12 +23,12 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "calibration/trajectory_generation.h"
 #include "projection/eucm.h"
 
+const int PARAM_NUM = 3;
 class CircularTrajectory : public ITrajectory
 {
 public:
-    CircularTrajectory(int numberSteps, int numberCircles = 1) : 
-        _numberSteps(numberSteps),
-        _numberCircles(numberCircles) {}
+    CircularTrajectory(int numberSteps) : 
+        _numberSteps(numberSteps) {}
         
     virtual void compute(const double * params, vector<Transf> & trajVec, 
             vector<Matrix6d> & covVec) const
@@ -39,68 +39,66 @@ public:
         Matrix2d covVW;
         //TODO make parameters
         
-        Matrix6d covAbs = Matrix6d::Identity()*1e-3;
-        for (int circle = 0; circle < _numberCircles; circle++)
+        Matrix6d covAbs = Matrix6d::Identity()*1e-2;
+        double alpha = params[0]; //turn angle
+        double dist = 0.05;//params[PARAM_NUM*circle + 1];
+        double ca = cos(alpha*0.5);
+        double sa = sin(alpha*0.5);
+        Transf xi0(params[2], 0, 0,
+                     0, 0, params[1]);
+        //TODO modelizer proprement l'odometrie            
+        covVW <<    1e-4,        0, 
+                    0,       1e-4;
+                
+        //circular motion model
+        Transf dxi(dist * ca, dist * sa, 0, 0, 0, alpha);
+        //motion jacobian
+        Matrixd<6, 2> dxidu;
+        dxidu <<    ca,     -dist/2 * sa,
+                    sa,     dist/2 * ca,
+                    0,          0,
+                    0,          0,
+                    0,          0,
+                    0,          1;
+        Matrix6d covIncr = dxidu * covVW * dxidu.transpose();
+        trajVec.push_back(xi0);
+        covVec.push_back(covAbs);
+        
+        //Screw transformation matrix
+        Matrix6d L = dxi.screwTransfInv();
+        Matrix6d covOdom = covIncr;
+        for (int i = 1; i < _numberSteps; i++)
         {
-            double alpha = params[2*circle]; //turn angle
-            double dist = params[2*circle + 1];
-            double ca = cos(alpha*0.5);
-            double sa = sin(alpha*0.5);
-            
-            //TODO modelizer proprement l'odometrie            
-            covVW <<    1e-4,        0, 
-                        0,       1e-4;
-                    
-            //circular motion model
-            Transf dxi(dist * ca, dist * sa, 0, 0, 0, alpha);
-            //motion jacobian
-            Matrixd<6, 2> dxidu;
-            dxidu <<    ca,     -dist/2 * sa,
-                        sa,     dist/2 * ca,
-                        0,          0,
-                        0,          0,
-                        0,          0,
-                        0,          1;
-            Matrix6d covIncr = dxidu * covVW * dxidu.transpose();
-            trajVec.push_back(dxi);
-            covVec.push_back(covIncr + covAbs);
-            
-            //Screw transformation matrix
-            Matrix3d R = dxi.rotMatInv();
-            Matrix6d L; //TODO make a separate function
-            L.topLeftCorner<3, 3>() = R;
-            L.topRightCorner<3, 3>() = -R * hat(dxi.trans());
-            L.bottomLeftCorner<3, 3>() = Matrix3d::Zero();
-            L.bottomRightCorner<3, 3>() = R;
-            Matrix6d covOdom = covIncr;
-            for (int i = 1; i < _numberSteps; i++)
-            {
-                trajVec.push_back(trajVec.back().compose(dxi));
-                covOdom = L * covOdom * L.transpose() + covIncr;
-                covVec.push_back(covOdom + covAbs);
-            }
+            trajVec.push_back(trajVec.back().compose(dxi));
+            covOdom = L * covOdom * L.transpose() + covIncr;
+            covVec.push_back(covOdom + covAbs);
         }
     }
     
-    virtual int paramSize() const { return _numberCircles * 2; }
+    virtual int paramSize() const { return  PARAM_NUM; }
     
     int _numberSteps;
-    int _numberCircles;
 };
 
 
 int main(int argc, char** argv) 
 {
-    int circleCount = 3;
+    
+    int circleCount = 2;
+    vector<ITrajectory*> trajVec;
+    double numberSteps = 30;
     vector<double> paramVec;
     for (int i = 0; i < circleCount; i++)
     {
-        paramVec.push_back(i * 0.01 + 0.03);
-        paramVec.push_back(0.02);
+        paramVec.push_back(i * 0.001 + 0.01);
+//        paramVec.push_back(0.01);
+//        paramVec.push_back(0);
+//        paramVec.push_back(0);
+        paramVec.push_back(-0.1);
+        paramVec.push_back(1);
+        trajVec.push_back(new CircularTrajectory(numberSteps));
     }
     
-    double numberSteps = 10;
-    CircularTrajectory * traj = new CircularTrajectory(numberSteps, circleCount);
     vector<Transf> xiOdomVec;
     vector<Matrix6d> covOdomVec;
 //    traj->compute(paramVec.data(), xiOdomVec, covOdomVec);
@@ -121,19 +119,37 @@ int main(int argc, char** argv)
     {
         for (int j = 0; j < M; j++)
         {
-            board.emplace_back(step * i, step * j, 0);
+            board.emplace_back(0, step * j, step * i);
         }
     }
     
-    Transf xiBoard(2, -0.5, 0.5, 0, -M_PI / 2, 0);
-    Transf xiCam(0.2, 0, 0.3, 1.2, 1.2, 1.2);
+    //ZOE
+    /*
+    Transf xiBoard(7, -0.4, 0.5, 0, 0, 0);
+    Matrix3d R;
+    R <<    0,      0,      1, 
+            -1,     0,      0,
+            0,      -1,     0;
+    Transf xiCam(Vector3d(3, 0.35, 0.3), R);
+    cout << xiCam.rot() << endl;
+    */
+    
+    //PIONEER
+    Transf xiBoard(3, -0.4, 0.5, 0, 0, 0);
+    Matrix3d R;
+    R <<    0,      0,      1, 
+            -1,     0,      0,
+            0,      -1,     0;
+    Transf xiCam(Vector3d(0.3, 0, 0.3), R);
+    cout << xiCam.rot() << endl;
+    
     
 //    Transf xiCam2(0, 0, 0, 0, 0, 0);
     
-    vector<double> camParams{0.5, 1, 250,  250,  500, 400};
-    EnhancedCamera cam(1000, 800, camParams.data());
+    vector<double> camParams{0.719981,  1.03894,  381.974,  382.378,  523.6,  366.235};
+    EnhancedCamera cam(1024, 768, camParams.data());
     TrajectoryVisualQuality * quality = new TrajectoryVisualQuality(
-                                                traj, &cam, xiCam, xiBoard, board,
+                                                trajVec, &cam, xiCam, xiBoard, board,
                                                 Matrix6d::Identity(), Matrix2d::Identity());
     
     //////////////////////////////////
@@ -144,11 +160,12 @@ int main(int argc, char** argv)
     cout << C.inverse() << endl;
     
     cout << quality->imageLimitsCost(Transf(0.1, 0.1, 0, 0, 0, 1.2).compose(xiCam)) << endl;
+    cout << quality->imageLimitsCost(Transf(0, 0, 0, 0, 0, 0).compose(xiCam)) << endl;
     
     ceres::GradientProblem problem(quality);
 
     ceres::GradientProblemSolver::Options options;
-    options.max_num_iterations = 500;
+    options.max_num_iterations = 1000;
     options.minimizer_progress_to_stdout = true;
     ceres::GradientProblemSolver::Summary summary;
     ceres::Solve(options, problem, paramVec.data(), &summary);
@@ -157,24 +174,65 @@ int main(int argc, char** argv)
     
     for (int i = 0; i < circleCount; i++)
     {
-        cout << paramVec[i * 2] << "   " << paramVec[i * 2 + 1] << endl;
+        for (int j = 0; j < PARAM_NUM; j++)
+        {
+             cout << paramVec[i * PARAM_NUM + j] << "   ";
+        }
+        
+        cout <<  endl;
     }
+    ofstream myfile;
+    myfile.open ("/home/bogdan/projects/python/trajectory/traj3");
     
-    traj->compute(paramVec.data(), xiOdomVec, covOdomVec);
     
-    for (int i = 0; i < xiOdomVec.size(); i++)
+    
+    for (int trajIdx = 0; trajIdx < trajVec.size(); trajIdx++)
     {
-        cout << xiOdomVec[i] << endl;
-//        cout << covOdomVec[i].diagonal().transpose() << endl << endl;
+        auto traj = trajVec[trajIdx];
+        traj->compute(paramVec.data() + trajIdx * traj->paramSize(), xiOdomVec, covOdomVec);
+        
+        for (int i = 0; i < xiOdomVec.size(); i++)
+        {
+            myfile << xiOdomVec[i].trans()[0] << "   " << xiOdomVec[i].trans()[1]  << endl;
+            cout << xiOdomVec[i] << endl;
+//            cout << quality->imageLimitsCost(xiOdomVec[i].compose(xiCam)) << endl;
+        }
+        
+        for (int i = 0; i < xiOdomVec.size(); i+= xiOdomVec.size() - 1)
+        {
+            Mat8u img(480, 640);
+            img.setTo(255);
+            fill(img.data, img.data + 640, 0);
+            fill(img.data + 640 * 479, img.data + 640 * 480, 0);
+            Transf xiCamBoard = xiOdomVec[i].compose(xiCam).inverseCompose(xiBoard);
+            Vector3dVec boardCam;
+            xiCamBoard.transform(board, boardCam);
+            Vector2dVec projectedBoard;
+            cam.projectPointCloud(boardCam, projectedBoard);
+            
+            for (int j = 0; j < projectedBoard.size(); j++)
+            {
+                Vector2i p = round(projectedBoard[j]);
+                img(p[1], p[0]) = 0;
+            }
+            
+//            imshow("points", img);
+            imwrite("points" + to_string(trajIdx) + to_string(i) + ".png", img);
+//            waitKey();
+        }         
     }
+    myfile.close();
     
+    
+      
+                  
     return 0;
     //////////////////////////////////
     //optimize the trajectory (gradient descent)
     //////////////////////////////////
     
 //    Transf xiCam(0.2, 0, 0.3, 1.2, 1.2, 1.2);
-    TrajectoryQuality * costFunction = new TrajectoryQuality(
+    /*TrajectoryQuality * costFunction = new TrajectoryQuality(
                                             traj,
                                             xiCam,
                                             Matrix6d::Identity()*1e-3,
@@ -221,7 +279,9 @@ int main(int argc, char** argv)
 
     for (int i = 0; i < circleCount; i++)
     {
-        cout << paramVec[i * 2] << "   " << paramVec[i * 2 + 1] << endl;
+        cout << paramVec[i * PARAM_NUM] << "   " 
+            << paramVec[i * PARAM_NUM + 1] << "   " 
+            << paramVec[i * PARAM_NUM + 2] << endl;
     }
     
     traj->compute(paramVec.data(), xiOdomVec, covOdomVec);
@@ -231,6 +291,6 @@ int main(int argc, char** argv)
 //        cout << xiOdomVec[i] << endl;
 //        cout << covOdomVec[i].diagonal().transpose() << endl << endl;
 //    }
-    
+    */
 }
 

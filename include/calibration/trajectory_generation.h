@@ -66,7 +66,7 @@ struct TrajectoryQuality : FirstOrderFunction
 struct TrajectoryVisualQuality : FirstOrderFunction
 {
     // the class takes the ownership of traj
-    TrajectoryVisualQuality(ITrajectory * traj, const ICamera * camera,
+    TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ICamera * camera,
             Transf xiCam, Transf xiBoard, const Vector3dVec & board,
             const Matrix6d & CovPrior, const Matrix2d & CovPt);
     
@@ -81,15 +81,19 @@ struct TrajectoryVisualQuality : FirstOrderFunction
     
     double EvaluateCost(const double * params) const;
     
-    virtual int NumParameters() const { return _traj->paramSize(); }
+    virtual int NumParameters() const { return _paramSize; }
     virtual ~TrajectoryVisualQuality()
     {
-        delete _traj;
+        for (auto & traj : _trajVec)
+        {
+            delete traj;   
+        }
         delete _camera;
     }
     
     ICamera * _camera;
-    ITrajectory * _traj;
+    vector<ITrajectory*> _trajVec;
+    int _paramSize;
     Transf _xiCam, _xiBoard;
     Vector3dVec _board;
     Matrix2d _ptStiffness;  // A^T * A = C_pt^-1

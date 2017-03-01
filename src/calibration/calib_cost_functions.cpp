@@ -96,18 +96,19 @@ bool GenericProjectionJac::Evaluate(double const * const * params,
                 for (int i = 0; i < pointCamVec.size(); i++)
                 {
                     jacobianCalculator.dpdxi(pointCamVec[i], jacobian[paramIdx] + i*12,
-                                                             jacobian[paramIdx] + i*12 + 6);
+                                                            jacobian[paramIdx] + i*12 + 6);
                 }
             }
         }
         
         if (jacobian[cameraIntrinsicIdx] != NULL)
         {
+            
             for (int i = 0; i < pointCamVec.size(); i++)
             {
                 _camera->intrinsicJacobian(pointCamVec[i],
-                                jacobian[cameraIntrinsicIdx] + i * 2 * _camera->numParams(),
-                                jacobian[cameraIntrinsicIdx] + (i * 2 + 1) * _camera->numParams());
+                            jacobian[cameraIntrinsicIdx] + i * 2 * _camera->numParams(),
+                            jacobian[cameraIntrinsicIdx] + (i * 2 + 1) * _camera->numParams());
             }
         }
     }
@@ -144,7 +145,7 @@ OdometryPrior::OdometryPrior(const double errV, const double errW, const double 
    
     Matrix3d Cx = dfdu * Cu * dfdu.transpose() + (lambda * lambda) * Matrix3d::Identity();
     Matrix3d CxInv = Cx.inverse();
-    Eigen::LLT<Matrix3d> lltOfCxInv(CxInv); // compute the Cholesky decomposition of A
+    Eigen::LLT<Matrix3d> lltOfCxInv(CxInv);
     Matrix3d U = lltOfCxInv.matrixU();
     _A.topLeftCorner<2, 2>() = U.topLeftCorner<2, 2>();
     _A.topRightCorner<2, 1>() = U.topRightCorner<2, 1>();

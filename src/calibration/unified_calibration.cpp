@@ -40,11 +40,11 @@ bool GenericCameraCalibration::compute()
     options.function_tolerance = 1e-10;
     options.gradient_tolerance = 1e-10;
     options.parameter_tolerance = 1e-10;
-    options.logging_type = ceres::SILENT;
-//        options.minimizer_progress_to_stdout = true;
+//    options.logging_type = ceres::SILENT;
+    options.minimizer_progress_to_stdout = true;
     Solver::Summary summary;
     Solve(options, &globalProblem, &summary);
-    cout << summary.BriefReport() << endl;
+    cout << summary.FullReport() << endl;
     
     cout << "Intrinsic parameters :" << endl;
     for (auto & x : intrinsicMap)
@@ -120,6 +120,7 @@ void GenericCameraCalibration::parseCameras()
     for (auto & cameraInfo : root.get_child("cameras"))
     {
         const string name = cameraInfo.second.get<string>("name");
+        cameraConstantMap[name] = cameraInfo.second.get<bool>("constant");
         intrinsicMap[name] = vector<double>();
         auto & intrinsicVec = intrinsicMap[name];
         const string cameraType = cameraInfo.second.get<string>("type");
@@ -235,6 +236,14 @@ void GenericCameraCalibration::getInitTransform(Transformation<double> & xi,
     }
 }
 
+bool GenericCameraCalibration::addResiduals(const string & infoFileName)
+{
+    read_json(infoFileName, root);
+    parseTransforms();
+    parseCameras();
+    parseData();
+}
+
 void GenericCameraCalibration::initGlobalTransform(const string & name)
 {
     Problem problem;
@@ -298,10 +307,12 @@ void GenericCameraCalibration::initGlobalTransform(const string & name)
     //solve
     Solver::Options options;
 //    options.check_gradients = true;
+    options.minimizer_progress_to_stdout = true;
     options.max_num_iterations = 500;
     Solver::Summary summary;
     Solve(options, &problem, &summary);
-//    cout << summary.FullReport() << endl;
+    cout << summary.FullReport() << endl;
+    cout << getTransform(name) << endl;
 }
 
 void GenericCameraCalibration::initTransforms(const ptree & node)
@@ -336,11 +347,14 @@ void GenericCameraCalibration::initTransforms(const ptree & node)
                     {
                         cout << "WARNING : " << initName << " " << gridIdx
                              << "is not initialized, no board extracted" << endl;
-                        sequenceTransformMap[initName].push_back(Array6d{0, 0, 1, 0, 0, 0});      
+                        sequenceTransformMap[initName].push_back(Array6d{0, 0, 1, 0, 0, 0});    
                     }
-                    auto xi = estimateInitialGrid(cameraName, gridExtractionVec[gridIdx], grid);
-                    getInitTransform(xi, initName, gridIdx);
-                    sequenceTransformMap[initName].push_back(xi.toArray());
+                    else
+                    {
+                        auto xi = estimateInitialGrid(cameraName, gridExtractionVec[gridIdx], grid);
+                        getInitTransform(xi, initName, gridIdx);
+                        sequenceTransformMap[initName].push_back(xi.toArray());
+                    }
                 }
             }
             else
@@ -350,7 +364,33 @@ void GenericCameraCalibration::initTransforms(const ptree & node)
                 assert(i < gridExtractionVec.size());
                 auto xi = estimateInitialGrid(cameraName, gridExtractionVec[i], grid);
                 getInitTransform(xi, initName, i);
+                cout << xi << endl;
                 xi.toArray(globalTransformMap[initName].data());
+                cout << rotationMatrix(xi.rot()) << endl;
+                //FIXME
+                //initialize the transform using all the measurements
+                
+                //FIXME to visualize he detected corners
+                /*
+                for (int i = 0; i < gridExtractionVec.size(); i++)
+                {
+                    if (gridExtractionVec[i].empty())
+                    {
+                        continue;
+                    }
+                    Mat8u img(800, 600);
+                    img.setTo(0);
+                    
+                    for (int j = 0; j < gridExtractionVec[i].size(); j++)
+                    {
+                        img(gridExtractionVec[i][j][1], gridExtractionVec[i][j][0]) = 255;
+                    }
+                    
+                    
+                    imshow(initName, img);
+                    waitKey();
+                }
+                */
                 
                 if (gridExtractionVec.size() > 1) initGlobalTransform(initName);
             }
@@ -422,14 +462,21 @@ void GenericCameraCalibration::addGridResidualBlocks()
             }
             ptrVec.push_back(getTransformData(name, gridIdx).data());
         }
-        
-        //set the limits on intrinsics
-        for (int i = 0; i < intrinsicMap[cameraName].size(); i++)
+
+        if (cameraConstantMap[cameraName]) 
         {
-            globalProblem.SetParameterLowerBound(intrinsicMap[cameraName].data(), i,
-                        cameraMap[cameraName]->lowerBound(i));
-            globalProblem.SetParameterUpperBound(intrinsicMap[cameraName].data(), i,
-                        cameraMap[cameraName]->upperBound(i));
+            globalProblem.SetParameterBlockConstant(intrinsicMap[cameraName].data());
+        }
+        else
+        {        
+            //set the limits on intrinsics
+            for (int i = 0; i < intrinsicMap[cameraName].size(); i++)
+            {
+                globalProblem.SetParameterLowerBound(intrinsicMap[cameraName].data(), i,
+                            cameraMap[cameraName]->lowerBound(i));
+                globalProblem.SetParameterUpperBound(intrinsicMap[cameraName].data(), i,
+                            cameraMap[cameraName]->upperBound(i));
+            }
         }
     }
 }
@@ -468,6 +515,15 @@ void GenericCameraCalibration::parseData()
             //use the odometry as initial values
             if (dataInfo.second.get<bool>("init"))
             {
+                cout << transformName << endl;
+                for (auto & xx : sequenceTransformMap[transformName])
+                {
+                    for (auto & x : xx)
+                    {
+                        cout << x << "   ";
+                    }
+                    cout << endl;
+                }
                 assert(sequenceTransformMap[transformName].size() == 0);
                 transformInfoMap[transformName].initialized = true;
                 for (auto & xi : odometryVec)
@@ -559,6 +615,11 @@ Transformation<double> GenericCameraCalibration::estimateInitialGrid(const strin
     Vector2d v = projection[1] - projection[0];
     xi[5] = atan2(v[1], v[0]);
     
+    for (auto & x : projection)
+    {
+        cout << x.transpose() << endl;
+    }
+    cout << Transformation<double>(xi.data()) << endl;
     problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
             xi.data(), intrinsicMap[cameraName].data());
     problem.SetParameterBlockConstant(intrinsicMap[cameraName].data());
@@ -566,6 +627,7 @@ Transformation<double> GenericCameraCalibration::estimateInitialGrid(const strin
     options.max_num_iterations = 500;
     Solver::Summary summary;
     Solve(options, &problem, &summary);
-//    cout << Transformation<double>(xi.data()) << endl;
+    cout << summary.FullReport() << endl;
+    cout << Transformation<double>(xi.data()) << endl;
     return Transformation<double>(xi.data());
 }

@@ -83,34 +83,40 @@ double TrajectoryQuality::EvaluateCost(const double * params) const
 /// TrajectoryVisualQuality ///
 ///////////////////////////////
 
-TrajectoryVisualQuality::TrajectoryVisualQuality(ITrajectory * traj, const ICamera * camera,
+TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ICamera * camera,
             Transf xiCam, Transf xiBoard, const Vector3dVec & board,
             const Matrix6d & CovPrior, const Matrix2d & CovPt) : 
-    _traj(traj),
+    _trajVec(trajVec),
     _camera(camera->clone()),
     _xiCam(xiCam),
     _xiBoard(xiBoard),
     _hessPrior(CovPrior.inverse()),
-    _board(board)
+    _board(board),
+    _paramSize(0)
 {
     Eigen::LLT<Matrix2d> lltOfCovCornerInv(CovPt.inverse()); // compute the Cholesky decomposition of A
     _ptStiffness = lltOfCovCornerInv.matrixU();
+    for (auto & t : _trajVec)
+    {
+        _paramSize += t->paramSize();
+    }
 }
     
 bool TrajectoryVisualQuality::Evaluate(const double * params,
         double * residual, double * jacobian) const
 {
     residual[0] = EvaluateCost(params);
-    vector<double> paramsDiff(params, params + _traj->paramSize());
+    vector<double> paramsDiff(params, params + _paramSize);
     for (int i = 0; i < paramsDiff.size(); i++)
     {
         //numeric differentiation
         double delta = max(abs(paramsDiff[i]) * DIFF_EPS, DIFF_EPS * DIFF_EPS);
-        paramsDiff[i] += delta;
+        double origValue = paramsDiff[i];
+        paramsDiff[i] = origValue + delta;
         double vPlus = EvaluateCost(paramsDiff.data());
-        paramsDiff[i] -= 2*delta;
+        paramsDiff[i] = origValue - delta;
         double vMinus = EvaluateCost(paramsDiff.data());
-        paramsDiff[i] += delta;
+        paramsDiff[i] = origValue;
         jacobian[i] = (vPlus - vMinus) / (2 * delta);  
     }
     return true;
@@ -120,22 +126,27 @@ double TrajectoryVisualQuality::EvaluateCost(const double * params) const
 {
     vector<Transf> xiOdomVec;
     vector<Matrix6d> covOdomVec;
-    _traj->compute(params, xiOdomVec, covOdomVec);
     Matrix6d H = _hessPrior;
     double res = 0;
-    for (int i = 0; i < xiOdomVec.size(); i++)
+    for (int trajIdx = 0; trajIdx < _trajVec.size(); trajIdx++)
     {
-        Matrix6d LcamOdom = _xiCam.screwTransfInv();
-        Transf xiBaseCam = xiOdomVec[i].compose(_xiCam);
-        Matrix6d C = visualCov(xiBaseCam) + LcamOdom * covOdomVec[i] * LcamOdom.transpose();
-        Transf xiVis = _xiCam.inverseCompose(xiBaseCam);
-        Matrix6d J = xiVis.screwTransfInv() - Matrix6d::Identity();
-        // hessian is computed up to an orthonormal transformation
-        // it does not change the rank but simplifies the calculus
-        H += (J.transpose() * C.inverse() * J); 
-        res += imageLimitsCost(xiBaseCam);
-        //TODO add the distance to board as a constraint
-//        res += distanceCost();
+        auto traj = _trajVec[trajIdx];
+        traj->compute(params + trajIdx * traj->paramSize(), xiOdomVec, covOdomVec);
+        
+        for (int i = 1; i < xiOdomVec.size(); i++)
+        {
+            Matrix6d LcamOdom = _xiCam.screwTransfInv();
+            Transf xiBaseCam = xiOdomVec[i].compose(_xiCam);
+            Matrix6d C = visualCov(xiBaseCam) + LcamOdom * covOdomVec[i] * LcamOdom.transpose();
+            Transf xiVis = _xiCam.inverseCompose(xiOdomVec[0].inverseCompose(xiBaseCam));
+            Matrix6d J = xiVis.screwTransfInv() - Matrix6d::Identity();
+            // hessian is computed up to an orthonormal transformation
+            // it does not change the rank but simplifies the calculus
+            H += (J.transpose() * C.inverse() * J); 
+            res += imageLimitsCost(xiBaseCam);
+            //TODO add the distance to board as a constraint
+    //        res += distanceCost();
+        }
     }
     JacobiSVD<Matrix6d> svd(H);
     for (int i = 0; i < 6; i++)
@@ -168,11 +179,16 @@ Matrix6d TrajectoryVisualQuality::visualCov(const Transf & camPose) const
     return JtCJinv.transpose() * JtJ * JtCJinv;
 }
 
+//image borders and the board size
 double TrajectoryVisualQuality::imageLimitsCost(const Transf & camPose) const
 {
-    const double MARGIN = 100;
+    const double MARGIN = 25;
+    const double MIN_DIAGONAL = 25;
+    //FIXME temporary for particular data
     Vector2d center(_camera->getCenterU(), _camera->getCenterV());
-    double r = min(center[1], _camera->height - center[1])  - MARGIN; // margin
+//    Vector2d center(280, 215);
+//    double r = min(center[1], _camera->height - center[1])  - MARGIN; // margin
+    double r = (_camera->getCenterU() + _camera->getCenterV()) / 2 - MARGIN;
     double res = 0;
     
     Transf xiCamBoard = camPose.inverseCompose(_xiBoard);
@@ -185,6 +201,9 @@ double TrajectoryVisualQuality::imageLimitsCost(const Transf & camPose) const
     {
         res += pow(max((pt - center).norm()- r, 0.) / 10., 2);
     }
+    auto pt1 = boardProjectionVec[0];
+    auto pt2 = boardProjectionVec.back();
+//    res += pow(max(MIN_DIAGONAL - (pt1 - pt2).norm(), 0.), 2);
     return res;
 }
 
