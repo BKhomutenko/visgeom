@@ -20,7 +20,6 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "eigen.h"
 #include "ceres.h"
 #include "ocv.h"
-#include "io.h"
 
 #include "utils/curve_rasterizer.h"
 
@@ -33,7 +32,6 @@ double findMinDistance(const Vector2dVec & cornerVec, const int rows, const int 
     {
         for (int j = 0; j < cols - 1; j++)
         {
-            cout << i << ' ' << j << endl;
             int idx = i * rows + i;
             res = min(res, (cornerVec[idx] - cornerVec[idx + 1]).squaredNorm());
         }

@@ -145,22 +145,22 @@ void GenericCameraCalibration::parseCameras()
 
 void GenericCameraCalibration::initTransformChainInfo(const ptree & node)
 {
-    transNameVec.clear();
-    transStatusVec.clear();
-    cameraName = node.get<string>("camera");
-    cout <<"Camera : " <<  cameraName << endl;
+    dataVec.emplace_back();
+    auto & data = dataVec.back();
+    data.cameraName = node.get<string>("camera");
+    cout <<"Camera : " <<  data.cameraName << endl;
     cout <<"Transformations : ";
     for (auto & transInfo : node.get_child("transform_chain"))
     {
-        transNameVec.push_back(transInfo.second.get<string>("name"));
-        cout << transNameVec.back();
+        data.transNameVec.push_back(transInfo.second.get<string>("name"));
+        cout << data.transNameVec.back();
         if (transInfo.second.get<bool>("direct")) 
         {
-            transStatusVec.push_back(TRANSFORM_DIRECT);
+            data.transStatusVec.push_back(TRANSFORM_DIRECT);
         }
         else
         {
-            transStatusVec.push_back(TRANSFORM_INVERSE);
+            data.transStatusVec.push_back(TRANSFORM_INVERSE);
             cout << "_inv";
         }
         cout <<  "   ";
@@ -169,29 +169,29 @@ void GenericCameraCalibration::initTransformChainInfo(const ptree & node)
 }
 
 void GenericCameraCalibration::initGrid(const ptree & node)
-{
-    Nx = node.get<int>("object.cols");
-    Ny = node.get<int>("object.rows");
+{   
+    auto & data = dataVec.back();
+    data.Nx = node.get<int>("object.cols");
+    data.Ny = node.get<int>("object.rows");
     double sqSize = node.get<double>("object.size");
-    grid.clear();
-    grid.reserve(Nx*Ny);
-    for (int i = 0; i < Ny; i++)
+    data.grid.clear();
+    data.grid.reserve(data.Nx * data.Ny);
+    for (int i = 0; i < data.Ny; i++)
     {
-        for (int j = 0; j < Nx; j++)
+        for (int j = 0; j < data.Nx; j++)
         {
-           grid.emplace_back(sqSize * j, sqSize * i, 0); 
+           data.grid.emplace_back(sqSize * j, sqSize * i, 0); 
         }
     }
     //fill up gridExtractionVec which stores all the extracted grids
     const string prefix = node.get<string>("images.prefix");
     bool checkExtraction = node.get<bool>("parameters.check_extraction");
-    gridExtractionVec.clear();
+    data.gridExtractionVec.clear();
     for (auto & x : node.get_child("images.names"))
     {
-        gridExtractionVec.emplace_back();
         const string filename = x.second.get_value<string>();
         cout << "." << flush;
-        if (not extractGridProjection(prefix + filename, gridExtractionVec.back(), checkExtraction))
+        if (not extractGridProjection(data, prefix + filename, checkExtraction))
         {
             cout << endl << "WARNING : GRID NOT EXTRACTED" << endl;
         }
@@ -202,35 +202,36 @@ void GenericCameraCalibration::initGrid(const ptree & node)
 void GenericCameraCalibration::getInitTransform(Transformation<double> & xi,
             const string & initName, int gridIdx)
 {
-    for (int i = 0; i < transNameVec.size(); i++)
+    auto & data = dataVec.back();
+    for (int i = 0; i < data.transNameVec.size(); i++)
     {
-        const string & name = transNameVec[i];
+        const string & name = data.transNameVec[i];
         if (name == initName) break;
-        else if (transStatusVec[i] == TRANSFORM_DIRECT)
+        else if (data.transStatusVec[i] == TRANSFORM_DIRECT)
         {
             xi = getTransform(name, gridIdx).inverseCompose(xi);
         }
-        else if (transStatusVec[i] == TRANSFORM_INVERSE)
+        else if (data.transStatusVec[i] == TRANSFORM_INVERSE)
         {
             xi = getTransform(name, gridIdx).compose(xi);
         }
     }
-    for (int i = transNameVec.size() - 1; i >= 0; i--)
+    for (int i = data.transNameVec.size() - 1; i >= 0; i--)
     {
-        const string & name = transNameVec[i];
+        const string & name = data.transNameVec[i];
         if (name == initName)
         {
-            if (transStatusVec[i] == TRANSFORM_INVERSE)
+            if (data.transStatusVec[i] == TRANSFORM_INVERSE)
             {
                 xi = xi.inverse();
             }
             break;
         }
-        else if (transStatusVec[i] == TRANSFORM_DIRECT)
+        else if (data.transStatusVec[i] == TRANSFORM_DIRECT)
         {
             xi = xi.composeInverse(getTransform(name, gridIdx));
         }
-        else if (transStatusVec[i] == TRANSFORM_INVERSE)
+        else if (data.transStatusVec[i] == TRANSFORM_INVERSE)
         {
             xi = xi.compose(getTransform(name, gridIdx));
         }
@@ -248,62 +249,63 @@ bool GenericCameraCalibration::addResiduals(const string & infoFileName)
 void GenericCameraCalibration::initGlobalTransform(const string & name)
 {
     Problem problem;
-    for (int gridIdx = 0; gridIdx < gridExtractionVec.size(); gridIdx++)
+    auto & data = dataVec.back();
+    for (int gridIdx = 0; gridIdx < data.gridExtractionVec.size(); gridIdx++)
     {
-        if (gridExtractionVec[gridIdx].empty()) continue;
+        if (data.gridExtractionVec[gridIdx].empty()) continue;
         
         vector<double*> ptrVec;
-        for (int i = 0; i < transNameVec.size(); i++)
+        for (int i = 0; i < data.transNameVec.size(); i++)
         {
-            const string & name = transNameVec[i];
+            const string & name = data.transNameVec[i];
             ptrVec.push_back(getTransformData(name, gridIdx).data());
         }
 
         //add a residual
-        GenericProjectionJac * costFunction = new GenericProjectionJac(gridExtractionVec[gridIdx],
-                    grid, cameraMap[cameraName], transStatusVec);
+        GenericProjectionJac * costFunction = new GenericProjectionJac(data.gridExtractionVec[gridIdx],
+                    data.grid, cameraMap[data.cameraName], data.transStatusVec);
 
         switch (ptrVec.size())
         {
         case 0:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    intrinsicMap[cameraName].data());
+                    intrinsicMap[data.cameraName].data());
             break;
         case 1:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    ptrVec[0], intrinsicMap[cameraName].data());
+                    ptrVec[0], intrinsicMap[data.cameraName].data());
             break;
         case 2:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    ptrVec[0], ptrVec[1], intrinsicMap[cameraName].data());
+                    ptrVec[0], ptrVec[1], intrinsicMap[data.cameraName].data());
             break;
         case 3:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    ptrVec[0], ptrVec[1], ptrVec[2], intrinsicMap[cameraName].data());
+                    ptrVec[0], ptrVec[1], ptrVec[2], intrinsicMap[data.cameraName].data());
             break;
         case 4:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
                     ptrVec[0], ptrVec[1], ptrVec[2],
-                    ptrVec[3], intrinsicMap[cameraName].data());
+                    ptrVec[3], intrinsicMap[data.cameraName].data());
             break;
         case 5:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
                     ptrVec[0], ptrVec[1], ptrVec[2],
-                    ptrVec[3], ptrVec[4], intrinsicMap[cameraName].data());
+                    ptrVec[3], ptrVec[4], intrinsicMap[data.cameraName].data());
             break;
         }
         
         //set everything to constant except for the transform to be initialize
-        for (int i = 0; i < transNameVec.size(); i++)
+        for (int i = 0; i < data.transNameVec.size(); i++)
         {
-            if (transNameVec[i] != name)
+            if (data.transNameVec[i] != name)
             {
                 problem.SetParameterBlockConstant(ptrVec[i]);
             }
         }
     }
     //initrinsics are constant as well
-    problem.SetParameterBlockConstant(intrinsicMap[cameraName].data());
+    problem.SetParameterBlockConstant(intrinsicMap[data.cameraName].data());
     
     //solve
     Solver::Options options;
@@ -319,14 +321,15 @@ void GenericCameraCalibration::initGlobalTransform(const string & name)
 void GenericCameraCalibration::initTransforms(const ptree & node)
 {
     const string initName = node.get<string>("init");
+    auto & data = dataVec.back();
     if (initName != "none")
     {
         //there is a transform to initialize
         assert(transformInfoMap.find(initName) != transformInfoMap.end());
         
         //and it belongs to the transformation chain
-        auto nameIter = find(transNameVec.begin(), transNameVec.end(), initName);
-        assert(nameIter != transNameVec.end());
+        auto nameIter = find(data.transNameVec.begin(), data.transNameVec.end(), initName);
+        assert(nameIter != data.transNameVec.end());
         
         //it is not allowed to initialize a transformation with a prior
         if (not (transformInfoMap[initName].prior or transformInfoMap[initName].initialized))
@@ -342,9 +345,9 @@ void GenericCameraCalibration::initTransforms(const ptree & node)
             //do the initialization
             if (not transformInfoMap[initName].global)
             {
-                for (int gridIdx = 0; gridIdx < gridExtractionVec.size(); gridIdx++)
+                for (int gridIdx = 0; gridIdx < data.gridExtractionVec.size(); gridIdx++)
                 {
-                    if (gridExtractionVec[gridIdx].empty())
+                    if (data.gridExtractionVec[gridIdx].empty())
                     {
                         cout << "WARNING : " << initName << " " << gridIdx
                              << "is not initialized, no board extracted" << endl;
@@ -352,7 +355,8 @@ void GenericCameraCalibration::initTransforms(const ptree & node)
                     }
                     else
                     {
-                        auto xi = estimateInitialGrid(cameraName, gridExtractionVec[gridIdx], grid);
+                        auto xi = estimateInitialGrid(data.cameraName,
+                                    data.gridExtractionVec[gridIdx], data.grid);
                         getInitTransform(xi, initName, gridIdx);
                         sequenceTransformMap[initName].push_back(xi.toArray());
                     }
@@ -360,10 +364,11 @@ void GenericCameraCalibration::initTransforms(const ptree & node)
             }
             else
             {
+                //FIXME put all into estimateInitialGrid(...)
                 int i = 0;
-                while (gridExtractionVec[i].empty()) i++;
-                assert(i < gridExtractionVec.size());
-                auto xi = estimateInitialGrid(cameraName, gridExtractionVec[i], grid);
+                while (data.gridExtractionVec[i].empty()) i++;
+                assert(i < data.gridExtractionVec.size());
+                auto xi = estimateInitialGrid(data.cameraName, data.gridExtractionVec[i], data.grid);
                 getInitTransform(xi, initName, i);
 //                cout << xi << endl;
                 xi.toArray(globalTransformMap[initName].data());
@@ -393,70 +398,72 @@ void GenericCameraCalibration::initTransforms(const ptree & node)
                 }
                 */
                 
-                if (gridExtractionVec.size() > 1) initGlobalTransform(initName);
+                if (data.gridExtractionVec.size() > 1) initGlobalTransform(initName);
             }
         }
     }
     
     //to make sure that all the other transformations are initialized
-    for (auto & x : transNameVec)
+    for (auto & x : data.transNameVec)
     {
         assert(transformInfoMap[x].prior xor transformInfoMap[x].initialized);
     }
 }
 
-void GenericCameraCalibration::addGridResidualBlocks()
+void GenericCameraCalibration::addGridResidualBlocks(const ImageData & data)
 {
-    for (int gridIdx = 0; gridIdx < gridExtractionVec.size(); gridIdx++)
+    for (int gridIdx = 0; gridIdx < data.gridExtractionVec.size(); gridIdx++)
     {
-        if (gridExtractionVec[gridIdx].empty()) continue;
+        if (data.gridExtractionVec[gridIdx].empty()) continue;
         
         // make the vector of pointers to the transformation data
         vector<double*> ptrVec;
-        for (int i = 0; i < transNameVec.size(); i++)
+        for (int i = 0; i < data.transNameVec.size(); i++)
         {
-            const string & name = transNameVec[i];
+            const string & name = data.transNameVec[i];
             ptrVec.push_back(getTransformData(name, gridIdx).data());
         }
 
+        //TODO create header calibration_data_structures.h
         //add a residual
-        GenericProjectionJac * costFunction = new GenericProjectionJac(gridExtractionVec[gridIdx],
-                    grid, cameraMap[cameraName], transStatusVec);
-
+        GenericProjectionJac * costFunction = new GenericProjectionJac(data.gridExtractionVec[gridIdx],
+                    data.grid, cameraMap[data.cameraName], data.transStatusVec);
+        double * intrinsicPtr = intrinsicMap[data.cameraName].data();
         switch (ptrVec.size())
         {
         case 0:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                 intrinsicMap[cameraName].data());
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1), intrinsicPtr);
             break;
         case 1:
             globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    ptrVec[0], intrinsicMap[cameraName].data());
+                    ptrVec[0], intrinsicPtr);
             break;
         case 2:
             globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    ptrVec[0], ptrVec[1], intrinsicMap[cameraName].data());
+                    ptrVec[0], ptrVec[1], intrinsicPtr);
             break;
         case 3:
             globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    ptrVec[0], ptrVec[1], ptrVec[2], intrinsicMap[cameraName].data());
+                    ptrVec[0], ptrVec[1], ptrVec[2], intrinsicPtr);
             break;
         case 4:
             globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
                     ptrVec[0], ptrVec[1], ptrVec[2],
-                    ptrVec[3], intrinsicMap[cameraName].data());
+                    ptrVec[3], intrinsicPtr);
             break;
         case 5:
             globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
                     ptrVec[0], ptrVec[1], ptrVec[2],
-                    ptrVec[3], ptrVec[4], intrinsicMap[cameraName].data());
+                    ptrVec[3], ptrVec[4], intrinsicPtr);
             break;
+        default:
+            assert(false);
         }
         
         //set constant transformations
-        for (int i = 0; i < transNameVec.size(); i++)
+        for (int i = 0; i < data.transNameVec.size(); i++)
         {
-            const string & name = transNameVec[i];
+            const string & name = data.transNameVec[i];
             if (transformInfoMap[name].constant)
             {
                 globalProblem.SetParameterBlockConstant(ptrVec[i]);
@@ -464,19 +471,19 @@ void GenericCameraCalibration::addGridResidualBlocks()
             ptrVec.push_back(getTransformData(name, gridIdx).data());
         }
 
-        if (cameraConstantMap[cameraName]) 
+        if (cameraConstantMap[data.cameraName]) 
         {
-            globalProblem.SetParameterBlockConstant(intrinsicMap[cameraName].data());
+            globalProblem.SetParameterBlockConstant(intrinsicMap[data.cameraName].data());
         }
         else
         {        
             //set the limits on intrinsics
-            for (int i = 0; i < intrinsicMap[cameraName].size(); i++)
+            for (int i = 0; i < intrinsicMap[data.cameraName].size(); i++)
             {
-                globalProblem.SetParameterLowerBound(intrinsicMap[cameraName].data(), i,
-                            cameraMap[cameraName]->lowerBound(i));
-                globalProblem.SetParameterUpperBound(intrinsicMap[cameraName].data(), i,
-                            cameraMap[cameraName]->upperBound(i));
+                globalProblem.SetParameterLowerBound(intrinsicMap[data.cameraName].data(), i,
+                            cameraMap[data.cameraName]->lowerBound(i));
+                globalProblem.SetParameterUpperBound(intrinsicMap[data.cameraName].data(), i,
+                            cameraMap[data.cameraName]->upperBound(i));
             }
         }
     }
@@ -495,7 +502,7 @@ void GenericCameraCalibration::parseData()
             
             initTransforms(dataInfo.second);
             
-            addGridResidualBlocks();
+            addGridResidualBlocks(dataVec.back());
         }
         else if (dataType == "odometry")
         {
@@ -568,9 +575,10 @@ void GenericCameraCalibration::parseData()
     }
 }
 
-bool GenericCameraCalibration::extractGridProjection(const string & fileName, Vector2dVec & cornerVec, bool checkExtraction)
+bool GenericCameraCalibration::extractGridProjection(ImageData & data,
+            const string & fileName, bool checkExtraction)
 {
-    Size patternSize(Nx, Ny);
+    Size patternSize(data.Nx, data.Ny);
     Mat8u frame = imread(fileName, 0);
     if (frame.empty())
     {
@@ -599,15 +607,17 @@ bool GenericCameraCalibration::extractGridProjection(const string & fileName, Ve
         }
     }
     
-    cornerVec.resize(Nx * Ny);
-    for (int i = 0; i < Nx * Ny; i++)
+    data.gridExtractionVec.emplace_back();
+    auto & cornerVec = data.gridExtractionVec.back();
+    cornerVec.resize(data.Nx * data.Ny);
+    for (int i = 0; i < data.Nx * data.Ny; i++)
     {
         cornerVec[i] = Vector2d(centers[i].x, centers[i].y);
     }
     
-    double minDist = findMinDistance(cornerVec, Ny, Nx);
+    double minDist = findMinDistance(cornerVec, data.Ny, data.Nx);
     
-    CornerDetector detector(frame, min(minDist / 3., 10.));
+    CornerDetector detector(frame, min(minDist / 2., 10.));
     detector.improveCorners(cornerVec);
     return true;
 }
