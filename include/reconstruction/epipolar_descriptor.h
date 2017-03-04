@@ -30,7 +30,7 @@ NOTE:
 #include "eigen.h"
 #include "utils/filter.h"
 
-#include "curve_rasterizer.h"
+#include "utils/curve_rasterizer.h"
 
 class EpipolarDescriptor
 {

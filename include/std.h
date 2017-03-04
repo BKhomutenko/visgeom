@@ -45,6 +45,9 @@ using std::copy;
 using std::sort;
 using std::fill;
 using std::accumulate;
+using std::max_element;
+using std::min_element;
+using std::distance;
 
 // Math
 using std::min;

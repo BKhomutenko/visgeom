@@ -3,7 +3,7 @@
 #include "eigen.h"
 #include "timer.h"
 
-#include "reconstruction/curve_rasterizer.h"
+#include "utils/curve_rasterizer.h"
 #include "reconstruction/eucm_motion_stereo.h"
 #include "reconstruction/eucm_sgm.h"
 

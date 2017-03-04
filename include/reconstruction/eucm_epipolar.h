@@ -28,7 +28,7 @@ A class that computes the epipolar curve equations for a calibrated stereo syste
 
 #include "geometry/geometry.h"
 #include "projection/eucm.h"
-#include "reconstruction/curve_rasterizer.h"
+#include "utils/curve_rasterizer.h"
 #include "reconstruction/epipoles.h"
 #include "reconstruction/stereo_misc.h"
 

@@ -27,6 +27,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include <glog/logging.h>
 
 #include "calibration/calib_cost_functions.h"
+#include "calibration/corner_detector.h"
 #include "projection/generic_camera.h"
 #include "projection/eucm.h"
     
@@ -311,8 +312,8 @@ void GenericCameraCalibration::initGlobalTransform(const string & name)
     options.max_num_iterations = 500;
     Solver::Summary summary;
     Solve(options, &problem, &summary);
-    cout << summary.FullReport() << endl;
-    cout << getTransform(name) << endl;
+//    cout << summary.FullReport() << endl;
+//    cout << getTransform(name) << endl;
 }
 
 void GenericCameraCalibration::initTransforms(const ptree & node)
@@ -364,9 +365,9 @@ void GenericCameraCalibration::initTransforms(const ptree & node)
                 assert(i < gridExtractionVec.size());
                 auto xi = estimateInitialGrid(cameraName, gridExtractionVec[i], grid);
                 getInitTransform(xi, initName, i);
-                cout << xi << endl;
+//                cout << xi << endl;
                 xi.toArray(globalTransformMap[initName].data());
-                cout << rotationMatrix(xi.rot()) << endl;
+//                cout << rotationMatrix(xi.rot()) << endl;
                 //FIXME
                 //initialize the transform using all the measurements
                 
@@ -567,10 +568,10 @@ void GenericCameraCalibration::parseData()
     }
 }
 
-bool GenericCameraCalibration::extractGridProjection(const string & fileName, Vector2dVec & projection, bool checkExtraction)
+bool GenericCameraCalibration::extractGridProjection(const string & fileName, Vector2dVec & cornerVec, bool checkExtraction)
 {
     Size patternSize(Nx, Ny);
-    Mat frame = imread(fileName, 0);
+    Mat8u frame = imread(fileName, 0);
     if (frame.empty())
     {
         cout << fileName << " : ERROR, file not found" << endl;
@@ -583,7 +584,9 @@ bool GenericCameraCalibration::extractGridProjection(const string & fileName, Ve
         cout << fileName << " : ERROR, pattern not found" << endl;
         return false;
     }
-
+    
+    
+    
     if (checkExtraction)
     {
         drawChessboardCorners(frame, patternSize, Mat(centers), patternIsFound);
@@ -596,29 +599,30 @@ bool GenericCameraCalibration::extractGridProjection(const string & fileName, Ve
         }
     }
     
-    projection.resize(Nx * Ny);
+    cornerVec.resize(Nx * Ny);
     for (int i = 0; i < Nx * Ny; i++)
     {
-        projection[i] = Vector2d(centers[i].x, centers[i].y);
+        cornerVec[i] = Vector2d(centers[i].x, centers[i].y);
     }
+    
+    double minDist = findMinDistance(cornerVec, Ny, Nx);
+    
+    CornerDetector detector(frame, min(minDist / 3., 10.));
+    detector.improveCorners(cornerVec);
     return true;
 }
 
 Transformation<double> GenericCameraCalibration::estimateInitialGrid(const string & cameraName,
-        const Vector2dVec & projection, const Vector3dVec & grid)
+        const Vector2dVec & cornerVec, const Vector3dVec & grid)
 {
     Problem problem;
-    GenericProjectionJac * costFunction = new GenericProjectionJac(projection, grid,
+    GenericProjectionJac * costFunction = new GenericProjectionJac(cornerVec, grid,
             cameraMap[cameraName], {TRANSFORM_DIRECT});
     array<double, 6> xi{0, 0, 1, 0, 0, 0};
     
-    Vector2d v = projection[1] - projection[0];
+    Vector2d v = cornerVec[1] - cornerVec[0];
     xi[5] = atan2(v[1], v[0]);
     
-    for (auto & x : projection)
-    {
-        cout << x.transpose() << endl;
-    }
     cout << Transformation<double>(xi.data()) << endl;
     problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
             xi.data(), intrinsicMap[cameraName].data());
@@ -627,7 +631,7 @@ Transformation<double> GenericCameraCalibration::estimateInitialGrid(const strin
     options.max_num_iterations = 500;
     Solver::Summary summary;
     Solve(options, &problem, &summary);
-    cout << summary.FullReport() << endl;
-    cout << Transformation<double>(xi.data()) << endl;
+//    cout << summary.FullReport() << endl;
+//    cout << Transformation<double>(xi.data()) << endl;
     return Transformation<double>(xi.data());
 }

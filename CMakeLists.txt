@@ -18,7 +18,8 @@ include_directories(include)
 
 #Lib compilation
 
-add_library( calibration STATIC     
+add_library( calibration STATIC   
+    src/calibration/corner_detector.cpp  
     src/calibration/unified_calibration.cpp
     src/calibration/calib_cost_functions.cpp
     src/calibration/trajectory_generation.cpp
@@ -70,6 +71,18 @@ target_link_libraries( optim_trajectory
     calibration
     ${CERES_LIBRARIES}
 )
+
+add_executable(subpixel
+    test/calibration/subpixel.cpp
+)
+
+target_link_libraries( subpixel
+    calibration
+    ${OpenCV_LIBS}  
+    ${CERES_LIBRARIES}
+    ${Boost_LIBRARIES}
+)
+
 ### RECONSTRUCTION ###
 
 add_executable( stereo 

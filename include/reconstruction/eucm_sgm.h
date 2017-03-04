@@ -33,7 +33,7 @@ NOTE:
 #include "projection/eucm.h"
 
 #include "reconstruction/scale_parameters.h"
-#include "reconstruction/curve_rasterizer.h"
+#include "utils/curve_rasterizer.h"
 #include "reconstruction/depth_map.h"
 #include "reconstruction/eucm_stereo.h"
 

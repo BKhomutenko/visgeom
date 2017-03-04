@@ -48,8 +48,13 @@ struct Grid2D
             
     void GetValue(int v, int u, double* val) const
     {
-        if (u < 0 or u >= uMax or v < 0 or v >= vMax) *val = 0.;
-        else *val = double(data[v*uMax + u]);
+        if (u < 0) u = 0;
+        else if (u >= uMax) u = uMax - 1;
+        
+        if (v < 0) v = 0;
+        else if (v >= vMax) v = vMax - 1;
+        
+        *val = double(data[v*uMax + u]);
         
     }
     

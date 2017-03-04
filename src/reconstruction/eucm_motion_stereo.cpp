@@ -31,7 +31,7 @@ Depth-from-motion class for semidense depth estimation
 
 #include "reconstruction/stereo_misc.h"
 #include "reconstruction/eucm_epipolar.h"
-#include "reconstruction/curve_rasterizer.h"
+#include "utils/curve_rasterizer.h"
 #include "reconstruction/depth_map.h"
 #include "reconstruction/epipolar_descriptor.h"
 
