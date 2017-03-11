@@ -543,8 +543,8 @@ OdometryPrior::OdometryPrior(const double errV, const double errW,
     xiOdom.toArray(_dxiPrior.data());
     
     Matrixd<3, 2> dfdu;
-    dfdu <<     c,     -l2 * s,  
-                s,      l2 * c, 
+    dfdu <<     c,     l2 * s,  
+                -s,      l2 * c, 
                 0,           1;
     
     Matrix2d Cu;

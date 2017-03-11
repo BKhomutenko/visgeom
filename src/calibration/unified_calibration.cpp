@@ -23,6 +23,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "eigen.h"
 #include "ceres.h"
 #include "json.h"
+#include "except.h"
 
 #include <glog/logging.h>
 
@@ -92,7 +93,11 @@ void GenericCameraCalibration::parseTransforms()
         info.global = transInfo.second.get<bool>("global");
         info.prior = transInfo.second.get<bool>("prior");
         info.constant = transInfo.second.get<bool>("constant");
-        assert(not info.constant or info.prior);
+        if (info.constant and not info.prior)
+        {
+            throw runtime_error(name + " is constant but there is no prior");
+        }
+        
         info.initialized = false;
         
         if (info.global)
@@ -133,16 +138,19 @@ void GenericCameraCalibration::parseCameras()
         {
             intrinsicVec.push_back(x.second.get_value<double>());
         }
+        //TODO add other projection models in the future
         if (cameraType == "eucm")
         {
             cout << "Model : EUCM" << endl;
-            assert(intrinsicVec.size() == 6);
+            if (intrinsicVec.size() != 6)
+            {
+                throw runtime_error("invalid number of intrinsic parameters");
+            }
             cameraMap[name] = new EnhancedCamera(intrinsicVec.data());
         }
         else
         {
-            cout << "ERROR : invalid camera model name" << endl;
-            assert(false);
+            throw runtime_error("invalid camera model name");
         }
     }
 }
@@ -178,6 +186,14 @@ void GenericCameraCalibration::initTransformChainInfo(ImageData & data, const pt
         }
         cout <<  "   ";
     }
+    //count transformation sequences
+    int sequenceCount = 0;
+    for (auto & name : data.transNameVec)
+    {
+        if (not transformInfoMap[name].global) sequenceCount++;
+    }
+    if (sequenceCount != 1) throw runtime_error("multiple sequences in a transform chain");
+    
     cout << endl;
 }
 
@@ -327,79 +343,69 @@ void GenericCameraCalibration::initGlobalTransform(const ImageData & data, const
 
 void GenericCameraCalibration::initTransforms(const ImageData & data, const string & initName)
 {
-    //there is a transform to initialize
-    assert(transformInfoMap.find(initName) != transformInfoMap.end());
-    
-    //and it belongs to the transformation chain
-    auto nameIter = find(data.transNameVec.begin(), data.transNameVec.end(), initName);
-    assert(nameIter != data.transNameVec.end());
-    
-    //it is not allowed to initialize a transformation with a prior
-    if (not (transformInfoMap[initName].prior or transformInfoMap[initName].initialized))
+    if (transformInfoMap.find(initName) == transformInfoMap.end())
     {
-        transformInfoMap[initName].initialized = true;
-        
-        //make sure that the data is not initializad
-        if (not transformInfoMap[initName].global)
+        throw runtime_error(initName + " does not exist, impossible to initialize");
+    }
+    
+    auto nameIter = find(data.transNameVec.begin(), data.transNameVec.end(), initName);
+    if (nameIter == data.transNameVec.end())
+    {
+        throw runtime_error(initName + " does not belong to the transform chain");
+    }
+    
+    if  (transformInfoMap[initName].prior) 
+    {
+        throw runtime_error(initName + " has a prior value");
+    }
+    
+    if  (transformInfoMap[initName].initialized) 
+    {
+        throw runtime_error(initName + " has already been initialized");
+    }
+    
+    if (not transformInfoMap[initName].global and sequenceTransformMap[initName].size() != 0)
+    {
+        throw runtime_error(initName + " has already been initialized");
+    }
+    
+    transformInfoMap[initName].initialized = true;
+    
+    for (auto & x : data.transNameVec)
+    {
+        if (not (transformInfoMap[x].prior xor transformInfoMap[x].initialized))
         {
-            assert(sequenceTransformMap[initName].size() == 0);
-        }
-        
-        //do the initialization
-        if (not transformInfoMap[initName].global)
-        {
-            for (int transfIdx = 0; transfIdx < data.detectedCornersVec.size(); transfIdx++)
-            {
-                if (data.detectedCornersVec[transfIdx].empty())
-                {
-                    cout << "WARNING : " << initName << " " << transfIdx
-                         << " is not initialized, no board extracted" << endl;
-                    sequenceTransformMap[initName].push_back(Array6d{0, 0, 1, 0, 0, 0});    
-                }
-                else
-                {
-                    auto xi = estimateInitialGrid(data, transfIdx);
-                    xi = getInitTransform(xi, initName, data, transfIdx);
-                    sequenceTransformMap[initName].push_back(xi.toArray());
-                }
-            }
-        }
-        else
-        {
-            int transfIdx = data.getFirstExtractedIdx();
-            auto xi = estimateInitialGrid(data, transfIdx);
-            xi = getInitTransform(xi, initName, data, transfIdx);
-            xi.toArray(globalTransformMap[initName].data());
-            
-            //FIXME to visualize he detected corners
-            /*
-            for (int i = 0; i < detectedCornersVec.size(); i++)
-            {
-                if (detectedCornersVec[i].empty())
-                {
-                    continue;
-                }
-                Mat8u img(800, 600);
-                img.setTo(0);
-                
-                for (int j = 0; j < detectedCornersVec[i].size(); j++)
-                {
-                    img(detectedCornersVec[i][j][1], detectedCornersVec[i][j][0]) = 255;
-                }
-                
-                
-                imshow(initName, img);
-                waitKey();
-            }
-            */
-            if (data.detectedCornersVec.size() > 1) initGlobalTransform(data, initName);
+            const string errMsg = " is not initialized. Cannot initialize more than one transform at a time";
+            throw runtime_error(x + errMsg);
         }
     }
     
-    //to make sure that all the other transformations are initialized
-    for (auto & x : data.transNameVec)
+    //do the initialization
+    if (not transformInfoMap[initName].global)
     {
-        assert(transformInfoMap[x].prior xor transformInfoMap[x].initialized);
+        for (int transfIdx = 0; transfIdx < data.detectedCornersVec.size(); transfIdx++)
+        {
+            if (data.detectedCornersVec[transfIdx].empty())
+            {
+                cout << "WARNING : " << initName << " " << transfIdx
+                     << " is not initialized, no board extracted" << endl;
+                sequenceTransformMap[initName].push_back(Array6d{0, 0, 1, 0, 0, 0});    
+            }
+            else
+            {
+                auto xi = estimateInitialGrid(data, transfIdx);
+                xi = getInitTransform(xi, initName, data, transfIdx);
+                sequenceTransformMap[initName].push_back(xi.toArray());
+            }
+        }
+    }
+    else
+    {
+        int transfIdx = data.getFirstExtractedIdx();
+        auto xi = estimateInitialGrid(data, transfIdx);
+        xi = getInitTransform(xi, initName, data, transfIdx);
+        xi.toArray(globalTransformMap[initName].data());
+        if (data.detectedCornersVec.size() > 1) initGlobalTransform(data, initName);
     }
 }
 
@@ -450,7 +456,7 @@ void GenericCameraCalibration::addGridResidualBlocks(const ImageData & data)
                     ptrVec[3], ptrVec[4], intrinsicPtr);
             break;
         default:
-            assert(false);
+            throw runtime_error("the transform chain is too long (5 transforms at max are supproted)");
         }
         
         //set constant transformations
@@ -501,8 +507,14 @@ void GenericCameraCalibration::parseData()
         else if (dataType == "odometry")
         {
             const string transformName = dataInfo.second.get<string>("transform");
-            assert(transformInfoMap.find(transformName) != transformInfoMap.end());
-            assert(not transformInfoMap[transformName].global); //works only fo sequences
+            if (transformInfoMap.find(transformName) == transformInfoMap.end())
+            {
+                throw runtime_error(transformName + " has not been declared");
+            }
+            if (transformInfoMap[transformName].global)
+            {
+                throw runtime_error(transformName + " is global. Odometry must be a sequence");
+            }
             
             const double errV = dataInfo.second.get<double>("err_v"); //relative error in speed
             const double errW = dataInfo.second.get<double>("err_w"); //relative error in rotation
@@ -526,7 +538,10 @@ void GenericCameraCalibration::parseData()
                     }
                     cout << endl;
                 }
-                assert(sequenceTransformMap[transformName].size() == 0);
+                if (not sequenceTransformMap[transformName].empty())
+                {
+                    throw runtime_error(transformName + " has already been initialized");
+                }
                 transformInfoMap[transformName].initialized = true;
                 for (auto & xi : odometryVec)
                 {
@@ -554,8 +569,14 @@ void GenericCameraCalibration::parseData()
         {
             const string transformName = dataInfo.second.get<string>("transform");
             
-            assert(globalTransformMap.find(transformName) != globalTransformMap.end());
-            assert(transformInfoMap[transformName].prior);
+            if (transformInfoMap.find(transformName) == transformInfoMap.end())
+            {
+                throw runtime_error(transformName + " has not been declared");
+            }
+            if (not transformInfoMap[transformName].prior)
+            {
+                throw runtime_error(transformName + " must have a prior value");
+            }
             vector<double> stiffnessVec;
             for (auto & x : dataInfo.second.get_child("stiffness"))
             {
@@ -567,6 +588,18 @@ void GenericCameraCalibration::parseData()
             globalProblem.AddResidualBlock(costFunction, NULL, transformData); 
         }
     }
+}
+
+//FIXME
+vector<int> xVec;
+vector<int> yVec;
+void onMouse( int event, int x, int y, int, void* )
+{
+    if( event != CV_EVENT_LBUTTONDOWN )
+        return;
+
+    xVec.push_back(x);
+    yVec.push_back(y);
 }
 
 void GenericCameraCalibration::extractGridProjections(ImageData & data)
@@ -583,15 +616,54 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
             continue;
         }
         vector<cv::Point2f> centers;
-        bool patternIsFound = findChessboardCorners(frame, patternSize, centers, CV_CALIB_CB_ADAPTIVE_THRESH);
+        bool patternIsFound = findChessboardCorners(frame, patternSize, centers);
         if (not patternIsFound)
         {
-            cout << fileName << " : ERROR, pattern not found" << endl;
-            continue;
+            //USER-guided detection
+            
+            xVec.clear();
+            yVec.clear();
+            
+            cout << "CB detection failed" << endl;
+            cout << "select UL, then BR corners of the area with CB" << endl;
+
+            imshow("Select", frame);
+            setMouseCallback("Select", onMouse);
+            while ( xVec.size() < 2) waitKey(50);
+
+            Mat8u subframe = frame.colRange(xVec[0], xVec[1]).rowRange(yVec[0], yVec[1]);
+            double ratio = 1;
+            const double ROWS_MIN = 120;
+            const double COLS_MIN = 160;
+            while (subframe.rows * ratio < ROWS_MIN or subframe.cols * ratio < COLS_MIN)
+            {
+                ratio += 1;
+            }
+            if (ratio != 1) resize(subframe, subframe, Size(0, 0), ratio, ratio);
+            
+            patternIsFound = findChessboardCorners(subframe, patternSize,
+                                    centers);
+//            imshow("Select", subframe);
+//            waitKey();
+            if (not patternIsFound)
+            {
+                cout << fileName << " : ERROR, pattern not found" << endl;
+                continue;
+            }
+            for (auto & pt : centers)
+            {
+                pt.x = pt.x / ratio + xVec[0];
+                pt.y = pt.y / ratio + yVec[0];
+            }
         }
         
         if (data.checkExtraction)
         {
+            //FIXME 
+//            F0310 19:01:41.823675  1227 cubic_interpolation.h:72] Check failed: x >= 0.0 (-nan vs. 0) 
+//*** Check failure stack trace: ***
+//Aborted (core dumped)
+
             drawChessboardCorners(frame, patternSize, Mat(centers), patternIsFound);
             imshow("corners", frame);
             char key = waitKey();

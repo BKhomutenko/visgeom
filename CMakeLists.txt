@@ -23,6 +23,7 @@ add_library( calibration STATIC
     src/calibration/unified_calibration.cpp
     src/calibration/calib_cost_functions.cpp
     src/calibration/trajectory_generation.cpp
+    src/calibration/board_generator.cpp  
 )
 
 target_link_libraries( calibration 
@@ -81,6 +82,15 @@ target_link_libraries( subpixel
     ${OpenCV_LIBS}  
     ${CERES_LIBRARIES}
     ${Boost_LIBRARIES}
+)
+
+add_executable(generate
+    test/calibration/generate_board.cpp
+)
+
+target_link_libraries( generate
+    calibration
+    ${OpenCV_LIBS}  
 )
 
 ### RECONSTRUCTION ###
@@ -225,8 +235,8 @@ target_link_libraries( mi_test
 )
 
 if(CMAKE_COMPILER_IS_GNUCXX)
-    set(CMAKE_CXX_FLAGS "-Wno-deprecated -O2")        ## Optimize
-    set(CMAKE_EXE_LINKER_FLAGS "-s")  ## Strip binary
+#    set(CMAKE_CXX_FLAGS "-Wno-deprecated -O2")        ## Optimize
+#    set(CMAKE_EXE_LINKER_FLAGS "-s")  ## Strip binary
 
-#    set(CMAKE_CXX_FLAGS "-Wno-deprecated -ggdb")        ## DEBUG    
+    set(CMAKE_CXX_FLAGS "-Wno-deprecated -ggdb")        ## DEBUG    
 endif()

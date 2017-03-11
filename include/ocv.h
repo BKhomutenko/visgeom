@@ -55,6 +55,9 @@ using cv::KeyPoint;
 using cv::DMatch;
 using cv::BFMatcher;
 
+//interface
+using cv::setMouseCallback;
+
 //TODO put it elsewhere
 template<typename T, typename Q>
 T bilinear(const Mat_<T> & src, Q x, Q y)

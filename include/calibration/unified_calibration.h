@@ -43,13 +43,20 @@ struct TransformInfo {
 //TODO make a constructor which loads the calibration data
 struct ImageData
 {
-    int Nx, Ny;
+    //sequence information
     vector<Vector2dVec> detectedCornersVec;
+    string filePrefix;
     vector<string> imageNameVec;
+    
+    //transformation chain information
     vector<string> transNameVec;
     vector<TransformationStatus> transStatusVec;
-    Vector3dVec board;
+    
+    int Nx, Ny; //calibration board size
+    Vector3dVec board; //calibraiton board model
+    
     string cameraName;
+    
     
     bool checkExtraction = false;
     bool showOutliers = false;
@@ -73,6 +80,8 @@ protected:
     //constants and variables
     map<string, vector<double>> intrinsicMap;
     map<string, Array6d> globalTransformMap;
+    //TODO map<string, map<string, Array6d>> sequenceTransformMap;
+    //make it a map from image's name
     map<string, vector<Array6d>> sequenceTransformMap;
     map<string, TransformInfo> transformInfoMap;
     map<string, ICamera*> cameraMap;

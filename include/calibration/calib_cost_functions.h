@@ -71,7 +71,7 @@ struct OdometryPrior : ceres::SizedCostFunction<6, 6, 6>
     virtual bool Evaluate(double const * const * params,
             double * residual, double ** jacobian) const;
     
-    Vector6d _dxiPrior;
+    Transf _zetaPrior;
     Matrix6d _A;
 };
 
@@ -79,14 +79,16 @@ struct TransformationPrior : ceres::SizedCostFunction<6, 6>
 {
     TransformationPrior(const double * const stiffness, const double * const xi):
         _xiPrior(xi),
-        _A(Matrix6d::Zero())
+        _A(Matrix6d::Zero()),
+        _R(_xiPrior.rotMat())
     {
         for (int i = 0; i < 6; i++)
         {
             _A(i, i) = stiffness[i];
         }
-        Transf xi12(xi);
-        _A.bottomRightCorner<3, 3>() = _A.bottomRightCorner<3, 3>() * interOmegaRot(xi12.rot());
+        Matrix3d M = interOmegaRot(_xiPrior.rot());
+        _A.bottomRightCorner<3, 3>() = _A.bottomRightCorner<3, 3>() * M;
+        
     }
 
     virtual ~TransformationPrior() { }
@@ -94,7 +96,8 @@ struct TransformationPrior : ceres::SizedCostFunction<6, 6>
     virtual bool Evaluate(double const * const * params,
             double * residual, double ** jacobian) const;
     
-    Vector6d _xiPrior;
+    Transf _xiPrior;
     Matrix6drm _A;
+    Matrix3d _R;
 };
 

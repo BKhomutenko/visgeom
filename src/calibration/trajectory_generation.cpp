@@ -85,14 +85,18 @@ double TrajectoryQuality::EvaluateCost(const double * params) const
 
 TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ICamera * camera,
             Transf xiCam, Transf xiBoard, const Vector3dVec & board,
-            const Matrix6d & CovPrior, const Matrix2d & CovPt) : 
+            const Matrix6d & CovPrior, const Matrix2d & CovPt, 
+            const int Nx, const int Ny, double kapaMax) : 
     _trajVec(trajVec),
     _camera(camera->clone()),
     _xiCam(xiCam),
     _xiBoard(xiBoard),
     _hessPrior(CovPrior.inverse()),
     _board(board),
-    _paramSize(0)
+    _paramSize(0),
+    _kapaMax(kapaMax),
+    _Nx(Nx),
+    _Ny(Ny)
 {
     Eigen::LLT<Matrix2d> lltOfCovCornerInv(CovPt.inverse()); // compute the Cholesky decomposition of A
     _ptStiffness = lltOfCovCornerInv.matrixU();
@@ -144,6 +148,7 @@ double TrajectoryVisualQuality::EvaluateCost(const double * params) const
             // it does not change the rank but simplifies the calculus
             H += (J.transpose() * C.inverse() * J); 
             res += imageLimitsCost(xiBaseCam);
+            res += curvatureCost(xiOdomVec[i - 1], xiOdomVec[i]);
             //TODO add the distance to board as a constraint
     //        res += distanceCost();
         }
@@ -182,13 +187,13 @@ Matrix6d TrajectoryVisualQuality::visualCov(const Transf & camPose) const
 //image borders and the board size
 double TrajectoryVisualQuality::imageLimitsCost(const Transf & camPose) const
 {
-    const double MARGIN = 25;
-    const double MIN_DIAGONAL = 25;
+    const double MARGIN = 100;
+    const double MIN_DIAGONAL = 50;
     //FIXME temporary for particular data
     Vector2d center(_camera->getCenterU(), _camera->getCenterV());
 //    Vector2d center(280, 215);
 //    double r = min(center[1], _camera->height - center[1])  - MARGIN; // margin
-    double r = (_camera->getCenterU() + _camera->getCenterV()) / 2 - MARGIN;
+    double r = (_camera->getCenterU() + _camera->getCenterV()) / 2;
     double res = 0;
     
     Transf xiCamBoard = camPose.inverseCompose(_xiBoard);
@@ -199,12 +204,30 @@ double TrajectoryVisualQuality::imageLimitsCost(const Transf & camPose) const
     _camera->projectPointCloud(boardCamVec, boardProjectionVec);
     for (auto & pt : boardProjectionVec)
     {
-        res += pow(max((pt - center).norm()- r, 0.) / 10., 2);
+        double distX = max(MARGIN - min(pt[0], _camera->width - pt[0]), 0.);
+        double distY = max(MARGIN - min(pt[1], _camera->height - pt[1]), 0.);
+        double distR = max((pt - center).norm() - r, 0.);
+        res += pow(max(distX, max(distY, distR))/ 10., 2);
     }
     auto pt1 = boardProjectionVec[0];
     auto pt2 = boardProjectionVec.back();
-//    res += pow(max(MIN_DIAGONAL - (pt1 - pt2).norm(), 0.), 2);
+    auto pt3 = boardProjectionVec[_Nx - 1];
+    auto pt4 = boardProjectionVec[_Nx * (_Ny- 1)];
+    double diag1 = (pt1 - pt2).norm();
+    double diag2 = (pt3 - pt4).norm();
+    double diag = min(diag1, diag2);
+    res += pow(max(MIN_DIAGONAL - (pt1 - pt2).norm(), 0.), 2);
+    res += pow(max(abs(diag1 - diag2) - MIN_DIAGONAL / 2, 0.), 2);
     return res;
+}
+
+double TrajectoryVisualQuality::curvatureCost(const Transf & xi1, const Transf & xi2) const
+{
+    const Transf zeta = xi1.inverseCompose(xi2);
+    const double v = zeta.trans().norm();
+    const double w = zeta.rot().norm();
+    const double kapa = w / v;
+    return pow(30 * max(0., kapa - _kapaMax), 2);
 }
 
 // Transformation kinematic jacobian

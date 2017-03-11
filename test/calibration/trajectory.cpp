@@ -23,7 +23,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "calibration/trajectory_generation.h"
 #include "projection/eucm.h"
 
-const int PARAM_NUM = 3;
+const int PARAM_NUM = 4;
 class CircularTrajectory : public ITrajectory
 {
 public:
@@ -41,7 +41,7 @@ public:
         
         Matrix6d covAbs = Matrix6d::Identity()*1e-2;
         double alpha = params[0]; //turn angle
-        double dist = 0.05;//params[PARAM_NUM*circle + 1];
+        double dist = params[3];//params[PARAM_NUM*circle + 1];
         double ca = cos(alpha*0.5);
         double sa = sin(alpha*0.5);
         Transf xi0(params[2], 0, 0,
@@ -80,6 +80,24 @@ public:
     int _numberSteps;
 };
 
+void fourParamsAnalysis(const double * const params, const Transf xiBoard)
+{
+    cout << "Parameter analysis" << endl;
+    
+    const double R = params[3] / params[0];
+    const double D = -params[2] + xiBoard.trans()[0];
+    const double th = params[1];
+    cout << "R : " << R << endl;
+    cout << "D : " << D << endl;
+    cout << "th : " << th << " or  " << th / M_PI * 180 << " deg" << endl;
+    
+    
+    const double x = D + R * sin(th);
+    const double y = R * cos(th);
+    
+    cout << "center coordinates : " <<  x << "   " << y << endl;
+    
+}
 
 int main(int argc, char** argv) 
 {
@@ -90,12 +108,13 @@ int main(int argc, char** argv)
     vector<double> paramVec;
     for (int i = 0; i < circleCount; i++)
     {
-        paramVec.push_back(i * 0.001 + 0.01);
+        paramVec.push_back(-i * 0.03 + 0.015);
 //        paramVec.push_back(0.01);
 //        paramVec.push_back(0);
 //        paramVec.push_back(0);
-        paramVec.push_back(-0.1);
-        paramVec.push_back(1);
+        paramVec.push_back(-0.2+ i * 0.4);
+        paramVec.push_back(1.5);
+        paramVec.push_back(0.05);
         trajVec.push_back(new CircularTrajectory(numberSteps));
     }
     
@@ -114,43 +133,48 @@ int main(int argc, char** argv)
     //generate the board
     Vector3dVec board;
     const int N = 5, M = 8;
-    double step = 0.1;
+    double step = 0.15;
     for (int i = 0; i < N; i++)
     {
         for (int j = 0; j < M; j++)
         {
-            board.emplace_back(0, step * j, step * i);
+            board.emplace_back(0, -step * j, -step * i);
         }
     }
     
     //ZOE
-    /*
-    Transf xiBoard(7, -0.4, 0.5, 0, 0, 0);
+    const int WIDTH = 800;
+    const int HEIGHT = 600;
+    Transf xiBoard(7, M * step / 2, N * step + 0.2, 0, 0, 0);
     Matrix3d R;
     R <<    0,      0,      1, 
             -1,     0,      0,
             0,      -1,     0;
-    Transf xiCam(Vector3d(3, 0.35, 0.3), R);
+    Transf xiCam(Vector3d(3.5, 0.35, 0.3), R);
     cout << xiCam.rot() << endl;
-    */
+    vector<double> camParams{0.55, 1.1, 200, 200, WIDTH / 2, HEIGHT / 2};
+    EnhancedCamera cam(WIDTH, HEIGHT, camParams.data());
+    const double curvatureMax = 1. / (2.588 / tan(M_PI / 6) + 1.);
     
     //PIONEER
-    Transf xiBoard(3, -0.4, 0.5, 0, 0, 0);
-    Matrix3d R;
-    R <<    0,      0,      1, 
-            -1,     0,      0,
-            0,      -1,     0;
-    Transf xiCam(Vector3d(0.3, 0, 0.3), R);
-    cout << xiCam.rot() << endl;
-    
+//    Transf xiBoard(3, -0.4, 0.5, 0, 0, 0);
+//    Matrix3d R;
+//    R <<    0,      0,      1, 
+//            -1,     0,      0,
+//            0,      -1,     0;
+//    Transf xiCam(Vector3d(0.3, 0, 0.3), R);
+//    cout << xiCam.rot() << endl;
+//    vector<double> camParams{0.719981,  1.03894,  381.974,  382.378,  523.6,  366.235};
+//    EnhancedCamera cam(1024, 768, camParams.data());
     
 //    Transf xiCam2(0, 0, 0, 0, 0, 0);
     
-    vector<double> camParams{0.719981,  1.03894,  381.974,  382.378,  523.6,  366.235};
-    EnhancedCamera cam(1024, 768, camParams.data());
+    
+    
     TrajectoryVisualQuality * quality = new TrajectoryVisualQuality(
                                                 trajVec, &cam, xiCam, xiBoard, board,
-                                                Matrix6d::Identity(), Matrix2d::Identity());
+                                                Matrix6d::Identity(), Matrix2d::Identity(),
+                                                M, N, curvatureMax);
     
     //////////////////////////////////
     //Test the visual covariance
@@ -159,8 +183,7 @@ int main(int argc, char** argv)
     cout << C << endl << endl;
     cout << C.inverse() << endl;
     
-    cout << quality->imageLimitsCost(Transf(0.1, 0.1, 0, 0, 0, 1.2).compose(xiCam)) << endl;
-    cout << quality->imageLimitsCost(Transf(0, 0, 0, 0, 0, 0).compose(xiCam)) << endl;
+    
     
     ceres::GradientProblem problem(quality);
 
@@ -181,45 +204,70 @@ int main(int argc, char** argv)
         
         cout <<  endl;
     }
+    
+    
+    //output the trajectory parameters
+    fourParamsAnalysis(paramVec.data(), xiBoard);
+    fourParamsAnalysis(paramVec.data() + PARAM_NUM, xiBoard);
+    
     ofstream myfile;
-    myfile.open ("/home/bogdan/projects/python/trajectory/traj3");
+    myfile.open("/home/bogdan/projects/python/trajectory/traj3");
+    ofstream jsonfile;
+    jsonfile.open("traj3.json");
     
-    
-    
+    paramVec[0] += 0.0015;
+    paramVec[4] += 0.0015;
+    paramVec[3] += 0.0015;
+    paramVec[7] += 0.0015;
     for (int trajIdx = 0; trajIdx < trajVec.size(); trajIdx++)
     {
         auto traj = trajVec[trajIdx];
+        
         traj->compute(paramVec.data() + trajIdx * traj->paramSize(), xiOdomVec, covOdomVec);
         
         for (int i = 0; i < xiOdomVec.size(); i++)
         {
+            //to read as json
+            
+            jsonfile << "            [" 
+                        << xiOdomVec[i].trans()[0] << ", " 
+                        << xiOdomVec[i].trans()[1] << ", " 
+                        << xiOdomVec[i].rot()[2] << "],"<< std::endl;
+            
+            //to plot
             myfile << xiOdomVec[i].trans()[0] << "   " << xiOdomVec[i].trans()[1]  << endl;
-            cout << xiOdomVec[i] << endl;
+            
 //            cout << quality->imageLimitsCost(xiOdomVec[i].compose(xiCam)) << endl;
         }
         
-        for (int i = 0; i < xiOdomVec.size(); i+= xiOdomVec.size() - 1)
+        for (int i = 0; i < xiOdomVec.size(); i+= /*xiOdomVec.size() - */1)
         {
-            Mat8u img(480, 640);
+            Mat8u img(HEIGHT, WIDTH);
             img.setTo(255);
-            fill(img.data, img.data + 640, 0);
-            fill(img.data + 640 * 479, img.data + 640 * 480, 0);
+            fill(img.data, img.data + WIDTH * 2, 0);
+            fill(img.data + WIDTH * (HEIGHT - 2), img.data + WIDTH * HEIGHT, 0);
             Transf xiCamBoard = xiOdomVec[i].compose(xiCam).inverseCompose(xiBoard);
             Vector3dVec boardCam;
             xiCamBoard.transform(board, boardCam);
             Vector2dVec projectedBoard;
             cam.projectPointCloud(boardCam, projectedBoard);
             
+            cout << xiOdomVec[i] << "      " 
+                << quality->imageLimitsCost(xiOdomVec[i].compose(xiCam)) << endl;
             for (int j = 0; j < projectedBoard.size(); j++)
             {
                 Vector2i p = round(projectedBoard[j]);
                 img(p[1], p[0]) = 0;
+                img(p[1]-1, p[0]) = 0;
+                img(p[1]+1, p[0]) = 0;
+                img(p[1], p[0]-1) = 0;
+                img(p[1], p[0]+1) = 0;
             }
             
-//            imshow("points", img);
-            imwrite("points" + to_string(trajIdx) + to_string(i) + ".png", img);
-//            waitKey();
-        }         
+            imshow("points", img);
+//            imwrite("points" + to_string(trajIdx) + to_string(i) + ".png", img);
+            waitKey();
+        }      
     }
     myfile.close();
     
