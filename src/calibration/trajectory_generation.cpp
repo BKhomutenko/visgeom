@@ -188,7 +188,8 @@ Matrix6d TrajectoryVisualQuality::visualCov(const Transf & camPose) const
 double TrajectoryVisualQuality::imageLimitsCost(const Transf & camPose) const
 {
     const double MARGIN = 100;
-    const double MIN_DIAGONAL = 50;
+    const double MIN_DIAGONAL = 70;
+    const double MAX_DIFF = 1.5;
     //FIXME temporary for particular data
     Vector2d center(_camera->getCenterU(), _camera->getCenterV());
 //    Vector2d center(280, 215);
@@ -215,9 +216,10 @@ double TrajectoryVisualQuality::imageLimitsCost(const Transf & camPose) const
     auto pt4 = boardProjectionVec[_Nx * (_Ny- 1)];
     double diag1 = (pt1 - pt2).norm();
     double diag2 = (pt3 - pt4).norm();
-    double diag = min(diag1, diag2);
-    res += pow(max(MIN_DIAGONAL - (pt1 - pt2).norm(), 0.), 2);
-    res += pow(max(abs(diag1 - diag2) - MIN_DIAGONAL / 2, 0.), 2);
+    double diagSmall = min(diag1, diag2);
+    double diagBig = max(diag1, diag2);
+    res += pow(max(MIN_DIAGONAL - diagSmall, 0.), 2);
+    res += pow(max(diagBig / diagSmall - MAX_DIFF, 0.) * 10, 2);
     return res;
 }
 

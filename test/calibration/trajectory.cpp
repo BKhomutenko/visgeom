@@ -101,7 +101,41 @@ void fourParamsAnalysis(const double * const params, const Transf xiBoard)
 
 int main(int argc, char** argv) 
 {
+
+//    vector<Transf> subVec {Transf( 3.50115, 0.349983, 0.499947, -1.21177,  1.20848, -1.20952),
+//                                Transf( 3.56777 ,0.360773 ,0.490473 , -1.24337 , 1.19484, -1.24086),
+//                                Transf( 3.76132,  0.41007 ,0.464887 , -1.32837,  1.15668, -1.32002),
+//                                Transf( 4.03562 , 0.49536 ,0.432115 , -1.47058 ,  1.0778 ,-1.45874),
+//                                Transf( 4.3787, 0.614852, 0.402354 , -1.65827, 0.941195, -1.65902)};
+        vector<Transf> subVec {Transf( 3.48345, 0.34885  , 0.49993  , -1.20864,  1.20987,  -1.21105),
+                                Transf( 3.53387,  0.32341 , 0.491414 , -1.21527,  1.21199,  -1.2225 ),
+                                Transf( 3.67889, 0.262883 , 0.467718 , -1.23466,  1.21828,  -1.25445),
+                                Transf( 3.89535, 0.166555 , 0.434341 , -1.26156,  1.22972,  -1.30231),
+                                Transf( 4.16502, 0.0273281,  0.399096, -1.28958,  1.24757,  -1.36067)};
+    vector<Transf> optimVec {Transf( 3.49097, 0.34758, 0.49995,  -1.20894,  1.20852, -1.20934),
+                                Transf( 3.49044, 0.346785, 0.494068,  -1.21047,  1.20729, -1.20665),
+                                Transf( 3.51464, 0.342563, 0.478823,   -1.2163,  1.20731, -1.20437),
+                                Transf( 3.56106, 0.335435, 0.459801,  -1.22571,  1.20809, -1.20326),
+                                Transf( 3.62818, 0.328741, 0.445304,  -1.23619,   1.2091, -1.20371)};
+                                
+ 
+    Matrix3d RGT;
+    RGT <<    0,      0,      1, 
+            -1,     0,      0,
+            0,      -1,     0;
+    Transf xiGT(Vector3d(3.5, 0.35, 0.5), RGT);
+    cout << xiGT << endl;
+    for (int i = 0; i < 5; i++)
+    {
+        Transf err1 = xiGT.inverseCompose(optimVec[i]);
+        Transf err2 = xiGT.inverseCompose(subVec[i]);
+        cout << i * 0.002 << " & " << i * 0.01  << std::setprecision(3)
+                << " & " << err1.trans().norm() << " & " << err1.rot().norm()
+                << " & " << err2.trans().norm() << " & " << err2.rot().norm()
+                << "\\\\ \\hline" << endl; 
+    }
     
+    return 0;
     int circleCount = 2;
     vector<ITrajectory*> trajVec;
     double numberSteps = 30;
@@ -120,6 +154,10 @@ int main(int argc, char** argv)
     
     vector<Transf> xiOdomVec;
     vector<Matrix6d> covOdomVec;
+    
+    vector<Transf> xiOdomBiasVec;
+    vector<Matrix6d> covOdomBiasVec;
+    
 //    traj->compute(paramVec.data(), xiOdomVec, covOdomVec);
 //    
 //    for (int i = 0; i < xiOdomVec.size(); i++)
@@ -188,7 +226,7 @@ int main(int argc, char** argv)
     ceres::GradientProblem problem(quality);
 
     ceres::GradientProblemSolver::Options options;
-    options.max_num_iterations = 1000;
+    options.max_num_iterations = 40;
     options.minimizer_progress_to_stdout = true;
     ceres::GradientProblemSolver::Summary summary;
     ceres::Solve(options, problem, paramVec.data(), &summary);
@@ -215,15 +253,20 @@ int main(int argc, char** argv)
     ofstream jsonfile;
     jsonfile.open("traj3.json");
     
-    paramVec[0] += 0.0015;
-    paramVec[4] += 0.0015;
-    paramVec[3] += 0.0015;
-    paramVec[7] += 0.0015;
+    ofstream jsonBiasfile;
+    jsonBiasfile.open("traj3Bias.json");
+    
+    vector<double> paramBiasVec = paramVec;
+    paramBiasVec[0] *= 1.03;
+//    paramBiasVec[4] += 0.0015;
+    paramBiasVec[3] *= 1.03;
+//    paramBiasVec[7] += 0.0015;
     for (int trajIdx = 0; trajIdx < trajVec.size(); trajIdx++)
     {
         auto traj = trajVec[trajIdx];
         
         traj->compute(paramVec.data() + trajIdx * traj->paramSize(), xiOdomVec, covOdomVec);
+        traj->compute(paramBiasVec.data() + trajIdx * traj->paramSize(), xiOdomBiasVec, covOdomBiasVec);
         
         for (int i = 0; i < xiOdomVec.size(); i++)
         {
@@ -233,7 +276,10 @@ int main(int argc, char** argv)
                         << xiOdomVec[i].trans()[0] << ", " 
                         << xiOdomVec[i].trans()[1] << ", " 
                         << xiOdomVec[i].rot()[2] << "],"<< std::endl;
-            
+            jsonBiasfile << "            [" 
+                        << xiOdomBiasVec[i].trans()[0] << ", " 
+                        << xiOdomBiasVec[i].trans()[1] << ", " 
+                        << xiOdomBiasVec[i].rot()[2] << "],"<< std::endl;
             //to plot
             myfile << xiOdomVec[i].trans()[0] << "   " << xiOdomVec[i].trans()[1]  << endl;
             
@@ -270,7 +316,8 @@ int main(int argc, char** argv)
         }      
     }
     myfile.close();
-    
+    jsonfile.close();
+    jsonBiasfile.close();
     
       
                   
