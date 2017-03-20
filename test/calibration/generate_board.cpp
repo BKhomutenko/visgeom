@@ -71,5 +71,29 @@ int main(int argc, char** argv)
     generateImages("images_2_", xiBaseCam, xiOrigBoard, odom2Vec);
     
     
+    //stereo
+    /*Transf xiBaseCam1(-0.35, 0, 0, 0, 0, 0);
+    Transf xiBaseCam2(0.35, 0, 0, 0, 0, 0);
+    Transf xiOrigBoard(-0.4, -0.2, 1.5, 0, 0, 0);
+    for (int i = -1; i < 2; i++)
+    {
+        for (int j = -1; j < 2; j++)
+        {
+            for (int k = -1; k < 2; k++)
+            {
+//                for (int l = -1; l < 2; l++)
+//                {
+                    const double step = 0.3;
+                    odom1Vec.emplace_back(step * i, step * j, 0, 0, step * k, 0);
+//                }
+            }
+        }
+    }
+    
+    
+    
+    generateImages("images_stereo_1_", xiBaseCam1, xiOrigBoard, odom1Vec);
+    generateImages("images_stereo_2_", xiBaseCam2, xiOrigBoard, odom1Vec);*/
+    
     return 0;
 }

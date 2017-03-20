@@ -29,6 +29,8 @@ Requires Eigen3
 
 #define ZERO T(0.)
 
+#define T_PI T(M_PI)
+
 template<typename T>
 using Vector2 = Eigen::Matrix<T, 2, 1>;
 template<typename T>
@@ -40,6 +42,9 @@ using Vector3Vec = std::vector<Vector3<T>>;
 
 template<typename T>
 T sinc(const T & x);
+
+template<typename T>
+T normalizeAngle(const T & th);
 
 template<typename T>
 Matrix3<T> rotationMatrix(const Vector3<T> & v);

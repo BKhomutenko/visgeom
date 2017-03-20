@@ -192,7 +192,7 @@ void GenericCameraCalibration::initTransformChainInfo(ImageData & data, const pt
     {
         if (not transformInfoMap[name].global) sequenceCount++;
     }
-    if (sequenceCount != 1) throw runtime_error("multiple sequences in a transform chain");
+    if (sequenceCount != 1) throw runtime_error("not one sequences in a transform chain");
     
     cout << endl;
 }
@@ -525,8 +525,8 @@ void GenericCameraCalibration::parseData()
             {
                 odometryVec.emplace_back(readTransform(odomItem.second));
                 auto & xi = odometryVec.back();
-                xi.rot() += 0.008 * Vector3d::Random();
-                xi.trans() += 0.04 * Vector3d::Random();
+//                xi.rot() += 0.002 * Vector3d::Random();
+//                xi.trans() += 0.01 * Vector3d::Random();
             }
             
             //use the odometry as initial values

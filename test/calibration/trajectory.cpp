@@ -107,23 +107,30 @@ int main(int argc, char** argv)
 //                                Transf( 3.76132,  0.41007 ,0.464887 , -1.32837,  1.15668, -1.32002),
 //                                Transf( 4.03562 , 0.49536 ,0.432115 , -1.47058 ,  1.0778 ,-1.45874),
 //                                Transf( 4.3787, 0.614852, 0.402354 , -1.65827, 0.941195, -1.65902)};
-        vector<Transf> subVec {Transf( 3.48345, 0.34885  , 0.49993  , -1.20864,  1.20987,  -1.21105),
-                                Transf( 3.53387,  0.32341 , 0.491414 , -1.21527,  1.21199,  -1.2225 ),
-                                Transf( 3.67889, 0.262883 , 0.467718 , -1.23466,  1.21828,  -1.25445),
-                                Transf( 3.89535, 0.166555 , 0.434341 , -1.26156,  1.22972,  -1.30231),
-                                Transf( 4.16502, 0.0273281,  0.399096, -1.28958,  1.24757,  -1.36067)};
-    vector<Transf> optimVec {Transf( 3.49097, 0.34758, 0.49995,  -1.20894,  1.20852, -1.20934),
-                                Transf( 3.49044, 0.346785, 0.494068,  -1.21047,  1.20729, -1.20665),
-                                Transf( 3.51464, 0.342563, 0.478823,   -1.2163,  1.20731, -1.20437),
-                                Transf( 3.56106, 0.335435, 0.459801,  -1.22571,  1.20809, -1.20326),
-                                Transf( 3.62818, 0.328741, 0.445304,  -1.23619,   1.2091, -1.20371)};
+
+     /*   vector<Transf> subVec {Transf( 3.48345, 0.34885  , 0 , -1.20864,  1.20987,  -1.21105),
+                                Transf( 3.53387,  0.32341 , 0 , -1.21527,  1.21199,  -1.2225 ),
+                                Transf( 3.67889, 0.262883 , 0 , -1.23466,  1.21828,  -1.25445),
+                                Transf( 3.89535, 0.166555 , 0 , -1.26156,  1.22972,  -1.30231),
+                                Transf( 4.16502, 0.0273281,  0, -1.28958,  1.24757,  -1.36067)};
+    vector<Transf> optimVec {Transf( 3.49097, 0.34758, 0,  -1.20894,  1.20852, -1.20934),
+                                Transf( 3.49044, 0.346785, 0,  -1.21047,  1.20729, -1.20665),
+                                Transf( 3.51464, 0.342563, 0,   -1.2163,  1.20731, -1.20437),
+                                Transf( 3.56106, 0.335435, 0,  -1.22571,  1.20809, -1.20326),
+                                Transf( 3.62818, 0.328741,0,  -1.23619,   1.2091, -1.20371)};
                                 
  
+
+//vector<Transf> stereoVec {Transf( 3.48284, 0.348637 ,0 , -1.21019  ,1.20978,  -1.2083),
+//                                Transf( 3.49206,  0.356478, 0,  -1.21078 , 1.21011, -1.20566),
+//                                Transf( 3.51522,  0.358268, 0,  -1.21328 , 1.21054, -1.20487),
+//                                Transf( 3.55623,  0.355995, 0,  -1.21787,  1.21059, -1.20602),
+//                                Transf( 3.61632, 0.352219 ,0 , -1.22372,  1.21071, -1.20881)};
     Matrix3d RGT;
     RGT <<    0,      0,      1, 
             -1,     0,      0,
             0,      -1,     0;
-    Transf xiGT(Vector3d(3.5, 0.35, 0.5), RGT);
+    Transf xiGT(Vector3d(3.5, 0.35, 0), RGT);
     cout << xiGT << endl;
     for (int i = 0; i < 5; i++)
     {
@@ -135,7 +142,8 @@ int main(int argc, char** argv)
                 << "\\\\ \\hline" << endl; 
     }
     
-    return 0;
+    return 0;*/
+    
     int circleCount = 2;
     vector<ITrajectory*> trajVec;
     double numberSteps = 30;
@@ -220,13 +228,14 @@ int main(int argc, char** argv)
     Matrix6d C = quality->visualCov(Transf(0.1, 0.1, 0, 0, 0, .1).compose(xiCam));
     cout << C << endl << endl;
     cout << C.inverse() << endl;
-    
+    cout << quality->EvaluateCost(paramVec.data()) << endl;
     
     
     ceres::GradientProblem problem(quality);
 
     ceres::GradientProblemSolver::Options options;
-    options.max_num_iterations = 40;
+//    options.max_num_iterations = 25;
+    options.max_num_iterations = 1000;
     options.minimizer_progress_to_stdout = true;
     ceres::GradientProblemSolver::Summary summary;
     ceres::Solve(options, problem, paramVec.data(), &summary);
