@@ -293,6 +293,7 @@ bool MotionStereo::computeUncertainty(double d, double s)
     if (d == OUT_OF_RANGE)  // no prior
     {
         //just rotate
+        return false; //FIXME
         Xmax = R21() * gX;
         if (not _camera2->projectPoint(Xmax, gptStart)) return false;
         gdispMax = _params.dispMax;

@@ -101,7 +101,7 @@ int main(int argc, char** argv)
         {
             Transf xiCam12 = xiBaseCam.inverseCompose(xi13).compose(xiBaseCam);
             d2 = mstereo.compute(xiCam12, img3, d2);
-            d2.filterNoise();
+//            d2.filterNoise();
             photometricLocalizer.setDepth(d2);
             d2.toInverseMat(depthMat); 
             //FIXME rewrite with Mat8u
@@ -114,7 +114,7 @@ int main(int argc, char** argv)
             //TODO for every new keyframe do SGBM
             
             DepthMap d3 = mstereo.compute(xiCam12, img3, d2, CAMERA_2);
-            d3.filterNoise();
+//            d3.filterNoise();
             d3.toInverseMat(depthMat); 
             imshow("res3", depthMat);
             waitKey();
