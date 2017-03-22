@@ -82,7 +82,7 @@ int main(int argc, char** argv)
     photometricLocalizer.setDepth(depth);
     
     MotionStereoParameters stereoMotionParams(stereoParams);
-    
+    stereoMotionParams.descRespThresh = 5;
     MotionStereo mstereo(&camera, &camera, stereoMotionParams);
     mstereo.setBaseImage(img1);
     DepthMap d2 = depth;

@@ -509,6 +509,7 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & 
             
             if (gdispMax / gstep < 2) 
             {
+                //TODO verify instead of copying
                 if (camIdx == CAMERA_1)
                 { 
                     count3++;
