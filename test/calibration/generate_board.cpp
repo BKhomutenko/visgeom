@@ -22,7 +22,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "geometry/geometry.h"
 #include "projection/eucm.h"
-#include "calibration/board_generator.h"
+#include "utils/image_generator.h"
 
 void generateImages(const string baseName, const Transf xiBaseCam,
         const Transf xiOrigBoard, const vector<Transf> & odomVec)
@@ -30,20 +30,24 @@ void generateImages(const string baseName, const Transf xiBaseCam,
     ofstream nameFile;
     nameFile.open(baseName + "_names.txt");
     
-    array<double, 6> params {0.55, 1.1, 200, 200, 400, 300};
-    EnhancedCamera camera(800, 600, params.data());
+    array<double, 6> params {0.55, 1.1, 160, 160, 320, 240};
+    EnhancedCamera camera(640, 480, params.data());
     
-    BoardGenerator generator(&camera, 8, 5, 0.1, 20);
-    
+    BoardGenerator generator(&camera, 8, 5, 0.1);
+    generator.setPlaneTransform(xiOrigBoard);    
+//    Mat8u img0 = imread("/home/bogdan/projects/stack/aliasing4.png", 0);
+    Mat8u img0 = imread("/home/bogdan/projects/stack/lena.png", 0);
+    ImageGenerator generator2(&camera, img0, 100);
+    generator2.setPlaneTransform(xiOrigBoard);
     
     Mat8u img;
-    for (int i = 0; i < odomVec.size(); i++)
+    for (int i = 15; i < odomVec.size(); i++)
     {
-        Transf xiCamBoard = odomVec[i].compose(xiBaseCam).inverseCompose(xiOrigBoard);
+        Transf xiCam = odomVec[i].compose(xiBaseCam);
         
-        cout << xiCamBoard << endl;
+        cout << xiCam << endl;
         
-        generator.generate(img, xiCamBoard);
+        generator2.generate(img, xiCam);
         
         const string name = baseName + to_string(i) + ".png";
         imwrite(name, img);
@@ -67,8 +71,8 @@ int main(int argc, char** argv)
         odom2Vec.emplace_back(readTransform(odomItem.second));
     }
     
-    generateImages("images_1_", xiBaseCam, xiOrigBoard, odom1Vec);
-    generateImages("images_2_", xiBaseCam, xiOrigBoard, odom2Vec);
+    generateImages("lena_1_", xiBaseCam, xiOrigBoard, odom1Vec);
+    generateImages("lena_2_", xiBaseCam, xiOrigBoard, odom2Vec);
     
     
     //stereo

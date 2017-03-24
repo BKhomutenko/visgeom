@@ -22,6 +22,7 @@ reading out .json files
 #pragma once
 
 #include "std.h"
+#include "except.h"
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
@@ -34,13 +35,17 @@ using boost::property_tree::read_json;
 template<typename T>
 Transformation<T> transformFromData(const vector<T> & valVec)
 {
-    switch (valVec.size())
+    if (valVec.size() == 3) //x, y, theta
     {
-    case 3:     //x, y, theta
         return Transformation<T>(valVec[0], valVec[1], 0, 0, 0, valVec[2]);
-    case 6:     //full 6 dof
+    }
+    else  if (valVec.size() == 6)   //full 6 dof
+    {
         return Transformation<T>(valVec.data());
-    case 12:    //homogeneous transformation
+    }
+    
+    else  if (valVec.size() == 12)    //homogeneous transformation
+    {
         Matrix3<T> R;
         R << valVec[0], valVec[1], valVec[2],
              valVec[4], valVec[5], valVec[6],
@@ -48,6 +53,11 @@ Transformation<T> transformFromData(const vector<T> & valVec)
         
         Vector3<T> t(valVec[3], valVec[7], valVec[11]);
         return Transformation<T>(t, R);
+    }
+    else
+    {
+        throw runtime_error("invalid trasformation format. must be 3, 6, or 12 values; " 
+            + to_string(valVec.size()) + " are given."); 
     }
 }
 
