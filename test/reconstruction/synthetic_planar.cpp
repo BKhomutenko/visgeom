@@ -48,18 +48,32 @@ int main(int argc, char** argv)
     for (auto & boardPoseItem : root.get_child("plane_transform"))
     {
         generator.setPlaneTransform(readTransform(boardPoseItem.second));
+        //depth GT
+        Mat32f depth;
+        generator.generateDepth(depth, xiCam0);
+        const string depthName = imageBaseName + "_" + 
+            to_string(boardPoseCount) + "_depth.png";
+        imwrite(depthName, depth*100);
+        //base frame
+        Mat8u dst;
+        generator.generate(dst, xiCam0);
+        const string imgName = imageBaseName + "_" + to_string(boardPoseCount) + "_base.png";
+        imwrite(imgName, dst);
+        
+        //different increment diretion
         for (auto & cameraIncItem : root.get_child("camera_increment"))
         {
             Transf dxi = readTransform(cameraIncItem.second);
-            Transf xiCam = xiCam0;
+            Transf xiCam = xiCam0.compose(dxi);
             
+            //increment count
             for (int i = 0; i < iterMax; i++, xiCam = xiCam.compose(dxi))
             {
                 cout << xiCam << endl;
-                Mat8u dst;
+                
                 generator.generate(dst, xiCam);
-                const string imgName = imageBaseName + "_" + to_string(boardPoseCount) + "_" +
-                        to_string(cameraIncCount) + "_" + to_string(i) + ".png";
+                const string imgName = imageBaseName + "_" + to_string(boardPoseCount) 
+                    + "_" + to_string(cameraIncCount) + "_" + to_string(i+1) + ".png";
                 cout << imgName << endl;
                 imwrite(imgName, dst);
             }

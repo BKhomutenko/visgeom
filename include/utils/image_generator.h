@@ -32,6 +32,7 @@ public:
 
     
     virtual uchar brightness(const Vector2d p, const Vector2d u, const Vector2d v) const { return 255; }
+    virtual bool isInside(const Vector2d p) const { return false; }
     
     void generate(Mat8u & dst, const Transf xiCam);
     void generateDepth(Mat32f & dst, const Transf xiCam);
@@ -80,7 +81,7 @@ public:
 
     uchar brightness(const Vector2d p, const Vector2d u, const Vector2d v) const;
     
-    
+    bool isInside(const Vector2d p) const;
     
 private:
     double _scale;

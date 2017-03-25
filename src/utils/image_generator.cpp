@@ -85,7 +85,43 @@ void PlanarGenerator::computeIntersectionCoordinates()
         _intersectionVec[idx] = Vector2d(v.dot(_ex), v.dot(_ey));
     }
 }
-      
+
+void PlanarGenerator::generateDepth(Mat32f & dst, const Transf xiCam)
+{
+    const int W = _camera->width;
+    const int H = _camera->height;
+    dst.create(H, W);
+    _xiCamPlane = xiCam.inverseCompose(_xiPlane);
+    _R = _xiCamPlane.rotMat();
+    _ex = _R.col(0);
+    _ey = _R.col(1);
+    _ez = _R.col(2);
+    _t = _xiCamPlane.trans();
+    _lambdaNum = _t.dot(_ez);
+//    Matrix3d Rcam = xiCam.rotMat();
+    computeLengths();
+    computeIntersectionCoordinates();
+    
+    for (int r = 0; r < H; r++)
+    {
+        cout << r << endl;
+        const int shift = r * W;
+        for (int c = 0; c < W; c++)
+        {
+            const int idx = shift + c;
+            if (_intersectionFlagVec[idx] and isInside(_intersectionVec[idx])) 
+            {
+                dst(r, c) = _directionVec[idx].norm() * _lambdaVec[idx];
+            }
+            else
+            {
+                dst(r, c) = 0;
+            }
+        }
+    }
+    
+}
+
 void PlanarGenerator::generate(Mat8u & dst, const Transf xiCam)
 {
     const int W = _camera->width;
@@ -223,16 +259,23 @@ ImageGenerator::ImageGenerator(const ICamera * camera,
 
 void clip(const vector<Vector2d> & simplex, list<Vector2d> & poly2);
 
+bool ImageGenerator::isInside(const Vector2d p) const
+{
+    Vector2i p1 = round((p + _p0) * _scale);
+    return  (p1[0] >= 0 and p1[0] < _img.cols and p1[1] >= 0 and p1[1] < _img.rows);
+}
+
 uchar ImageGenerator::brightness(const Vector2d p, const Vector2d u, const Vector2d v) const
 {
     
     //check the image limits
-    Vector2i p1 = round((p + _p0) * _scale);
-    if (p1[0] < 0 or p1[0] >= _img.cols or p1[1] < 0 or p1[1] >= _img.rows) return 255;
+    
+    if (not isInside(p)) return 255;
     const double invScale = 1. / _scale;
     //Nneigh
     if (max( max( abs(u[0]), abs(u[1]) ), max( abs(v[0]), abs(v[1]) ) ) < 0.2*invScale )
     {    
+        Vector2i p1 = round((p + _p0) * _scale);
         return _img(p1[1], p1[0]);
     }
     

@@ -536,7 +536,8 @@ void EnhancedSGM::reconstructDisparity()
                     bestCost = cost;
                 }
             }
-            if (_params.verbosity > 4) cout << "    x: " << x << " best error: " << _finalErrorMat(y, x) << endl;
+            if (_params.verbosity > 4) cout << "    x: " << x << " best error: " 
+                    << _finalErrorMat(y, x) << endl;
         }
         if (_params.verbosity > 3) cout << "    y: " << y << endl;
     }
@@ -593,7 +594,8 @@ void EnhancedSGM::reconstructDisparityMH()
 //            sort(indexedCostVec.begin(), indexedCostVec.end());
             sizeAcc += indexedCostVec.size();
             sizeCount++;
-            partial_sort(indexedCostVec.begin(), indexedCostVec.begin() + _params.hypMax, indexedCostVec.end());
+            partial_sort(indexedCostVec.begin(), indexedCostVec.begin() + 
+                    _params.hypMax, indexedCostVec.end());
             for (int hypIdx = 0; hypIdx < minIdxVec.size(); hypIdx++)
             {
                 _smallDisparity(y, x * _params.hypMax + hypIdx) = indexedCostVec[hypIdx].second;
@@ -646,7 +648,8 @@ void EnhancedSGM::reconstructDisparityMH()
                 minCost = bestErr;
                 minCostDisp = bestDisp;
             }
-            if (_params.verbosity > 4) cout << "    x: " << x << " best error: " << _finalErrorMat(y, x) << endl;
+            if (_params.verbosity > 4) cout << "    x: " << x << " best error: " 
+                << _finalErrorMat(y, x) << endl;
         }
         if (_params.verbosity > 3) cout << "    y: " << y << endl;
     }
