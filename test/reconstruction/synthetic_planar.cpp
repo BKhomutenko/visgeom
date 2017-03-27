@@ -42,11 +42,12 @@ int main(int argc, char** argv)
     ImageGenerator generator(&camera, foreImg, 250);
 //    generator.setBackground(backImg);
     const int iterMax = root.get<int>("steps");
-    int cameraIncCount = 0;
+    
     int boardPoseCount = 0;
     const string imageBaseName = root.get<string>("output_name");
     for (auto & boardPoseItem : root.get_child("plane_transform"))
     {
+        int cameraIncCount = 0;
         generator.setPlaneTransform(readTransform(boardPoseItem.second));
         //depth GT
         Mat32f depth;

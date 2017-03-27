@@ -119,6 +119,16 @@ target_link_libraries( synthetic_planar
     ${OpenCV_LIBS} 
 )
 
+add_executable( sgm_synthetic_planar 
+    test/reconstruction/sgm_synthetic_planar.cpp
+)
+
+target_link_libraries( sgm_synthetic_planar 
+    utils
+    reconstruction
+    ${OpenCV_LIBS} 
+)
+
 add_executable( stereo 
     test/reconstruction/stereo_test.cpp
 )

@@ -193,7 +193,7 @@ bool DepthMap::filterPushHypothesis(const int x, const int y, const double d, co
             if ( h == 0 )
             {
                 pushHypothesis(x, y, d, sigmaVal);
-                // if(d<1) cout << "Pushing: x: " << x << " y: " << y << " d: " << d << " s: " << sigmaVal << endl;
+    // if(d<1) cout << "Pushing: x: " << x << " y: " << y << " d: " << d << " s: " << sigmaVal << endl;
                 return true;
             }
             break;
@@ -549,7 +549,7 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
     result.sigmaVec.clear();
     result.cloud.clear();
     result.valVec.clear();
-//    result.datatype = (minmax_flag) ? MHPack::MINMAX_DISTANCE_VEC_WITH_SIGN : MHPack::RECONSTRUCTION_WITH_SIGMA;
+//result.datatype = (minmax_flag) ? MHPack::MINMAX_DISTANCE_VEC_WITH_SIGN : MHPack::RECONSTRUCTION_WITH_SIGMA;
 
     vector<double> depthVec;
     for (int i = 0; i < queryIdxVec.size(); i++)
@@ -683,7 +683,8 @@ void DepthMap::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
 	// vector<int> idx1Vec;
     MHPack cloud22MH;
 	// dMap2.reconstruct(point12Vec, idx1Vec, cloud22);
-    dMap2.reconstruct(cloud22MH, QUERY_POINTS); // Do not reconstruct all hypotheses, we need a 1-1 map between input and output
+	// Do not reconstruct all hypotheses, we need a 1-1 map between input and output
+    dMap2.reconstruct(cloud22MH, QUERY_POINTS); 
 
 	//Step 5 : Transform above into first frame
 	Vector3dVec cloud21;

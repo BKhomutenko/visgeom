@@ -104,7 +104,6 @@ void PlanarGenerator::generateDepth(Mat32f & dst, const Transf xiCam)
     
     for (int r = 0; r < H; r++)
     {
-        cout << r << endl;
         const int shift = r * W;
         for (int c = 0; c < W; c++)
         {

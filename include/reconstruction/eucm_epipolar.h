@@ -45,8 +45,6 @@ public:
         nSteps(numberSteps),
         verbosity(verbosity)
     {
-    
-            cout << "Desc constructor" << endl;
     }
     
     EnhancedEpipolar(const EnhancedCamera * cam1, const EnhancedCamera * cam2,
