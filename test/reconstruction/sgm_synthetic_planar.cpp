@@ -26,6 +26,9 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 
+//FIXME make an argument
+ofstream results;
+
 void analyzeError(const Mat32f & depthGT, const Mat32f & depth, 
         const Mat32f & sigma, const ScaleParameters & scaleParams)
 {
@@ -45,7 +48,7 @@ void analyzeError(const Mat32f & depthGT, const Mat32f & depth,
             Nmax++;
             dist += depthGT(vgt, ugt);
             if (depthGT(vgt, ugt) != depthGT(vgt, ugt) or depth(v, u) != depth(v, u)) continue;
-            if (sigma(v, u) > 1 or abs(depthGT(vgt, ugt) - depth(v, u)) > 2.5 * sigma(v, u)) continue;
+            if (sigma(v, u) > 0.3 or abs(depthGT(vgt, ugt) - depth(v, u)) > 2.5 * sigma(v, u)) continue;
             inlierMat(v, u) = 255;
             err += depthGT(vgt, ugt) - depth(v, u);
             err2 += pow(depthGT(vgt, ugt) - depth(v, u), 2);
@@ -55,6 +58,10 @@ void analyzeError(const Mat32f & depthGT, const Mat32f & depth,
     cout << "avg err : " << err / N *1000 << " avg err2 : " 
         << sqrt(err2 / N)*1000  << " number of inliers : " << 100 * N / double(Nmax)
         << "   average distance : " << dist / Nmax << endl;
+    
+    results << sqrt(err2 / N)*1000  << "    " << 100 * N / double(Nmax)
+        << "    " << dist / Nmax;
+        
     imshow("inliers", inlierMat);
 }
 
@@ -92,6 +99,10 @@ int main(int argc, char** argv)
     const int iterMax = root.get<int>("steps");
     int boardPoseCount = 0;
     const string imageBaseName = root.get<string>("output_name");
+    
+    if (argc >= 3) results.open(argv[2]);
+    else results.open("sgm_results.txt");
+    
     for (auto & boardPoseItem : root.get_child("plane_transform"))
     {   
         int cameraIncCount = 0;
@@ -119,19 +130,21 @@ int main(int argc, char** argv)
                 Mat8u img2 = imread(imgName, 0);
                 Transf TleftRight = xiCam0.inverseCompose(xiCam);
                 EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
+                results << TleftRight.trans().norm() << "    ";
                 DepthMap depthStereo;
                 stereo.computeStereo(img1, img2, depthStereo);
                 depthStereo.toMat(depth);
                 depthStereo.sigmaToMat(sigmaMat);
                 analyzeError(depthGT, depth, sigmaMat, stereoParams);
+                results << endl;
                 imshow("depth", depth / 10);
                 imshow("img", img2);
-                waitKey();
+                waitKey(30);
             }
             cameraIncCount++;
         }
         boardPoseCount++;
     }
-    
+    results.close();
     return 0;
 }
