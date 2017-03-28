@@ -92,7 +92,8 @@ public:
         else
         {
             T th = 2. * atan2(s, w);
-            return u / s * th;
+            
+            return u / s * normalizeAngle(th);
         }
     } 
     

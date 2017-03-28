@@ -30,6 +30,14 @@ inline T sinc(const T & x)
 }
 
 template<typename T>
+T normalizeAngle(const T & th)
+{
+    if (th > T_PI) return th - 2 * T_PI;
+    else if (th < -T_PI) return th + 2 * T_PI;
+    else return th;
+}
+
+template<typename T>
 Matrix3<T> rotationMatrix(const Vector3<T> & v)
 {
     Matrix3<T> R;
@@ -45,9 +53,10 @@ Matrix3<T> rotationMatrix(const Vector3<T> & v)
     else
     {
         //Rodrigues formula
-        T u1 = v(0) / th;
-        T u2 = v(1) / th;
-        T u3 = v(2) / th;
+        T thInv = T(1.) / th;
+        T u1 = v(0) * thInv;
+        T u2 = v(1) * thInv;
+        T u3 = v(2) * thInv;
         T sinth = sin(th);
         T costhVar = T(1.) - cos(th);
         

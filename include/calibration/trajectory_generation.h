@@ -68,7 +68,8 @@ struct TrajectoryVisualQuality : FirstOrderFunction
     // the class takes the ownership of traj
     TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ICamera * camera,
             Transf xiCam, Transf xiBoard, const Vector3dVec & board,
-            const Matrix6d & CovPrior, const Matrix2d & CovPt);
+            const Matrix6d & CovPrior, const Matrix2d & CovPt, 
+            const int Nx, const int Ny, double kapaMax = 0.3);
     
     virtual bool Evaluate(const double * params,
             double * residual, double * jacobian) const;
@@ -78,6 +79,8 @@ struct TrajectoryVisualQuality : FirstOrderFunction
     //TODO to think how to regularize for different cameras
     //This function is adapted for fisheye cameras
     double imageLimitsCost(const Transf & camPose) const;
+    
+    double curvatureCost(const Transf & xi1, const Transf & xi2) const;
     
     double EvaluateCost(const double * params) const;
     
@@ -96,8 +99,10 @@ struct TrajectoryVisualQuality : FirstOrderFunction
     int _paramSize;
     Transf _xiCam, _xiBoard;
     Vector3dVec _board;
+    int _Nx, _Ny;
     Matrix2d _ptStiffness;  // A^T * A = C_pt^-1
     Matrix6d _hessPrior;  // C_prior^-1   --  the regularization term
+    double _kapaMax;
 };
 
 //TODO put lesewhere

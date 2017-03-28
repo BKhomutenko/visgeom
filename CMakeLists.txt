@@ -18,6 +18,16 @@ include_directories(include)
 
 #Lib compilation
 
+add_library( utils STATIC   
+    src/utils/image_generator.cpp  
+)
+
+target_link_libraries( utils 
+    ${OpenCV_LIBS}  
+    ${CERES_LIBRARIES}
+    ${Boost_LIBRARIES}
+)
+
 add_library( calibration STATIC   
     src/calibration/corner_detector.cpp  
     src/calibration/unified_calibration.cpp
@@ -26,6 +36,7 @@ add_library( calibration STATIC
 )
 
 target_link_libraries( calibration 
+    utils
     ${OpenCV_LIBS}  
     ${CERES_LIBRARIES}
     ${Boost_LIBRARIES}
@@ -49,7 +60,11 @@ add_library( localization STATIC
     src/localization/sparse_odom.cpp
 )
 
-TARGET_LINK_LIBRARIES( localization reconstruction  ${OpenCV_LIBS} ${CERES_LIBRARIES})
+TARGET_LINK_LIBRARIES( localization
+    reconstruction
+    ${OpenCV_LIBS}
+    ${CERES_LIBRARIES}
+)
 
 ### CALIBRATION ###
 add_executable( calib
@@ -83,7 +98,36 @@ target_link_libraries( subpixel
     ${Boost_LIBRARIES}
 )
 
+add_executable(generate
+    test/calibration/generate_board.cpp
+)
+
+target_link_libraries( generate
+    calibration
+    ${OpenCV_LIBS}  
+)
+
 ### RECONSTRUCTION ###
+
+add_executable( synthetic_planar 
+    test/reconstruction/synthetic_planar.cpp
+)
+
+target_link_libraries( synthetic_planar 
+    utils
+    reconstruction
+    ${OpenCV_LIBS} 
+)
+
+add_executable( sgm_synthetic_planar 
+    test/reconstruction/sgm_synthetic_planar.cpp
+)
+
+target_link_libraries( sgm_synthetic_planar 
+    utils
+    reconstruction
+    ${OpenCV_LIBS} 
+)
 
 add_executable( stereo 
     test/reconstruction/stereo_test.cpp

@@ -66,3 +66,4 @@ const double HALF_PI = M_PI / 2;
 const double DOUBLE_INF = std::numeric_limits<double>::infinity();
 const double DOUBLE_MAX = std::numeric_limits<double>::max();
 const double DOUBLE_BIG = 1e15;
+const double DOUBLE_SMALL = 1e-6;

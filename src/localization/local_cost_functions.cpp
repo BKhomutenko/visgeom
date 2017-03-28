@@ -542,10 +542,11 @@ OdometryPrior::OdometryPrior(const double errV, const double errW,
     const double c = cos(delta2);
     
     Matrixd<3, 2> dfdu;
-    dfdu <<     l2 * c,      l2 * s,  
-                -l2 * s,      l2 * c, 
-                0,           1; // in the terminal frame
-    
+
+    dfdu <<     c,     l2 * s,  
+                -s,      l2 * c, 
+                0,           1;
+
     Matrix2d Cu;
     Cu <<   errV * errV * l * l,              0,
                       0,    errW * errW * delta * delta; 

@@ -40,26 +40,57 @@ struct TransformInfo {
     bool initialized;  
 };
 
-//TODO choose the model in the parameter file, not as atemplate parameter
+//TODO make a constructor which loads the calibration data
+struct ImageData
+{
+    //sequence information
+    vector<Vector2dVec> detectedCornersVec;
+    string filePrefix;
+    vector<string> imageNameVec;
+    
+    //transformation chain information
+    vector<string> transNameVec;
+    vector<TransformationStatus> transStatusVec;
+    
+    int Nx, Ny; //calibration board size
+    Vector3dVec board; //calibraiton board model
+    
+    string cameraName;
+    
+    
+    bool checkExtraction = false;
+    bool showOutliers = false;
+    bool improveDetection = false;
+    
+    int getFirstExtractedIdx() const
+    {
+        int i = 0;
+        while (detectedCornersVec[i].empty()) i++;
+        assert(i < detectedCornersVec.size());
+        return i;
+    }
+};
+
+//TODO choose the model in the parameter file, not as a template parameter
+//TODO make different verbosity levels
 class GenericCameraCalibration
 {
 protected:
+
+    //constants and variables
     map<string, vector<double>> intrinsicMap;
     map<string, Array6d> globalTransformMap;
+    //TODO map<string, map<string, Array6d>> sequenceTransformMap;
+    //make it a map from image's name
     map<string, vector<Array6d>> sequenceTransformMap;
     map<string, TransformInfo> transformInfoMap;
     map<string, ICamera*> cameraMap;
     map<string, bool> cameraConstantMap; //TODO make a structure
     Problem globalProblem;
     
-    //temporary variables
-    int Nx, Ny;
+    //reprojection problem descriptors
+    vector<ImageData> dataVec;
     ptree root;
-    vector<Vector2dVec> gridExtractionVec;
-    vector<string> transNameVec;
-    vector<TransformationStatus> transStatusVec;
-    Vector3dVec grid;
-    string cameraName;
     
     void parseTransforms();
     
@@ -67,18 +98,31 @@ protected:
     
     void parseData();
     
-    void initTransformChainInfo(const ptree & node);
+    void initTransformChainInfo(ImageData & data, const ptree & node);
     
-    void initGrid(const ptree & node);
+    void initGrid(ImageData & data, const ptree & node);
     
-    void initTransforms(const ptree & node);
+    void initTransforms(const ImageData & data, const string & initName);
     
-    void getInitTransform(Transformation<double> & xi, const string & initName, int gridIdx = 0);
+    Transf getInitTransform(Transf xi, const string & initName, const ImageData & data, const int transfIdx);
     
-    void addGridResidualBlocks();
+    void addGridResidualBlocks(const ImageData & data);
     
-    void initGlobalTransform(const string & name);
+    void initGlobalTransform(const ImageData & data, const string & name);
     
+    void computeTransforms(const ImageData & data, vector<Transf> & transfVec) const; 
+    
+    void writeImageResidual(const ImageData & data, const string & fileName) const;
+    
+    //TODO implement
+    void writeOdometryResidual(/*????*/ const string & fileName) const;
+    
+    //returns xi_camera_board
+    Transf estimateInitialGrid(const ImageData & data, const int gridIdx);
+    
+    //fills up data.detectedCornersVec
+    void extractGridProjections(ImageData & data);
+
 public:
     virtual ~GenericCameraCalibration() 
     { 
@@ -93,23 +137,22 @@ public:
     //returns the first transform if it is a sequence
     Array6d & getTransformData(const string & name, int idx = 0)
     {
-        if (transformInfoMap[name].global)  return globalTransformMap[name];
+        if (transformInfoMap[name].global) return globalTransformMap[name];
         else return sequenceTransformMap[name][idx];
     }
     
-    Transformation<double> getTransform(const string & name, int idx = 0)
+    const Array6d & getTransformData(const string & name, int idx = 0) const
     {
-        return Transformation<double>(getTransformData(name, idx).data());
+        if (transformInfoMap.find(name)->second.global) return globalTransformMap.find(name)->second;
+        else return sequenceTransformMap.find(name)->second[idx];
     }
     
-    
+    Transf getTransform(const string & name, int idx = 0) const
+    {
+        return Transf(getTransformData(name, idx).data());
+    }
     
     bool addResiduals(const string & infoFileName);
-        
-    bool extractGridProjection(const string & fileName, Vector2dVec & projection, bool checkExtraction);
-
-    Transformation<double> estimateInitialGrid(const string & cameraName,
-            const Vector2dVec & projection, const Vector3dVec & grid);
 
 };
 
@@ -126,7 +169,7 @@ public:
         for (int ptIdx = 0; ptIdx < calibDataVec.size(); ptIdx++)
         {
                 Vector3dVec transfModelVec;
-                Transformation<double> TcamGrid(calibDataVec[ptIdx].extrinsic.data());
+                Transf TcamGrid(calibDataVec[ptIdx].extrinsic.data());
                 TcamGrid.transform(grid, transfModelVec);
 
                 Vector2dVec projModelVec(transfModelVec.size());

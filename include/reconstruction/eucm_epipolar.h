@@ -44,9 +44,7 @@ public:
         step(4. / numberSteps),
         nSteps(numberSteps),
         verbosity(verbosity)
-    {
-    
-    }
+    { }
     
     EnhancedEpipolar(const EnhancedCamera * cam1, const EnhancedCamera * cam2,
             const Transf & T12, const int numberSteps, int verbosity = 0) :

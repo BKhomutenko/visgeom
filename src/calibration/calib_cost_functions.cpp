@@ -118,13 +118,18 @@ bool GenericProjectionJac::Evaluate(double const * const * params,
 OdometryPrior::OdometryPrior(const double errV, const double errW, const double lambda,
         const Transformation<double> xi1,
         const Transformation<double> xi2) : 
-    _dxiPrior(),
+    _zetaPrior(xi1.inverseCompose(xi2)),
     _A(Matrix6d::Zero())
 {
-    auto xi12 = xi1.inverseCompose(xi2);
     
-    const double delta = xi12.rot().norm();
-    const double l = xi12.trans().norm();
+    const double MIN_SIGMA_V = 0.01;
+    const double MIN_SIGMA_W = 0.01;
+    
+    const double MIN_DELTA = 0.01;
+    const double MIN_L = 0.01;
+    
+    const double delta = max(_zetaPrior.rot().norm(), MIN_DELTA);
+    const double l = max(_zetaPrior.trans().norm(), MIN_L);
     
     const double delta2 = delta / 2.;
     const double l2 = l / 2.;
@@ -132,17 +137,18 @@ OdometryPrior::OdometryPrior(const double errV, const double errW, const double 
     const double s = sin(delta2);
     const double c = cos(delta2);
     
-    xi12.toArray(_dxiPrior.data());
     
     Matrixd<3, 2> dfdu;
-    dfdu <<     c,     -l2 * s,  
-                s,      l2 * c, 
+    dfdu <<     c,      l2 * s,  
+               -s,      l2 * c, 
                 0,           1;
     
     Matrix2d Cu;
     Cu <<   errV * errV * l * l,              0,
                       0,    errW * errW * delta * delta; 
-   
+    Cu(0, 0) = max(Cu(0, 0), MIN_SIGMA_V*MIN_SIGMA_V);
+    Cu(1, 1) = max(Cu(1, 1), MIN_SIGMA_W*MIN_SIGMA_W);
+    
     Matrix3d Cx = dfdu * Cu * dfdu.transpose() + (lambda * lambda) * Matrix3d::Identity();
     Matrix3d CxInv = Cx.inverse();
     Eigen::LLT<Matrix3d> lltOfCxInv(CxInv);
@@ -156,45 +162,47 @@ OdometryPrior::OdometryPrior(const double errV, const double errW, const double 
     B(1, 1) = 1. / lambda;
     B(2, 2) = U(2, 2);
     
-    _A.bottomRightCorner<3, 3>() = B * interOmegaRot(xi12.rot());
+    _A.bottomRightCorner<3, 3>() = B /* interOmegaRot(_zetaPrior.rot())*/; //FIXME
+    
+//    _A = Matrix6d::Identity();
 }
 
 //TODO check whether the interaction matrix calculation is redundand here
+//TODO replace (dxi - prior) by dxi.inverseCompose(prior)
 bool OdometryPrior::Evaluate(double const * const * params,
         double * residual, double ** jacobian) const
 {
     Transformation<double> xi1(params[0]);
     Transformation<double> xi2(params[1]);
-    Transformation<double> xi12 = xi1.inverseCompose(xi2);
+    Transformation<double> zeta = xi1.inverseCompose(xi2);
     
-    Vector6d dxi(xi12.toArray().data());
     
     Map<Vector6d> res(residual);
-    res = _A * (dxi - _dxiPrior);
+    Vector6d err;
+    _zetaPrior.inverseCompose(zeta).toArray(err.data());
+    res = _A * err;
     
     if (jacobian != NULL)
     {
-        //common variables
-        Matrix3d R10 = xi1.rotMatInv();
-        Matrix3d Mrw = interRotOmega(xi12.rot());
-        
         //first transformation
         if (jacobian[0] != NULL)
         {
+            Matrix3d R10 = xi1.rotMatInv();
             Matrix3d R10_Mwr1 = R10 * interOmegaRot(xi1.rot());
-            Matrix3d t12skew = hat(xi12.trans());
             Matrix6d J1;
-            J1 << -R10, t12skew * R10_Mwr1, Matrix3d::Zero(), -Mrw * R10_Mwr1;
+            J1 << R10, Matrix3d::Zero(), Matrix3d::Zero(), R10_Mwr1;
+            Matrix6d TT = _zetaPrior.screwTransfInv();
             Map<Matrix6drm> jac(jacobian[0]);
-            jac = _A * J1;
+            jac = -_A * TT * J1;
         }
         
         //second transformation
         if (jacobian[1] != NULL)
         {
-            Matrix3d Mwr2 = interOmegaRot(xi2.rot());
+            Matrix3d R20 = xi2.rotMatInv();
+            Matrix3d R20_Mwr2 = R20 * interOmegaRot(xi2.rot());
             Matrix6d J2;
-            J2 << R10, Matrix3d::Zero(), Matrix3d::Zero(), Mrw * R10 * Mwr2;
+            J2 << R20, Matrix3d::Zero(), Matrix3d::Zero(), R20_Mwr2;
             Map<Matrix6drm> jac(jacobian[1]);
             jac = _A * J2;
         }
@@ -206,7 +214,11 @@ bool TransformationPrior::Evaluate(double const * const * params,
         double * residual, double ** jacobian) const
 {
     Map<Vector6d> res(residual);
-    res = _A * (Map<const Vector6d>(params[0]) - _xiPrior);
+    Vector6d err;
+    _xiPrior.inverseCompose( Transf(params[0]) ).toArray(err.data()) ;
+    err.head<3>() = _R * err.head<3>();
+    err.tail<3>() = _R * err.tail<3>();
+    res = _A * err;
     if (jacobian != NULL and jacobian[0] != NULL)
     {
         copy(_A.data(), _A.data() + 36, jacobian[0]);
