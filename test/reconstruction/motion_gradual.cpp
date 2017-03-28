@@ -166,7 +166,7 @@ int main(int argc, char** argv)
 //        depth.setDefault();
         timer.reset();
         cout << TleftRight << endl;
-        DepthMap depth2 = stereo.compute(TleftRight, img2, depth, counter - 3);
+        DepthMap depth2 = stereo.compute(TleftRight, img2, depth);
         depth = depth2;
         depth.filterNoise();
         cout << timer.elapsed() << endl; 

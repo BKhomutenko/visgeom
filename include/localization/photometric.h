@@ -40,24 +40,17 @@ public:
             scaleSpace1(nScales, true),
             scaleSpace2(nScales, false),
             camPtr2(cam2->clone()),
+            _xiBaseCam(0, 0, 0, 0, 0, 0),
             verbosity(0) {}
             
-    ScalePhotometric() : 
-            scaleSpace1(1, true),
-            scaleSpace2(1, false), 
-            camPtr2(NULL) {}
+           
     virtual ~ScalePhotometric()
     {
         delete camPtr2;
         camPtr2 = NULL;
     }
     
-    void setCamera(const ICamera * cam)
-    {
-        delete camPtr2;
-        camPtr2 = cam->clone();
-    }
-    
+    void setXiBaseCam(const Transf & xiBaseCam) { _xiBaseCam = xiBaseCam; }
     void setNumberScales(int numScales)
     {
         scaleSpace1.setNumberScales(numScales);
@@ -66,27 +59,30 @@ public:
     
     const DepthMap & depth() const { return depthMap; }
     DepthMap & depth() { return depthMap; }
+    void setDepth(const DepthMap & newDepth) { depthMap = newDepth; }
     
-    void computeBaseScaleSpace(const Mat32f & img1);
+    void computeBaseScaleSpace(const Mat8u & img1);
     
-    void computePose(const Mat32f & img2, Transformation<double> & T12);
+    void computePose(const Mat8u & img2, Transf & T12);
     
     void setVerbosity(int newVerbosity) { verbosity = newVerbosity; }
     
-    void computePoseMI(const Mat32f & img2, Transformation<double> & T12);
+    void computePoseMI(const Mat8u & img2, Transf & T12);
 
     //TODO make enum for choosing the camera
     array<double, 6> covarianceEigenValues(const int scaleIdx, 
-            const Transformation<double> T12, bool baseValues);
+            const Transf T12, bool baseValues);
 
     //FIXME temporary function
-    void wrapImage(const Mat32f & src, Mat32f & dst, const Transformation<double> T12) const;
+    void wrapImage(const Mat32f & src, Mat32f & dst, const Transf T12) const;
 private:
     // scaleSpace2 must be initialized
-    void computePose(int scaleIdx, Transformation<double> & T12);
-    void computePoseAuto(int scaleIdx, Transformation<double> & T12);
-    void computePoseMI(int scaleIdx, Transformation<double> & T12);
+    void computePose(int scaleIdx, Transf & T12);
+    void computePoseAuto(int scaleIdx, Transf & T12);
+    void computePoseMI(int scaleIdx, Transf & T12);
     PhotometricPack initPhotometricData(int scaleIdx);
+
+    Transf _xiBaseCam;
 
     BinaryScalSpace scaleSpace1;
     BinaryScalSpace scaleSpace2;

@@ -190,7 +190,8 @@ void Triangulator::computeRegular(const Vector3d p, Vector3d q,
         if (jac1 != NULL)
         {
             Vector3d jacDelta1V = 2*rq * t - tq * r - tr * q;
-            Vector3d jacDelta1Omega = qSkew * (tt * p - 2 * tq * t);
+//            Vector3d jacDelta1Omega = qSkew * (tt * p - 2 * tq * t);
+            Vector3d jacDelta1Omega = qSkew * (tt * p - tq * t - tr * t);
             Map<Vector3d> jacLambda1V(jac1);
             Map<Vector3d> jacLambda1Omega(jac1 + 3);
             if (delta > eps * delta1)
@@ -205,18 +206,18 @@ void Triangulator::computeRegular(const Vector3d p, Vector3d q,
             }
             else
             {
-                const double coef = -1. / (eps * eps);
+                const double coef = 1. / (eps * eps);
                 double deltaInv1 = 1. / delta1;
-                double k = coef * deltaInv1;
+                double k = -coef * deltaInv1;
                 double k1 = coef * delta * deltaInv1 * deltaInv1;
-                jacLambda1V = k * jacDeltaV - k1 * jacDelta1V;
-                jacLambda1Omega = k * jacDeltaOmega - k1 * jacDelta1Omega;
+                jacLambda1V = k * jacDeltaV + k1 * jacDelta1V;
+                jacLambda1Omega = k * jacDeltaOmega + k1 * jacDelta1Omega;
             }
         }
         if (jac2 != NULL)
         {
             Vector3d jacDelta2V = 2*rp * t - tp * r - tr * p;
-            Vector3d jacDelta2Omega = qSkew * (tt * p - 2 * tp * t);
+            Vector3d jacDelta2Omega = qSkew * (tt * p - tp * t);
             Map<Vector3d> jacLambda2V(jac2);
             Map<Vector3d> jacLambda2Omega(jac2 + 3);
             if (delta > eps * delta2)

@@ -26,7 +26,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "projection/eucm.h"
 #include "reconstruction/mh_pack.h"
 
-void ScalePhotometric::computeBaseScaleSpace(const Mat32f & img1)
+void ScalePhotometric::computeBaseScaleSpace(const Mat8u & img1)
 {
     if (verbosity > 0) cout << "ScalePhotometric::computeBaseScaleSpace" << endl;
     scaleSpace1.generate(img1);
@@ -65,6 +65,7 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
     }
     vector<int> reconstIdxVec;
     depthMap.reconstruct(imagePointVec, reconstIdxVec, dataPack.cloud);
+    _xiBaseCam.transform(dataPack.cloud, dataPack.cloud);
     for (auto & idx : reconstIdxVec)
     {
         dataPack.idxVec.push_back(packIdxVec[idx]);
@@ -74,7 +75,7 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
     return dataPack;
 }
 
-void ScalePhotometric::computePose(const Mat32f & img2, Transformation<double> & T12)
+void ScalePhotometric::computePose(const Mat8u & img2, Transf & T12)
 {
     if (verbosity > 0) 
     {
@@ -88,7 +89,7 @@ void ScalePhotometric::computePose(const Mat32f & img2, Transformation<double> &
     }
 }
 
-void ScalePhotometric::computePose(int scaleIdx, Transformation<double> & T12)
+void ScalePhotometric::computePose(int scaleIdx, Transf & T12)
 {
     if (verbosity > 1) 
     {
@@ -98,7 +99,7 @@ void ScalePhotometric::computePose(int scaleIdx, Transformation<double> & T12)
     scaleSpace2.setActiveScale(scaleIdx);
     array<double, 6> pose = T12.toArray();
     Problem problem;
-    PhotometricCostFunction * costFunction = new PhotometricCostFunction(camPtr2, dataPack,
+    PhotometricCostFunction * costFunction = new PhotometricCostFunction(camPtr2, _xiBaseCam, dataPack,
                                             scaleSpace2.get(), scaleSpace2.getActiveScale());
     problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), pose.data());
     
@@ -112,10 +113,10 @@ void ScalePhotometric::computePose(int scaleIdx, Transformation<double> & T12)
     Solve(options, &problem, &summary);
     if (verbosity > 2) cout << summary.FullReport() << endl;
     else if (verbosity > 1) cout << summary.BriefReport() << endl;
-    T12 = Transformation<double>(pose.data());
+    T12 = Transf(pose.data());
 }
 
-void ScalePhotometric::computePoseMI(const Mat32f & img2, Transformation<double> & T12)
+void ScalePhotometric::computePoseMI(const Mat8u & img2, Transf & T12)
 {
     if (verbosity > 0) 
     {
@@ -152,20 +153,20 @@ void saveSurface(string fileName, FirstOrderFunction * func,
 }
 
 array<double, 6> ScalePhotometric::covarianceEigenValues(const int scaleIdx,
-        const Transformation<double> T12, bool baseValues)
+        const Transf T12, bool baseValues)
 {
     PhotometricPack dataPack = initPhotometricData(scaleIdx);
     PhotometricCostFunction * costFunction;
     if (baseValues)
     {
         //FIXME must be camPtr1
-        costFunction = new PhotometricCostFunction(camPtr2, dataPack,
+        costFunction = new PhotometricCostFunction(camPtr2, _xiBaseCam, dataPack,
                                 scaleSpace1.get(), scaleSpace1.getActiveScale());
     }
     else
     {
         scaleSpace2.setActiveScale(scaleIdx);
-        costFunction = new PhotometricCostFunction(camPtr2, dataPack,
+        costFunction = new PhotometricCostFunction(camPtr2, _xiBaseCam, dataPack,
                                 scaleSpace2.get(), scaleSpace2.getActiveScale());
     }
     cout << "Cost function is created" << endl;
@@ -186,7 +187,7 @@ array<double, 6> ScalePhotometric::covarianceEigenValues(const int scaleIdx,
     return res;    
 }
 
-void ScalePhotometric::computePoseMI(int scaleIdx, Transformation<double> & T12)
+void ScalePhotometric::computePoseMI(int scaleIdx, Transf & T12)
 {
     if (verbosity > 1) 
     {
@@ -237,12 +238,12 @@ void ScalePhotometric::computePoseMI(int scaleIdx, Transformation<double> & T12)
     Solve(options, problem, pose.data(), &summary);
     if (verbosity > 2) cout << summary.FullReport() << endl;
     else if (verbosity > 1) cout << summary.BriefReport() << endl;
-    T12 = Transformation<double>(pose.data());
+    T12 = Transf(pose.data());
     cout << T12 << endl;
 //    saveSurface("surf01.txt", costFunction, 2, 3, 0.0005, 50, pose.data());
 }
 
-void ScalePhotometric::wrapImage(const Mat32f & src, Mat32f & dst, const Transformation<double> T12) const
+void ScalePhotometric::wrapImage(const Mat32f & src, Mat32f & dst, const Transf T12) const
 {   
     MHPack pack;
     dst.create(src.size());
@@ -254,8 +255,10 @@ void ScalePhotometric::wrapImage(const Mat32f & src, Mat32f & dst, const Transfo
             pack.imagePointVec.emplace_back(j, i);
         }
     }
+    //TODO rewrite the reconstruct
     depthMap.reconstruct(pack, QUERY_POINTS | INDEX_MAPPING);
-    T12.inverseTransform(pack.cloud, pack.cloud);
+    Transf xiCam12 = _xiBaseCam.inverseCompose(T12).compose(_xiBaseCam);
+    xiCam12.inverseTransform(pack.cloud, pack.cloud);
     Vector2dVec ptVec;
     depthMap.project(pack.cloud, ptVec);
     for (int i = 0; i < pack.cloud.size(); i++)

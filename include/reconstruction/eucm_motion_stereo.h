@@ -83,7 +83,7 @@ public:
     */
     void reprojectDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
     
-    DepthMap compute(Transf T12, const Mat8u & img2, const DepthMap & depth, int arg = 0);
+    DepthMap compute(Transf T12, const Mat8u & img2, const DepthMap & depth, CameraIdx camIdx = CAMERA_1);
     
     DepthMap compute(Transf T12, const Mat8u & img2);
     
@@ -135,6 +135,7 @@ private:
     int gu, gv;
     Vector3d gX;
     Vector2d gptStart;
+    Vector2i ptStartRound;
     int gdispMax;
     int gstep;
     

@@ -30,9 +30,9 @@ Relative camera pose estimation based on photometric error and depth map
 #include "projection/generic_camera.h"
 
 //TODO make a parameter structure
-const double MIN_INIT_DIST = 0.25;   // minimal distance traveled befor VO is used
-const double MIN_STEREO_BASE = 0.15; // minimal acceptable stereo base
-const int distThresh = 100;
+//const double MIN_INIT_DIST = 0.25;   // minimal distance traveled befor VO is used
+//const double MIN_STEREO_BASE = 0.20; // minimal acceptable stereo base
+ // Feature matching threshold
 
 class SparseOdometry
 {
@@ -43,8 +43,8 @@ public:
     depthState(STATE_EMPTY),
     keyframeState(STATE_EMPTY),
     camera(cameraPtr->clone()),
-    detector(40, 0, 2) 
-    
+    detector(40, 0, 2) ,
+    numRansacPoints(3)
     { }
         
     ~SparseOdometry() { delete camera; }
@@ -55,10 +55,12 @@ public:
     double computeTransfSparse(const Vector3dVec & xVec1, const Vector3dVec & xVec2, 
             const Vector2dVec & pVec2, const Transf xiOdom, Transf & xiOut, bool report = false);
     
-    void ransacFivePoint(const Vector3dVec & cloud1,
+    void ransacNPoints(const Vector3dVec & cloud1,
         const Vector3dVec & cloud2, const Vector2dVec & ptVec2,
         const Transf xiOdom, vector<bool> & inlierMask);
-        
+    
+    const Transf & getIncrement() const { return xiIncr; }
+    const Transf & getIntegrated() const { return xiLocal; }
 private:
     vector<KeyPoint> keypointVec1;
     vector<KeyPoint> keypointVec2;
@@ -67,8 +69,14 @@ private:
     
     ICamera * camera;
     
+    // 3 points fully constraint the transformation
+    // 1 or 2 points rely on the odometry estimation
+    const int numRansacPoints; 
+    
+    
     // state
-    Transf xiLocal; // pose wrt actual keyframe
+    Transf xiLocal; // integrated VO path
+    Transf xiIncr; // the last pose increment
     Transf xiOdom; // the last WO measurement
     const Transf xiBaseCam; // extrinsic calibration
     Transf xi5, xiTmp;
@@ -80,6 +88,7 @@ private:
     BRISK detector;
 //    cv::ORB detector;
     
+    const int distThresh = 100;
 };
 
 

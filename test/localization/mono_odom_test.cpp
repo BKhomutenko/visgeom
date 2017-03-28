@@ -6,7 +6,12 @@
 #include "timer.h"
 #include "json.h"
 
-#include "localization/mono_odom.h"
+#include "reconstruction/eucm_sgm.h"
+#include "reconstruction/eucm_motion_stereo.h"
+#include "reconstruction/depth_map.h"
+
+#include "localization/photometric.h"
+#include "localization/sparse_odom.h"
 
 int main(int argc, char** argv)
 {
@@ -30,36 +35,94 @@ int main(int argc, char** argv)
     
     vector<double> intrinsic = readVector(root.get_child("intrinsic"));
     EnhancedCamera camera(intrinsic.data());
-    MotionStereoParameters params;
     
-    //TODO make reconstruction/utils and put there parameters readout
-    params.scale = root.get<int>("scale");
-    params.dispMax = root.get<int>("disparity_max");
-    params.u0 = root.get<int>("u0");
-    params.v0 = root.get<int>("v0");
-    params.uMax = root.get<int>("u_max");
-    params.vMax = root.get<int>("v_max");
-    if (root.get<bool>("equal margins")) params.setEqualMargin();
-    else
+    SparseOdometry odom(&camera, xiBaseCam);
+    
+    const int idx1 = 25, idx2 = 70, idx3 = 80;
+    cout << prefix + fileVec[idx1] << endl;
+    Mat8u img1 = imread(prefix + fileVec[idx1], 0);
+    Mat8u img2 = imread(prefix + fileVec[idx2], 0);
+    odom.feedData(img1, odomVec[idx1]);
+    odom.feedData(img2, odomVec[idx2]);
+    
+    SGMParameters stereoParams;
+    stereoParams.flawCost = 5;
+    stereoParams.verbosity = 0;
+    stereoParams.hypMax = 1;
+//    stereoParams.salientPoints = false;
+    stereoParams.u0 = 50;
+    stereoParams.v0 = 50;
+    stereoParams.dispMax = 26;
+    stereoParams.scale = 2;
+    
+    stereoParams.uMax = img1.cols;
+    stereoParams.vMax = img1.rows;
+    stereoParams.setEqualMargin();
+    cout << odom.getIncrement() << endl;
+    Transf xiCam = xiBaseCam.inverseCompose(odom.getIncrement().compose(xiBaseCam));
+    EnhancedSGM stereo(xiCam, &camera, &camera, stereoParams);
+    
+    DepthMap depth;
+    Mat32f depthMat;
+    stereo.computeStereo(img1, img2, depth);
+    cout << "stereo's done" << endl;
+    depth.toInverseMat(depthMat);
+    imshow("out1", img2);
+    imshow("res", depthMat);
+    
+    
+    
+    ScalePhotometric photometricLocalizer(5, &camera);
+    photometricLocalizer.setVerbosity(1);
+    
+    photometricLocalizer.setXiBaseCam(xiBaseCam);
+    imshow("img1", img1);
+    waitKey();
+    photometricLocalizer.computeBaseScaleSpace(img1);
+    photometricLocalizer.setDepth(depth);
+    
+    MotionStereoParameters stereoMotionParams(stereoParams);
+    stereoMotionParams.descRespThresh = 5;
+    MotionStereo mstereo(&camera, &camera, stereoMotionParams);
+    mstereo.setBaseImage(img1);
+    DepthMap d2 = depth;
+    
+    
+    //TODO implement the whole localization loop
+    for (int i = idx1; i < idx1 + 50; i++)
     {
-        params.setXMargin(root.get<int>("u_marg"));
-        params.setYMargin(root.get<int>("v_marg"));
+        cout << "Idx : " << i << endl;
+        Mat8u img3 = imread(prefix + fileVec[i], 0);
+        Transf xi13(odomVec[idx1].inverseCompose(odomVec[i]));
+        cout << xi13 << endl;
+        photometricLocalizer.computePose(img3, xi13);
+        cout << xi13 << endl; 
+        if (i > idx1 + 20)
+        {
+            Transf xiCam12 = xiBaseCam.inverseCompose(xi13).compose(xiBaseCam);
+            d2 = mstereo.compute(xiCam12, img3, d2);
+//            d2.filterNoise();
+            photometricLocalizer.setDepth(d2);
+            d2.toInverseMat(depthMat); 
+            //FIXME rewrite with Mat8u
+            Mat32f img3f, img3fWrapped;
+            img3.convertTo(img3f, CV_32F);
+            photometricLocalizer.wrapImage(img3f, img3fWrapped, xi13);
+            imshow("wrapped", img3fWrapped/256);
+            imshow("res2", depthMat);
+            
+            //TODO for every new keyframe do SGBM
+            
+            DepthMap d3 = mstereo.compute(xiCam12, img3, d2, CAMERA_2);
+//            d3.filterNoise();
+            d3.toInverseMat(depthMat); 
+            imshow("res3", depthMat);
+            waitKey();
+            waitKey(50);
+        }
+        
     }
     
-    MonoOdometry odom(&camera, xiBaseCam, params);
-    
-    for (int i = 0; i < fileVec.size(); i++)
-    {
-        cout << i << endl;
-        Mat8u img = imread(prefix + fileVec[i], 0);
-        odom.feedData(img, odomVec[i]);
-        Mat32f depth;
-        odom.depthMap.toInverseMat(depth);
-        cout << odomVec[i] << endl;
-        cout << odom._xiLocal << endl;
-        imshow("img", img);
-        imshow("depth", depth / 10);
-        waitKey();
-    }
-    
+    return 0;
 }
+

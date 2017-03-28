@@ -54,10 +54,26 @@ V = L_uTheta * dxi/dt
 class CameraJacobian
 {
 public:
+    CameraJacobian(const ICamera * camera, const Transf & T12, const Transf & T23) :
+        _camera(camera->clone()),
+        twoTransforms(true)
+    {
+        Matrix3d R21 = T12.rotMatInv();
+        Matrix3d R32 = T23.rotMatInv();
+        Matrix3d M = interOmegaRot(T12.rot());
+        L11 = R32 * R21;
+        L22 = L11 * M;
+        L12 = -R32 * hat(T23.trans()) * R21 * M;
+    }
+    
     CameraJacobian(const ICamera * camera, const Transf & T12) :
         _camera(camera->clone()),
-        R21( T12.rotMatInv() ),
-        M21( R21 * interOmegaRot(T12.rot()) ) {}
+        L11( T12.rotMatInv() ),
+        L12( Matrix3d::Zero()),
+        L22( L11 * interOmegaRot(T12.rot()) ),
+        twoTransforms(false) 
+    {}
+        
     
     // Point jacobian
     void dpdxi(const Vector3d & X2, double * dudxi, double * dvdxi)
@@ -72,13 +88,13 @@ public:
         
         Map<Covector3d> dudtr(dudxi);
         Map<Covector3d> dudrot(dudxi + 3);
-        dudtr = -projJac.row(0) * R21;
-        dudrot = projJac.row(0) * hat(X2) * M21;
-        
+        Matrix3d B = twoTransforms ? Matrix3d(hat(X2) * L22 - L12) : Matrix3d(hat(X2) * L22);
+        dudtr = -projJac.row(0) * L11;
+        dudrot = projJac.row(0) * B;
         Map<Covector3d> dvdtr(dvdxi);
         Map<Covector3d> dvdrot(dvdxi + 3);
-        dvdtr = -projJac.row(1) * R21;
-        dvdrot = projJac.row(1) * hat(X2) * M21;
+        dvdtr = -projJac.row(1) * L11;
+        dvdrot = projJac.row(1) * B;
     }
     
     //brightness jacobian
@@ -94,13 +110,15 @@ public:
         
         Map<Covector3d> dfdtr(dfdxi);
         Map<Covector3d> dfdrot(dfdxi + 3);
-        dfdtr = -dfdX * R21;
-        dfdrot = dfdX * hat(X2) * M21;
+        Matrix3d B = twoTransforms ? Matrix3d(hat(X2) * L22 - L12) : Matrix3d(hat(X2) * L22);
+        dfdtr = -dfdX * L11;
+        dfdrot = dfdX * B;
     }
     
 private:
     ICamera * _camera;
-    Matrix3d R21, M21;
+    Matrix3d L11, L12, L22;
+    bool twoTransforms;
 };
 
 

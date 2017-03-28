@@ -852,7 +852,7 @@ void DepthMap::pixelAverageFilter(const Vector3iVec & matches, DepthMap & dst)
 //TODO implement for multi-hyp case
 void DepthMap::filterNoise()
 {
-    const int minMatches = 3;
+    const int minMatches = 2;
 
     // Create copy of current depthmap, to avoid flow
     DepthMap myCopy = *this;
@@ -860,7 +860,7 @@ void DepthMap::filterNoise()
     const array<int, 8> dxArr =  {-1,  0,  1,  1,  1,  0, -1, -1};
     const array<int, 8> dyArr  = { 1,  1,  1,  0, -1, -1, -1,  0};
     
-    const int CENTRAL_WEIGHT = 3;
+    const int CENTRAL_WEIGHT = 5;
     // Three loops to loop through every hypothesis
     for (int y = 1; y < yMax - 1; ++y)
     {
@@ -888,7 +888,7 @@ void DepthMap::filterNoise()
             }
             else
             {
-                at(x, y) = acc / (countMatches + CENTRAL_WEIGHT);
+//                at(x, y) = acc / (countMatches + CENTRAL_WEIGHT);
             }
         }
     }

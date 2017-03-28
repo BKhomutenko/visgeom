@@ -40,21 +40,20 @@ works faster than autodiff version and works with any ICamera
 bool PhotometricCostFunction::Evaluate(double const * const * parameters,
         double * residual, double ** jacobian) const
 {
-    Transf T12(parameters[0]);
-    
+    Transf xiBase(parameters[0]);
+    Transf xiCam = xiBase.compose(_xiBaseCam);
     // point cloud in frame 2
     vector<Vector3d> transformedPoints;
-    T12.inverseTransform(_dataPack.cloud, transformedPoints);
+    xiCam.inverseTransform(_dataPack.cloud, transformedPoints);
     
     // init the image interpolation
     ceres::BiCubicInterpolator<Grid2D> imageInterpolator(_imageGrid);
     
     bool computeJac = (jacobian != NULL and jacobian[0] != NULL);
-    
     if (computeJac)
     {
         // L_uTheta
-        CameraJacobian jacobianCalculator(_camera, T12);
+        CameraJacobian jacobianCalculator(_camera, xiBase, _xiBaseCam);
         for (int i = 0; i < transformedPoints.size(); i++)
         {
             Vector2d pt;
@@ -101,8 +100,9 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
     }
     return true;
 }
-    
-    
+
+
+
 bool MutualInformation::Evaluate(double const * parameters,
         double * cost, double * gradient) const
 {
@@ -528,8 +528,9 @@ bool SparseReprojectCost::Evaluate(double const * const * params,
 
 OdometryPrior::OdometryPrior(const double errV, const double errW,
         const double lambdaT, const double lambdaR,
-        const Transformation<double> xiOdom) : 
-    _A(Matrix6d::Zero())
+        const Transf xiOdom) : 
+    _A(Matrix6d::Zero()),
+    _xiPrior(xiOdom)
 {
     const double delta = xiOdom.rot().norm();
     const double l = xiOdom.trans().norm();
@@ -540,12 +541,10 @@ OdometryPrior::OdometryPrior(const double errV, const double errW,
     const double s = sin(delta2);
     const double c = cos(delta2);
     
-    xiOdom.toArray(_dxiPrior.data());
-    
     Matrixd<3, 2> dfdu;
-    dfdu <<     c,     -l2 * s,  
-                s,      l2 * c, 
-                0,           1;
+    dfdu <<     l2 * c,      l2 * s,  
+                -l2 * s,      l2 * c, 
+                0,           1; // in the terminal frame
     
     Matrix2d Cu;
     Cu <<   errV * errV * l * l,              0,
@@ -568,6 +567,14 @@ OdometryPrior::OdometryPrior(const double errV, const double errW,
     _A(3, 3) = 1. / lambdaR;
     _A(4, 4) = 1. / lambdaR;
     _A(5, 5) = U(2, 2);
+    
+    Matrix3d M = interOmegaRot(xiOdom.rot());
+    Matrix3d R = xiOdom.rotMatInv();
+    
+    _J.topLeftCorner<3, 3>() = _A.topLeftCorner<3, 3>() * R;
+    _J.topRightCorner<3, 3>() = _A.topRightCorner<3, 3>() * R * M;
+    _J.bottomLeftCorner<3, 3>() = Matrix3d::Zero();
+    _J.bottomRightCorner<3, 3>() = _A.bottomRightCorner<3, 3>() * R * M;
 //    cout << U << endl;
 //    cout << _A << endl;
 //        assert(false);
@@ -576,9 +583,13 @@ OdometryPrior::OdometryPrior(const double errV, const double errW,
 bool OdometryPrior::Evaluate(double const * const * params,
         double * residual, double ** jacobian) const
 {
-    Map<const Vector6d> dxi(params[0]);
+    //TODO replace the difference between two transformation by InverseCompose
+    Transf xi(*params);
+    Transf delta = _xiPrior.inverseCompose(xi);
+    Vector6d vecDelta;
+    delta.toArray(vecDelta.data());
     Map<Vector6d> res(residual);
-    res = _A * (dxi - _dxiPrior);
+    res = _A * vecDelta;
     
     if (jacobian != NULL)
     {
@@ -586,7 +597,7 @@ bool OdometryPrior::Evaluate(double const * const * params,
         if (jacobian[0] != NULL)
         {
             Map<Matrix6drm> jac(jacobian[0]);
-            jac = _A;
+            jac = _J;
         }
     }
     return true;    

@@ -41,14 +41,19 @@ struct PhotometricPack
 /*
 A cost function with analytic jacobian
 works faster than autodiff version and works with any ICamera
+
+- 3D points in the dataPack must be projected into the odometry base frame
+- the computed transformation will correspond the the motion of the odometry frame
 */
 struct PhotometricCostFunction : ceres::CostFunction
 {
 
-    PhotometricCostFunction(const ICamera * camera, const PhotometricPack & dataPack,
+    PhotometricCostFunction(const ICamera * camera, const Transf & xiBaseCam,
+            const PhotometricPack & dataPack,
             const Mat32f & img2, double scale) :
             _camera(camera->clone()),
             _dataPack(dataPack),
+            _xiBaseCam(xiBaseCam),
             _imageGrid(img2.cols, img2.rows, (float*)(img2.data)),
             _scale(scale) 
     {
@@ -66,6 +71,7 @@ struct PhotometricCostFunction : ceres::CostFunction
     virtual bool Evaluate(double const * const * parameters, double * residual, double ** jacobian) const;
 
     ICamera * _camera;
+    const Transf _xiBaseCam;
     const PhotometricPack & _dataPack;
     const Grid2D _imageGrid;
     const double _scale;
@@ -263,8 +269,8 @@ struct OdometryPrior : ceres::SizedCostFunction<6, 6>
     virtual bool Evaluate(double const * const * params,
             double * residual, double ** jacobian) const;
     
-    
-    Vector6d _dxiPrior;
+    Transf _xiPrior;
     Matrix6d _A;
+    Matrix6d _J;
 };
 
