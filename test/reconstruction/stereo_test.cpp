@@ -104,6 +104,7 @@ int main(int argc, char** argv)
     stereoParams.verbosity = 0;
     stereoParams.hypMax = 1;
     stereoParams.salientPoints = false;
+//    stereoParams.scaleVec = {1};
     paramFile >> stereoParams.u0;
     paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
@@ -182,7 +183,7 @@ int main(int argc, char** argv)
         
         imshow("out1", out1);
         imshow("out2", out2);
-        imshow("res", depthMat/ 3);
+        imshow("res", depthMat);
         imshow("disp", stereo.disparity() * 256);
         cout << stereo.disparity()(350, 468) << " " << stereo.disparity()(350, 469) << endl;
         waitKey(); 

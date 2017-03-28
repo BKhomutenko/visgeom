@@ -89,6 +89,7 @@ int main(int argc, char** argv)
     stereoParams.dispMax = root.get<int>("stereo.disparity_max");
     stereoParams.scale = root.get<int>("stereo.scale");
     stereoParams.flawCost = root.get<int>("stereo.flaw_cost");
+    stereoParams.scaleVec = readIntVector(root.get_child("stereo.scale_vector"));
     stereoParams.uMax = width;
     stereoParams.vMax = height;
     stereoParams.setEqualMargin();
@@ -115,7 +116,9 @@ int main(int argc, char** argv)
         //base frame
         const string imgName = imageBaseName + "_" + to_string(boardPoseCount) + "_base.png";
         Mat8u img1 = imread(imgName, 0);
-        
+        Mat8u noise(img1.size());
+        cv::randu(noise, 0, 25);
+        img1 -= noise;
         //different increment diretion
         for (auto & cameraIncItem : root.get_child("camera_increment"))
         {
@@ -128,6 +131,7 @@ int main(int argc, char** argv)
                 const string imgName = imageBaseName + "_" + to_string(boardPoseCount) 
                     + "_" + to_string(cameraIncCount) + "_" + to_string(i+1) + ".png";
                 Mat8u img2 = imread(imgName, 0);
+                img2 -= noise;
                 Transf TleftRight = xiCam0.inverseCompose(xiCam);
                 EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
                 results << TleftRight.trans().norm() << "    ";

@@ -71,6 +71,16 @@ inline vector<double> readVector(const ptree & node)
     return valVec;
 }
 
+inline vector<int> readIntVector(const ptree & node)
+{
+    vector<int> valVec;
+    for (auto & x : node)
+    {
+        valVec.push_back(x.second.get_value<int>());
+    }
+    return valVec;
+}
+
 inline Transformation<double> readTransform(const ptree & node)
 {
     return transformFromData(readVector(node));

@@ -28,7 +28,6 @@ NOTE:
 #include "std.h"
 #include "ocv.h"
 #include "eigen.h"
-#include "utils/filter.h"
 
 #include "utils/curve_rasterizer.h"
 
@@ -43,38 +42,7 @@ public:
                 
     // return: the sampling step
     int compute(const Mat8u & img1, const CurveRasterizer<int, Polynomial2> & descRasterRef,
-                vector<uint8_t> & descVec)
-    {
-        descVec.resize(LENGTH);
-        bool imageBorder = false;
-        bool saturated = false;
-        for (int step : samplingStepVec)
-        {
-            CurveRasterizer<int, Polynomial2> descRaster(descRasterRef);
-            descRaster.setStep(-step);
-            descRaster.steps(-HALF_LENGTH);
-            for (int i = 0; i < LENGTH; i++, descRaster.step())
-            {
-                if (descRaster.v < 0 or descRaster.v >= img1.rows 
-                    or descRaster.u < 0 or descRaster.u >= img1.cols)
-                {
-                    imageBorder = true;
-                    break;
-                }
-                descVec[i] = img1(descRaster.v, descRaster.u);
-//                if (descVec[i] == 255)
-//                {
-//                    saturated = true;
-//                    break;
-//                }
-            }
-            if (imageBorder /*or saturated*/) return -1;
-            descResp = totalVariation(descVec.begin(), descVec.end(), int(0));
-            descResp = (descResp * /*255*/100) / (int(descVec[HALF_LENGTH]) + /*255*/30);
-            if (goodResp()) return step;
-        }
-        return samplingStepVec.back();
-    }
+                vector<uint8_t> & descVec);
     
     int getResp() { return descResp; }
     
@@ -87,4 +55,3 @@ private:
     const int WAVE_THRESH;
     vector<int> samplingStepVec;
 };
-
