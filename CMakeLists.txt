@@ -49,6 +49,7 @@ add_library( reconstruction STATIC
     src/reconstruction/eucm_epipolar.cpp
     src/reconstruction/depth_map.cpp
     src/reconstruction/triangulator.cpp
+    src/reconstruction/epipolar_descriptor.cpp
 )
 
 target_link_libraries( reconstruction ${OpenCV_LIBS} )
