@@ -433,6 +433,26 @@ void EnhancedSGM::computeDynamicProgramming()
     
     if (not _params.imageBasedCost) _jumpCost = _params.lambdaJump;
     
+    // _tableau1 init
+    for (int x = 0; x < _params.xMax + (_params.yMax + 1) / 2; x++)
+    {
+        int x0 = x;
+        int y0 = 0;
+        if (x0 >= _params.xMax) x0 = x
+        int32_t * _tableauRow = (int32_t *)(_tableauLeft.row(y).data);
+        uint8_t * errorRow = _errorBuffer.row(y).data;
+        // init the first row
+        copy(errorRow, errorRow + _params.dispMax, _tableauRow);
+        // fill up the _tableau
+        for (int x = 1; x < _params.xMax; x++)
+        {
+            if (_params.imageBasedCost) _jumpCost = _costBuffer(y, x);
+            computeDynamicStep(_tableauRow + (x - 1)*_params.dispMax,
+                    errorRow + x*_params.dispMax, _tableauRow + x*_params.dispMax);
+        }
+    }
+    
+    /*
     // left _tableau init
     for (int y = 0; y < _params.yMax; y++)
     {
@@ -497,7 +517,7 @@ void EnhancedSGM::computeDynamicProgramming()
                     (int32_t*)(_tableauCol.row(y).data));
         }
     }
-    
+    */
 }
 
 void EnhancedSGM::reconstructDisparity()
