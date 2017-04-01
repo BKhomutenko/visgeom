@@ -288,22 +288,30 @@ bool MotionStereo::computeUncertainty(double d, double s)
     uint32_t neededFlag = GLB_X;
     assert( (flags & neededFlag) ^ neededFlag == 0);
     
-    Vector3d Xmax;
     
     if (d == OUT_OF_RANGE)  // no prior
     {
         //just rotate
-        return false; //FIXME
-        Xmax = R21() * gX;
+//        return false; //FIXME
+        Vector3d Xmax = R21() * gX;
         if (not _camera2->projectPoint(Xmax, gptStart)) return false;
-        gdispMax = _params.dispMax;
+        if (epipoles().secondIsInverted())
+        {
+            gdispMax = _params.dispMax;
+        }
+        else
+        {
+            int delta = round( (epipoles().getSecond() - gptStart).norm() );
+            gdispMax = min( _params.dispMax, delta);
+        }
+        ptStartRound = round(gptStart);
         flags |= GLB_START_POINT | GLB_DISP_MAX;
     }
     else // there is a prior
     {
         gX.normalize();
-        Xmax = gX * (d + 2 * s);
-        Vector3d Xmin = gX * max(d - 2 * s, MIN_DEPTH);
+        Vector3d Xmax = gX * (d + 2.5 * s);
+        Vector3d Xmin = gX * max(d - 2.5 * s, MIN_DEPTH);
         Xmax = R21() * (Xmax - t12());
         Xmin = R21() * (Xmin - t12());
         Vector2d ptFin;
@@ -344,7 +352,7 @@ bool MotionStereo::sampleImage(const Mat8u & img2)
         if (raster.v < 0 or raster.v >= img2.rows 
             or raster.u < 0 or raster.u >= img2.cols) 
         {
-            return false;
+            break;
         }//sampleVec.push_back(0);
         
         gsampleVec.push_back(img2(raster.v, raster.u));
@@ -363,44 +371,44 @@ void MotionStereo::reconstructFirst(double & dist, double & sigma, double & cost
     vector<int> costVec = compareDescriptor(gdescriptor, gsampleVec, _params.flawCost);
     auto bestCostIter = min_element(costVec.begin(), costVec.end());
     
-//    if (gu < 550 and gu > 450 and gv > 280 and gv < 380 )
-//    {
-//        cout << gu << "   " << gv << endl;
-//        cout << "depth: " << dist
-//            << " +-" << sigma
-//            << endl;
-//        cout << "samples:" << endl;
-//        for (auto & x : gsampleVec)
-//        {
-//            cout << " " << int(x);
-//        }
-//        cout << endl;
-//        cout << "coordinates:" << endl;
-//        for (auto & x : guVec)
-//        {
-//            cout << " " << int(x);
-//        }
-//        cout << endl;
-//        for (auto & x : gvVec)
-//        {
-//            cout << " " << int(x);
-//        }
-//        cout << endl;
-//        cout << "descriptor:" << endl;
-//        for (auto & x : gdescriptor)
-//        {
-//            cout << " " << int(x);
-//        }
-//        cout << endl;
-//        cout << "cost:" << endl;
-//        for (auto & x : costVec)
-//        {
-//            cout << " " << int(x);
-//        }
-//        cout << endl<< endl;
-//    }
+    if (gu < 550 and gu > 450 and gv > 280 and gv < 380 )
+    {
+        cout << gu << "   " << gv << endl;
+        cout << "depth: " << dist
+            << " +-" << sigma
+            << endl;
+        cout << "samples:" << endl;
+        for (auto & x : gsampleVec)
+        {
+            cout << " " << int(x);
+        }
+        cout << endl;
+        cout << "coordinates:" << endl;
+        for (auto & x : guVec)
+        {
+            cout << " " << int(x);
+        }
+        cout << endl;
+        for (auto & x : gvVec)
+        {
+            cout << " " << int(x);
+        }
+        cout << endl;
+        cout << "descriptor:" << endl;
+        for (auto & x : gdescriptor)
+        {
+            cout << " " << int(x);
+        }
+        cout << endl;
+        cout << "cost:" << endl;
+        for (auto & x : costVec)
+        {
+            cout << " " << int(x);
+        }
+        cout << endl<< endl;
+    }
     
-    if (*bestCostIter < _params.maxError and *bestCostIter < 2*cost)
+    if (*bestCostIter < _params.maxError and *bestCostIter < 2*cost or 1)
     {
         int dBest = bestCostIter - costVec.begin();
         triangulate(gu, gv, guVec[dBest], gvVec[dBest], guVec[dBest + 1], gvVec[dBest + 1],
@@ -507,7 +515,7 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & 
             
             if (not computeUncertainty(depthIn.at(x, y), depthIn.sigma(x, y))) { count2++; continue;}
             
-            if (gdispMax / gstep < 2) 
+            if (gdispMax / gstep < 3) 
             {
                 //TODO verify instead of copying
                 if (camIdx == CAMERA_1)

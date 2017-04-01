@@ -75,7 +75,6 @@ int main(int argc, char** argv)
     Transf xiCam0 = readTransform(root.get_child("camera_transform"));
     
     Mat8u foreImg = imread(root.get<string>("foreground"), 0);
-    Mat8u backImg = imread(root.get<string>("background"), 0);
     
     EnhancedCamera camera(width, height, intrinsic.data());
     
@@ -83,12 +82,13 @@ int main(int argc, char** argv)
     SGMParameters stereoParams;
     
     stereoParams.verbosity = root.get<int>("stereo.verbosity");
-    stereoParams.salientPoints = false;
+    stereoParams.salientPoints = true;
     stereoParams.u0 = root.get<int>("stereo.u0");
     stereoParams.v0 = root.get<int>("stereo.v0");
     stereoParams.dispMax = root.get<int>("stereo.disparity_max");
     stereoParams.scale = root.get<int>("stereo.scale");
     stereoParams.flawCost = root.get<int>("stereo.flaw_cost");
+    stereoParams.scaleVec = readIntVector(root.get_child("stereo.scale_vector"));
     stereoParams.uMax = width;
     stereoParams.vMax = height;
     stereoParams.setEqualMargin();
@@ -100,8 +100,7 @@ int main(int argc, char** argv)
     int boardPoseCount = 0;
     const string imageBaseName = root.get<string>("output_name");
     
-    if (argc >= 3) results.open(argv[2]);
-    else results.open("sgm_results.txt");
+    results.open(root.get<string>("analysis_output_name"));
     
     for (auto & boardPoseItem : root.get_child("plane_transform"))
     {   
@@ -115,7 +114,15 @@ int main(int argc, char** argv)
         //base frame
         const string imgName = imageBaseName + "_" + to_string(boardPoseCount) + "_base.png";
         Mat8u img1 = imread(imgName, 0);
+        Mat8u noise(img1.size());
         
+        const int noiseLevel = root.get<int>("noise");
+        if (noiseLevel != 0)
+        {
+            Mat8u noise(img1.size());
+            randu(noise, 0, noiseLevel);
+            img1 -= noise;
+        }
         //different increment diretion
         for (auto & cameraIncItem : root.get_child("camera_increment"))
         {
@@ -128,6 +135,12 @@ int main(int argc, char** argv)
                 const string imgName = imageBaseName + "_" + to_string(boardPoseCount) 
                     + "_" + to_string(cameraIncCount) + "_" + to_string(i+1) + ".png";
                 Mat8u img2 = imread(imgName, 0);
+                if (noiseLevel != 0)
+                {
+                    Mat8u noise(img2.size());
+                    randu(noise, 0, noiseLevel);
+                    img2 -= noise;
+                }
                 Transf TleftRight = xiCam0.inverseCompose(xiCam);
                 EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
                 results << TleftRight.trans().norm() << "    ";

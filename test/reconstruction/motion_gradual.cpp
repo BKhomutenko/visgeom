@@ -1,187 +1,183 @@
+/*
+This file is part of visgeom.
+
+visgeom is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+visgeom is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
+*/ 
+
 #include "io.h"
 #include "ocv.h"
 #include "eigen.h"
-#include "timer.h"
+#include "json.h"
 
-#include "utils/curve_rasterizer.h"
-#include "reconstruction/eucm_motion_stereo.h"
+#include "geometry/geometry.h"
+#include "projection/eucm.h"
+#include "utils/image_generator.h"
 #include "reconstruction/eucm_sgm.h"
+#include "reconstruction/depth_map.h"
+#include "reconstruction/eucm_motion_stereo.h"
+//FIXME make an argument
+ofstream results;
 
-int main(int argc, char** argv)
-{	
-    /*Polynomial2 poly2;
-    poly2.kuu = -1; 
-    poly2.kuv = 1; 
-    poly2.kvv= -1; 
-    poly2.ku = 0.25; 
-    poly2.kv = 0.25; 
-    poly2.k1 = 5;
-    
-    CurveRasterizer<Polynomial2> raster(1, 1, -100, 100, poly2);
-    CurveRasterizer2<Polynomial2> raster2(1, 1, -100, 100, poly2);
-
-    auto tr0 = clock();
-    int x1 = 0;
-    int x2 = 0;
-    for (int i = 0; i < 10000000; i++)
+void analyzeError(const Mat32f & depthGT, const Mat32f & depth, 
+        const Mat32f & sigma, const ScaleParameters & scaleParams)
+{
+    Mat8u inlierMat(depth.size());
+    inlierMat.setTo(0);
+    int Nmax = 0;
+    double dist = 0;
+    int N = 0;
+    double err = 0, err2 = 0;
+    double err3 = 0;
+    for (int u = 0; u < depth.cols; u++)
     {
-        raster.step();
-        x1 += raster.x;
+        for (int v = 0; v < depth.rows; v++)
+        {
+            int ugt = scaleParams.uConv(u);
+            int vgt = scaleParams.vConv(v);
+            if (depthGT(vgt, ugt) == 0 or depth(v, u) == 0 ) continue;
+            if (depthGT(vgt, ugt) != depthGT(vgt, ugt) or depth(v, u) != depth(v, u)) continue;
+            Nmax++;
+            dist += depthGT(vgt, ugt);
+            if (sigma(v, u) > 0.3 or abs(depthGT(vgt, ugt) - depth(v, u)) > 2.5 * sigma(v, u))
+            {
+             continue;
+            }
+            inlierMat(v, u) = 255;
+            err += depthGT(vgt, ugt) - depth(v, u);
+            err2 += pow(depthGT(vgt, ugt) - depth(v, u), 2);
+            N++;
+        }
     }
-    auto tr1 = clock();
+    cout << "avg err : " << err / N *1000 << " avg err2 : " 
+        << sqrt(err2 / N)*1000  << " number of inliers : " << 100 * N / double(Nmax)
+        << "   average distance : " << dist / Nmax << endl;
     
-    for (int i = 0; i < 10000000; i++)
-    {
-        raster2.step();
-        x2 += raster2.x;
-    }
-    auto tr2 = clock();
-    
-    cout << "optimized " << double(tr1 - tr0) / CLOCKS_PER_SEC << endl;
-    cout << "simple " << double(tr2 - tr1) / CLOCKS_PER_SEC << endl;
-    cout << x1 << " " << x2 << endl;
-    return 0;*/
-    ifstream paramFile(argv[1]);
-    if (not paramFile.is_open())
-    {
-        cout << argv[1] << " : ERROR, file is not found" << endl;
-        return 0;
-    }
-    
-    array<double, 6> params;
-    
-    cout << "EU Camera model parameters :" << endl;
-    for (auto & p: params) 
-    {
-        paramFile >> p;
-        cout << setw(10) << p;
-    }
-    cout << endl;
-    paramFile.ignore();
-    
-    array<double, 6> cameraPose;
-    cout << "Camera pose wrt the robot :" << endl;
-    for (auto & e: cameraPose) 
-    {
-        paramFile >> e;
-        cout << setw(10) << e;
-    }
-    cout << endl;
-    paramFile.ignore();
-    Transformation<double> TbaseCamera(cameraPose.data());
-    
-    array<double, 6> robotPose1, robotPose2;
-
-    
-    
-    
-    
-    SGMParameters stereoParams2;
-    stereoParams2.salientPoints = false;
-    stereoParams2.verbosity = 3;
-    stereoParams2.hypMax = 1;
-//    stereoParams.salientPoints = false;
-    paramFile >> stereoParams2.u0;
-    paramFile >> stereoParams2.v0;
-    paramFile >> stereoParams2.dispMax;
-    paramFile >> stereoParams2.scale;
-    
-    paramFile.ignore();
-    string imageDir;
-    getline(paramFile, imageDir);
-    string imageInfo, imageName;
-    getline(paramFile, imageInfo);
-    istringstream imageStream(imageInfo);
-    imageStream >> imageName;
-    for (auto & x : robotPose1) imageStream >> x;
-
-    Mat8u img1 = imread(imageDir + imageName, 0);
-    cout << "Image name: "<< imageDir + imageName << endl;
-    cout << "Image size: "<<img1.size()<<endl;;
-    
-    stereoParams2.u0 = 50;
-    stereoParams2.v0 = 50;
-    stereoParams2.uMax = img1.cols;
-    stereoParams2.vMax = img1.rows;
-    stereoParams2.setEqualMargin();
-//    stereoParams2.salientPoints = true;
-    
-    int counter = 2;
-    EnhancedCamera camera(params.data());
-    DepthMap depth;
-    depth.setDefault();
-    
-//    stereoParams2.dispMax = 40;
-//    stereoParams2.descRespThresh = 2;
-//    stereoParams2.scaleVec = vector<int>{1};
-    
-    MotionStereoParameters stereoParams(stereoParams2);
-    stereoParams.verbosity = 1;
-    stereoParams.descLength = 5;
-//    stereoParams.descRespThresh = 2;
-//    stereoParams.scaleVec = vector<int>{1};
-    
-    MotionStereo stereo(&camera, &camera, stereoParams);
-    stereo.setBaseImage(img1);
-    
-    
-    //do SGM to init the depth
-    getline(paramFile, imageInfo);
-    getline(paramFile, imageInfo);
-    getline(paramFile, imageInfo);
-    imageStream.str(imageInfo);
-    imageStream.clear();
-    imageStream >> imageName;
-    for (auto & x : robotPose2) imageStream >> x;
-    Mat8u img2 = imread(imageDir + imageName, 0);
-    Transformation<double> T01(robotPose1.data()), T02(robotPose2.data());
-    Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
-    EnhancedSGM stereoSG(TleftRight, &camera, &camera, stereoParams2);
-    
-    Timer timer;
-    stereoSG.computeStereo(img1, img2, depth);
-    depth.filterNoise();
-    cout << timer.elapsed() << endl; 
-    Mat32f res, sigmaRes;
-    Mat32f res2, sigmaRes2;
-    depth.toInverseMat(res2);
-    depth.sigmaToMat(sigmaRes2);
-    imshow("res" + to_string(counter), res2 *0.12);
-    imshow("sigma " + to_string(counter), sigmaRes2*20);
-    cv::waitKey(0);
-    
-    counter++;
-    while (getline(paramFile, imageInfo))
-    {
-        istringstream imageStream(imageInfo);
+    results << sqrt(err2 / N)*1000  << "    " << 100 * N / double(Nmax)
+        << "    " << dist / Nmax;
         
-        imageStream >> imageName;
-        for (auto & x : robotPose2) imageStream >> x;
-    
-        Transformation<double> T01(robotPose1.data()), T02(robotPose2.data());
-        Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
-        
-        Mat8u img2 = imread(imageDir + imageName, 0);
+    imshow("inliers", inlierMat);
+}
 
-//        depth.setDefault();
-        timer.reset();
-        cout << TleftRight << endl;
-        DepthMap depth2 = stereo.compute(TleftRight, img2, depth);
-        depth = depth2;
-        depth.filterNoise();
-        cout << timer.elapsed() << endl; 
-        depth.toInverseMat(res);
-        depth.sigmaToMat(sigmaRes);
-//        imwrite(imageDir + "res" + to_string(counter++) + ".png", depth*200);
+int main(int argc, char** argv) 
+{
+    ptree root;
+    read_json(argv[1], root);
+    const vector<double> intrinsic = readVector(root.get_child("camera_intrinsics"));
+    const int width = root.get<int>("image.width");
+    const int height = root.get<int>("image.height");
+    Transf xiCam0 = readTransform(root.get_child("camera_transform"));
+    
+    Mat8u foreImg = imread(root.get<string>("foreground"), 0);
+    
+    EnhancedCamera camera(width, height, intrinsic.data());
+    
+    //init stereoParameters
+    SGMParameters stereoParams;
+    
+    stereoParams.verbosity = root.get<int>("stereo.verbosity");
+    stereoParams.salientPoints = true;
+    stereoParams.u0 = root.get<int>("stereo.u0");
+    stereoParams.v0 = root.get<int>("stereo.v0");
+    stereoParams.dispMax = root.get<int>("stereo.disparity_max");
+    stereoParams.scale = root.get<int>("stereo.scale");
+    stereoParams.flawCost = root.get<int>("stereo.flaw_cost");
+    stereoParams.scaleVec = readIntVector(root.get_child("stereo.scale_vector"));
+    stereoParams.uMax = width;
+    stereoParams.vMax = height;
+    stereoParams.setEqualMargin();
+    
+    
+    ImageGenerator generator(&camera, foreImg, 250);
+//    generator.setBackground(backImg);
+    const int iterMax = root.get<int>("steps");
+    int boardPoseCount = 0;
+    const string imageBaseName = root.get<string>("output_name");
+    
+    results.open(root.get<string>("analysis_output_name"));
+    
+    for (auto & boardPoseItem : root.get_child("plane_transform"))
+    {   
+        int cameraIncCount = 0;
+        generator.setPlaneTransform(readTransform(boardPoseItem.second));
+        //depth GT
+        Mat32f depthGT, depth, sigmaMat;
+        generator.generateDepth(depthGT, xiCam0);
         
-        imshow("sigma " + to_string(counter), sigmaRes*20);
-        imshow("d sigma " + to_string(counter), (sigmaRes - sigmaRes2)*20  + 0.5);
-//        cout << (sigmaRes - sigmaRes2)(Rect(150, 150, 15, 15)) << endl;
-        imshow("res " + to_string(counter), res *0.12);
-        counter++; 
-        waitKey();
+        imshow("depthGT", depthGT / 10);
+        //base frame
+        const string imgName = imageBaseName + "_" + to_string(boardPoseCount) + "_base.png";
+        Mat8u img1 = imread(imgName, 0);
+         
+        const int noiseLevel = root.get<int>("noise");
+        if (noiseLevel != 0)
+        {
+            Mat8u noise(img1.size());
+            randu(noise, 0, noiseLevel);
+            img1 -= noise;
+        }
+        //different increment diretion
+        for (auto & cameraIncItem : root.get_child("camera_increment"))
+        {
+            Transf dxi = readTransform(cameraIncItem.second);
+            Transf xiCam = xiCam0.compose(dxi);
+            cout << boardPoseCount << " " << cameraIncCount << endl;
+            
+            MotionStereoParameters motionStereoParams(stereoParams);
+            motionStereoParams.verbosity = 0;
+            motionStereoParams.descLength = 5;
+            
+            MotionStereo motionStereo(&camera, &camera, motionStereoParams);
+            motionStereo.setBaseImage(img1);
+            //increment count
+            DepthMap depthStereo;
+            for (int i = 0; i < iterMax; i++, xiCam = xiCam.compose(dxi))
+            {
+                const string imgName = imageBaseName + "_" + to_string(boardPoseCount) 
+                    + "_" + to_string(cameraIncCount) + "_" + to_string(i+1) + ".png";
+                Mat8u img2 = imread(imgName, 0);
+                if (noiseLevel != 0)
+                {
+                    Mat8u noise(img2.size());
+                    randu(noise, 0, noiseLevel);
+                    img2 -= noise;
+                }
+                Transf TleftRight = xiCam0.inverseCompose(xiCam);
+                
+                results << TleftRight.trans().norm() << "    ";
+                
+                if (i < 1)
+                {
+                    EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
+                    stereo.computeStereo(img1, img2, depthStereo);
+                }
+                else
+                {
+                    depthStereo = motionStereo.compute(TleftRight, img2, depthStereo);
+                }
+                depthStereo.toMat(depth);
+                depthStereo.sigmaToMat(sigmaMat);
+                analyzeError(depthGT, depth, sigmaMat, stereoParams);
+                results << endl;
+                imshow("depth", depth / 10);
+                imshow("img", img2);
+                waitKey();
+            }
+            cameraIncCount++;
+        }
+        boardPoseCount++;
     }
-    waitKey();
+    results.close();
     return 0;
 }
 

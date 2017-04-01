@@ -63,7 +63,7 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
     
     for (int i = 1; i < desc.size() - 1; i++)
     {
-        const int & d = desc[i];
+        const int d = desc[i];
         int d1 = (desc[i] + desc[i - 1]) / 2;
         int d2 = (desc[i] + desc[i + 1]) / 2;
         thMinVec[i] = min(d, min(d1, d2));
@@ -81,7 +81,7 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
         thMinVec[0] = desc[0];
     }
     
-    const int & d = desc[desc.size() - 2];
+    const int d = desc[desc.size() - 2];
     if (desc.back() > d)
     {
         thMinVec.back() = (desc.back() + d) / 2;
@@ -96,8 +96,50 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
     
     const int HALF_LENGTH = desc.size() / 2;
     vector<int> rowA(sampleVec.size()), rowB(sampleVec.size());
+    /////////////////////////////////////////////////////////////////
     
     //match the first half
+    for (int i = 0; i < sampleVec.size(); i++)
+    {
+        rowA[i] = abs(int(sampleVec[i]) - int(desc[0]));
+    }
+    for (int i = 1; i <= HALF_LENGTH; i++)
+    {
+        rowB[0] = rowA[0] + flawCost + abs(int(sampleVec[0]) - int(desc[i]));
+        int cost = min(rowA[1] + flawCost, rowA[0]);
+        rowB[1] = cost + abs(int(sampleVec[1]) - int(desc[i]));
+        for (int j = 2; j < sampleVec.size(); j++)
+        {
+            cost = min(min(rowA[j] + flawCost, rowA[j - 1]), rowA[j - 2] + flawCost);
+            rowB[j] = cost + abs(int(sampleVec[j]) - int(desc[i]));
+        }
+        swap(rowA, rowB);
+    }
+    vector<int> rowC(sampleVec.size()); //center cost
+    swap(rowA, rowC);
+    
+    //match the second half (from the last pixel to first)
+    for (int i = 0; i < sampleVec.size(); i++)
+    {
+        rowA[i] = abs(sampleVec[i] - desc.back());
+    }
+    for (int i = desc.size() - 2; i > HALF_LENGTH; i--)
+    {
+        for (int j = 0; j < sampleVec.size() - 2; j++)
+        {
+            int cost = min(min(rowA[j] + flawCost, rowA[j + 1]), rowA[j + 2] + flawCost);
+            rowB[j] = cost + abs(int(sampleVec[j]) - int(desc[i]));
+        }
+        int j = sampleVec.size() - 2;
+        int cost = min(rowA[j] + flawCost, rowA[j + 1]);
+        rowB[j] = cost + abs(int(sampleVec[j]) - int(desc[i]));
+        rowB.back() = rowA.back() + flawCost + abs(int(sampleVec.back()) - int(desc[i]));
+        swap(rowA, rowB);
+    }
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    /*
+        //match the first half
     for (int i = 0; i < sampleVec.size(); i++)
     {
 //        rowA[i] = abs(int(sampleVec[i]) - int(desc[0]));
@@ -144,7 +186,7 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
         rowB.back() = rowA.back() + flawCost + computeError(sampleVec.back(), thMinVec[i], thMaxVec[i]);
         swap(rowA, rowB);
     }
-    
+    */
     //accumulate the cost
     for (int i = 0; i < sampleVec.size() - 2; i++)
     {

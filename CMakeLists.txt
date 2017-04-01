@@ -219,6 +219,7 @@ add_executable( motion_gradual
 
 target_link_libraries( motion_gradual 
     reconstruction
+    utils
     ${OpenCV_LIBS} 
 )
 
