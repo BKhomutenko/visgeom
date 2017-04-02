@@ -262,6 +262,6 @@ bool EnhancedStereo::triangulate(const double u1, const double v1, const double 
     }
     
     //result
-    sigma = abs(lambda2 - lambda1) * SIGMA_COEFF;
+    sigma = abs(lambda2 - lambda1);
     d = lambda1;
 }

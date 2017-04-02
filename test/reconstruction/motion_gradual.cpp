@@ -28,7 +28,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "reconstruction/eucm_motion_stereo.h"
 //FIXME make an argument
 ofstream results;
-
+string histDataName;
 void analyzeError(const Mat32f & depthGT, const Mat32f & depth, 
         const Mat32f & sigma, const ScaleParameters & scaleParams)
 {
@@ -39,6 +39,11 @@ void analyzeError(const Mat32f & depthGT, const Mat32f & depth,
     int N = 0;
     double err = 0, err2 = 0;
     double err3 = 0;
+    std::ofstream ofs;
+  ofs.open (histDataName, std::ofstream::out | std::ofstream::app);
+
+
+ 
     for (int u = 0; u < depth.cols; u++)
     {
         for (int v = 0; v < depth.rows; v++)
@@ -49,9 +54,10 @@ void analyzeError(const Mat32f & depthGT, const Mat32f & depth,
             if (depthGT(vgt, ugt) != depthGT(vgt, ugt) or depth(v, u) != depth(v, u)) continue;
             Nmax++;
             dist += depthGT(vgt, ugt);
-            if (sigma(v, u) > 0.3 or abs(depthGT(vgt, ugt) - depth(v, u)) > 2.5 * sigma(v, u))
+            ofs << (depthGT(vgt, ugt) - depth(v, u)) / sigma(v, u) << endl;
+            if (sigma(v, u) > 1 or abs(depthGT(vgt, ugt) - depth(v, u)) > 2.5 * sigma(v, u))
             {
-             continue;
+                continue;
             }
             inlierMat(v, u) = 255;
             err += depthGT(vgt, ugt) - depth(v, u);
@@ -65,7 +71,7 @@ void analyzeError(const Mat32f & depthGT, const Mat32f & depth,
     
     results << sqrt(err2 / N)*1000  << "    " << 100 * N / double(Nmax)
         << "    " << dist / Nmax;
-        
+     ofs.close();    
     imshow("inliers", inlierMat);
 }
 
@@ -97,6 +103,10 @@ int main(int argc, char** argv)
     stereoParams.vMax = height;
     stereoParams.setEqualMargin();
     
+    //to clear the file
+    std::ofstream ofs;
+    ofs.open ("test.txt", std::ofstream::out);
+    ofs.close();
     
     ImageGenerator generator(&camera, foreImg, 250);
 //    generator.setBackground(backImg);
@@ -135,7 +145,7 @@ int main(int argc, char** argv)
             
             MotionStereoParameters motionStereoParams(stereoParams);
             motionStereoParams.verbosity = 0;
-            motionStereoParams.descLength = 5;
+            motionStereoParams.descLength = 7;
             
             MotionStereo motionStereo(&camera, &camera, motionStereoParams);
             motionStereo.setBaseImage(img1);
@@ -143,6 +153,12 @@ int main(int argc, char** argv)
             DepthMap depthStereo;
             for (int i = 0; i < iterMax; i++, xiCam = xiCam.compose(dxi))
             {
+                histDataName = "hist_" + to_string(boardPoseCount) 
+                    + "_" + to_string(cameraIncCount) + "_" + to_string(i+1) + ".txt";
+                std::ofstream ofs;
+                ofs.open (histDataName, std::ofstream::out);
+                ofs.close();
+                
                 const string imgName = imageBaseName + "_" + to_string(boardPoseCount) 
                     + "_" + to_string(cameraIncCount) + "_" + to_string(i+1) + ".png";
                 Mat8u img2 = imread(imgName, 0);
@@ -171,10 +187,12 @@ int main(int argc, char** argv)
                 results << endl;
                 imshow("depth", depth / 10);
                 imshow("img", img2);
-                waitKey();
+                waitKey(30);
             }
+            break;
             cameraIncCount++;
         }
+        break;
         boardPoseCount++;
     }
     results.close();
