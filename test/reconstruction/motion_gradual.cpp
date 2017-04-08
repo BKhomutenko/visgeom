@@ -29,7 +29,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 //FIXME make an argument
 ofstream results;
 string histDataName;
-void analyzeError(const Mat32f & depthGT, const Mat32f & depth, 
+void analyzeError(const Mat32f & depthGT, Mat32f & depth, 
         const Mat32f & sigma, const ScaleParameters & scaleParams)
 {
     Mat8u inlierMat(depth.size());
@@ -50,7 +50,12 @@ void analyzeError(const Mat32f & depthGT, const Mat32f & depth,
         {
             int ugt = scaleParams.uConv(u);
             int vgt = scaleParams.vConv(v);
-            if (depthGT(vgt, ugt) == 0 or depth(v, u) == 0 ) continue;
+            if (depthGT(vgt, ugt) == 0 or depth(v, u) == 0 )
+            {
+                depth(v, u) = 0;
+                continue;
+                
+            }
             if (depthGT(vgt, ugt) != depthGT(vgt, ugt) or depth(v, u) != depth(v, u)) continue;
             Nmax++;
             dist += depthGT(vgt, ugt);
@@ -92,7 +97,7 @@ int main(int argc, char** argv)
     SGMParameters stereoParams;
     
     stereoParams.verbosity = root.get<int>("stereo.verbosity");
-    stereoParams.salientPoints = true;
+    stereoParams.salientPoints = false;
     stereoParams.u0 = root.get<int>("stereo.u0");
     stereoParams.v0 = root.get<int>("stereo.v0");
     stereoParams.dispMax = root.get<int>("stereo.disparity_max");
@@ -102,11 +107,6 @@ int main(int argc, char** argv)
     stereoParams.uMax = width;
     stereoParams.vMax = height;
     stereoParams.setEqualMargin();
-    
-    //to clear the file
-    std::ofstream ofs;
-    ofs.open ("test.txt", std::ofstream::out);
-    ofs.close();
     
     ImageGenerator generator(&camera, foreImg, 250);
 //    generator.setBackground(backImg);
@@ -172,7 +172,7 @@ int main(int argc, char** argv)
                 
                 results << TleftRight.trans().norm() << "    ";
                 
-                if (i < 1)
+                if (i < 1 or true)
                 {
                     EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
                     stereo.computeStereo(img1, img2, depthStereo);
@@ -189,10 +189,8 @@ int main(int argc, char** argv)
                 imshow("img", img2);
                 waitKey(30);
             }
-            break;
             cameraIncCount++;
         }
-        break;
         boardPoseCount++;
     }
     results.close();

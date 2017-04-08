@@ -97,7 +97,7 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
     const int HALF_LENGTH = desc.size() / 2;
     vector<int> rowA(sampleVec.size()), rowB(sampleVec.size());
     /////////////////////////////////////////////////////////////////
-    
+    /*
     //match the first half
     for (int i = 0; i < sampleVec.size(); i++)
     {
@@ -136,9 +136,9 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
         rowB.back() = rowA.back() + flawCost + abs(int(sampleVec.back()) - int(desc[i]));
         swap(rowA, rowB);
     }
-    
+    */
     ////////////////////////////////////////////////////////////////////////////////
-    /*
+    
         //match the first half
     for (int i = 0; i < sampleVec.size(); i++)
     {
@@ -186,7 +186,7 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
         rowB.back() = rowA.back() + flawCost + computeError(sampleVec.back(), thMinVec[i], thMaxVec[i]);
         swap(rowA, rowB);
     }
-    */
+    
     //accumulate the cost
     for (int i = 0; i < sampleVec.size() - 2; i++)
     {
