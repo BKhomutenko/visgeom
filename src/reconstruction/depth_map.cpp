@@ -875,10 +875,10 @@ void DepthMap::filterNoise()
             for (int i = 0; i < 8; i++)
             {
                 double neighDepthVal = myCopy.at(x + dxArr[i], y + dyArr[i]);
-                double neighSigmaVal = myCopy.sigma(x + dxArr[i], y + dyArr[i]);
+//                double neighSigmaVal = myCopy.sigma(x + dxArr[i], y + dyArr[i]);
                 if (neighDepthVal == OUT_OF_RANGE) continue;
                 countFilled++;
-                if (abs(depthVal - neighDepthVal) > 2.5*max(sigmaVal, neighSigmaVal)) continue;
+                if (abs(depthVal - neighDepthVal) > 2*sigmaVal) continue;
                 countMatches++;
                 acc += neighDepthVal;
             }
@@ -889,7 +889,7 @@ void DepthMap::filterNoise()
             }
             else
             {
-//                at(x, y) = acc / (countMatches + CENTRAL_WEIGHT);
+                at(x, y) = acc / (countMatches + CENTRAL_WEIGHT);
             }
         }
     }

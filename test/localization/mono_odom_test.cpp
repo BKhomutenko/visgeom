@@ -113,10 +113,6 @@ int main(int argc, char** argv)
             
             //TODO for every new keyframe do SGBM
             
-            DepthMap d3 = mstereo.compute(xiCam12, img3, d2, CAMERA_2);
-//            d3.filterNoise();
-            d3.toInverseMat(depthMat); 
-            imshow("res3", depthMat);
             waitKey();
             waitKey(50);
         }

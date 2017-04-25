@@ -83,7 +83,7 @@ public:
     */
     void reprojectDepth(Transf T12, const Mat8u & img2, DepthMap & depth);
     
-    DepthMap compute(Transf T12, const Mat8u & img2, const DepthMap & depth, CameraIdx camIdx = CAMERA_1);
+    DepthMap compute(Transf T12, const Mat8u & img2, const DepthMap & depth);
     
     DepthMap compute(Transf T12, const Mat8u & img2);
     
@@ -94,9 +94,8 @@ public:
     
     bool sampleImage(const Mat8u & img2);
     
-    void reconstructFirst(double & dist, double & sigma, double & cost);
+    void reconstruct(double & dist, double & sigma, double & cost);
     
-    void reconstructSecond(DepthMap & depth);
 private:
     
     // based on the image gradient

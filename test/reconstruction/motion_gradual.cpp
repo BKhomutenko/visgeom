@@ -34,7 +34,7 @@ void analyzeError(const Mat32f & depthGT, Mat32f & depth,
 {
     Mat8u inlierMat(depth.size());
     inlierMat.setTo(0);
-    int Nmax = 0;
+    int Nmax = 0, Ngt = 0;
     double dist = 0;
     int N = 0;
     double err = 0, err2 = 0;
@@ -56,6 +56,7 @@ void analyzeError(const Mat32f & depthGT, Mat32f & depth,
                 continue;
                 
             }
+            Ngt++;
             if (depthGT(vgt, ugt) != depthGT(vgt, ugt) or depth(v, u) != depth(v, u)) continue;
             Nmax++;
             dist += depthGT(vgt, ugt);
@@ -75,7 +76,7 @@ void analyzeError(const Mat32f & depthGT, Mat32f & depth,
         << "   average distance : " << dist / Nmax << endl;
     
     results << sqrt(err2 / N)*1000  << "    " << 100 * N / double(Nmax)
-        << "    " << dist / Nmax;
+        << "    " << dist / Nmax << "    " << N / double(Ngt);
      ofs.close();    
     imshow("inliers", inlierMat);
 }
@@ -172,7 +173,7 @@ int main(int argc, char** argv)
                 
                 results << TleftRight.trans().norm() << "    ";
                 
-                if (i < 1 or true)
+                if (i < 1 or root.get<bool>("sgm"))
                 {
                     EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
                     stereo.computeStereo(img1, img2, depthStereo);
@@ -181,13 +182,16 @@ int main(int argc, char** argv)
                 {
                     depthStereo = motionStereo.compute(TleftRight, img2, depthStereo);
                 }
+//                depthStereo.filterNoise();
                 depthStereo.toMat(depth);
                 depthStereo.sigmaToMat(sigmaMat);
                 analyzeError(depthGT, depth, sigmaMat, stereoParams);
                 results << endl;
                 imshow("depth", depth / 10);
                 imshow("img", img2);
-                waitKey(30);
+                imwrite("depth_" + to_string(i) + ".png", depth * 25);
+                imwrite("img_" + to_string(i) + ".png", img2);
+                waitKey();
             }
             cameraIncCount++;
         }
