@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     Transf xiCam0 = readTransform(root.get_child("camera_transform"));
     
     Mat8u foreImg = imread(root.get<string>("foreground"), 0);
-    Mat8u backImg = imread(root.get<string>("background"), 0);
+//    Mat8u backImg = imread(root.get<string>("background"), 0);
     
     EnhancedCamera camera(width, heigth, intrinsic.data());
     

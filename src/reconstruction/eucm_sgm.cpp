@@ -273,7 +273,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
             }
             
             //TODO revise the criterion (step == 1)
-            if (_params.salientPoints and step <= 2)
+            if (_params.salientPoints and step <= 2 and _epipolarDescriptor.goodResp())
             {
                 _salientBuffer(y, x) = 1;
             }

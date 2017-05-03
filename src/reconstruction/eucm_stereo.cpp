@@ -63,7 +63,7 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
     
     for (int i = 1; i < desc.size() - 1; i++)
     {
-        const int & d = desc[i];
+        const int d = desc[i];
         int d1 = (desc[i] + desc[i - 1]) / 2;
         int d2 = (desc[i] + desc[i + 1]) / 2;
         thMinVec[i] = min(d, min(d1, d2));
@@ -81,7 +81,7 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
         thMinVec[0] = desc[0];
     }
     
-    const int & d = desc[desc.size() - 2];
+    const int d = desc[desc.size() - 2];
     if (desc.back() > d)
     {
         thMinVec.back() = (desc.back() + d) / 2;
@@ -96,8 +96,50 @@ vector<int> compareDescriptor(const vector<uint8_t> & desc,
     
     const int HALF_LENGTH = desc.size() / 2;
     vector<int> rowA(sampleVec.size()), rowB(sampleVec.size());
-    
+    /////////////////////////////////////////////////////////////////
+    /*
     //match the first half
+    for (int i = 0; i < sampleVec.size(); i++)
+    {
+        rowA[i] = abs(int(sampleVec[i]) - int(desc[0]));
+    }
+    for (int i = 1; i <= HALF_LENGTH; i++)
+    {
+        rowB[0] = rowA[0] + flawCost + abs(int(sampleVec[0]) - int(desc[i]));
+        int cost = min(rowA[1] + flawCost, rowA[0]);
+        rowB[1] = cost + abs(int(sampleVec[1]) - int(desc[i]));
+        for (int j = 2; j < sampleVec.size(); j++)
+        {
+            cost = min(min(rowA[j] + flawCost, rowA[j - 1]), rowA[j - 2] + flawCost);
+            rowB[j] = cost + abs(int(sampleVec[j]) - int(desc[i]));
+        }
+        swap(rowA, rowB);
+    }
+    vector<int> rowC(sampleVec.size()); //center cost
+    swap(rowA, rowC);
+    
+    //match the second half (from the last pixel to first)
+    for (int i = 0; i < sampleVec.size(); i++)
+    {
+        rowA[i] = abs(sampleVec[i] - desc.back());
+    }
+    for (int i = desc.size() - 2; i > HALF_LENGTH; i--)
+    {
+        for (int j = 0; j < sampleVec.size() - 2; j++)
+        {
+            int cost = min(min(rowA[j] + flawCost, rowA[j + 1]), rowA[j + 2] + flawCost);
+            rowB[j] = cost + abs(int(sampleVec[j]) - int(desc[i]));
+        }
+        int j = sampleVec.size() - 2;
+        int cost = min(rowA[j] + flawCost, rowA[j + 1]);
+        rowB[j] = cost + abs(int(sampleVec[j]) - int(desc[i]));
+        rowB.back() = rowA.back() + flawCost + abs(int(sampleVec.back()) - int(desc[i]));
+        swap(rowA, rowB);
+    }
+    */
+    ////////////////////////////////////////////////////////////////////////////////
+    
+        //match the first half
     for (int i = 0; i < sampleVec.size(); i++)
     {
 //        rowA[i] = abs(int(sampleVec[i]) - int(desc[0]));
@@ -220,6 +262,36 @@ bool EnhancedStereo::triangulate(const double u1, const double v1, const double 
     }
     
     //result
-    sigma = abs(lambda2 - lambda1) * SIGMA_COEFF;
+    sigma = abs(lambda2 - lambda1);
+    d = lambda1;
+}
+
+bool EnhancedStereo::triangulate(const Vector2d pt11, const Vector2d pt12, const Vector2d pt21,
+        const Vector2d pt22, double & d, double & sigma) const
+{
+    if (_params.verbosity > 3) cout << "EnhancedStereo::triangulate" << endl;
+    Vector3d p1, p2, q1, q2;  //spatial direction points
+    if (not _camera1->reconstructPoint(pt11, p1) or 
+        not _camera1->reconstructPoint(pt12, p2) or
+        not _camera2->reconstructPoint(pt21, q1) or 
+        not _camera2->reconstructPoint(pt22, q2))
+    {
+        if (_params.verbosity > 2) 
+        {
+            cout << "    not reconstructed " << pt11.transpose(); 
+            cout << " # " << pt21.transpose() << endl;
+        }
+        return false;
+    }
+    
+    double lambda1, lambda2;
+    _triangulator.computeRegular(p1, q1, &lambda1);
+    _triangulator.computeRegular(p2, q2, &lambda2);
+    double pnorm = p1.norm();
+    lambda1 *= pnorm; //TODO change to lambda only?
+    lambda2 *= pnorm; 
+    
+    //result
+    sigma = abs(lambda2 - lambda1);
     d = lambda1;
 }
