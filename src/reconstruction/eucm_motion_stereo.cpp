@@ -274,8 +274,18 @@ bool MotionStereo::selectPoint(int x, int y)
     CurveRasterizer<int, Polynomial2> descRaster(round(pt), epipoles().getFirstPx(),
                                 _epipolarCurves.getFirst(gX));
     if (epipoles().firstIsInverted()) descRaster.setStep(-1);
+
+    //to compute one step for the uncertainty estimation
+    CurveRasterizer<int, Polynomial2> descRasterUncert = descRaster;
     
     gstep = _epipolarDescriptor.compute(_img1, descRaster, gdescriptor);
+    
+    descRasterUncert.setStep(gstep);
+    descRasterUncert.step();
+    
+    gu2 = descRasterUncert.u;
+    gv2 = descRasterUncert.v;
+    
     if (gstep < 1 or not _epipolarDescriptor.goodResp()) return false;
     flags |= GLB_STEP | GLB_DESCRIPTOR;
     return true;
@@ -412,8 +422,11 @@ void MotionStereo::reconstruct(double & dist, double & sigma, double & cost)
     {
         int dBest = bestCostIter - costVec.begin();
         double distNew, sigmaNew;
-        triangulate(gu, gv, guVec[dBest], gvVec[dBest], guVec[dBest + 1], gvVec[dBest + 1],
-                distNew, sigmaNew, CAMERA_1); 
+        triangulate(Vector2d(gu, gv),
+                    Vector2d(gu2, gv2),
+                    Vector2d(guVec[dBest], gvVec[dBest]), 
+                    Vector2d(guVec[dBest + 1], gvVec[dBest + 1]),
+                    distNew, sigmaNew); 
          
         //temporal filtering       
         const double K = 1 / (sigma + sigmaNew);

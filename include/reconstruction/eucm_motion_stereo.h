@@ -132,6 +132,7 @@ private:
     uint32_t flags;
     
     int gu, gv;
+    int gu2, gv2;
     Vector3d gX;
     Vector2d gptStart;
     Vector2i ptStartRound;

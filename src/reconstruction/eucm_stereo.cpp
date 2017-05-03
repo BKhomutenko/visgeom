@@ -265,3 +265,33 @@ bool EnhancedStereo::triangulate(const double u1, const double v1, const double 
     sigma = abs(lambda2 - lambda1);
     d = lambda1;
 }
+
+bool EnhancedStereo::triangulate(const Vector2d pt11, const Vector2d pt12, const Vector2d pt21,
+        const Vector2d pt22, double & d, double & sigma) const
+{
+    if (_params.verbosity > 3) cout << "EnhancedStereo::triangulate" << endl;
+    Vector3d p1, p2, q1, q2;  //spatial direction points
+    if (not _camera1->reconstructPoint(pt11, p1) or 
+        not _camera1->reconstructPoint(pt12, p2) or
+        not _camera2->reconstructPoint(pt21, q1) or 
+        not _camera2->reconstructPoint(pt22, q2))
+    {
+        if (_params.verbosity > 2) 
+        {
+            cout << "    not reconstructed " << pt11.transpose(); 
+            cout << " # " << pt21.transpose() << endl;
+        }
+        return false;
+    }
+    
+    double lambda1, lambda2;
+    _triangulator.computeRegular(p1, q1, &lambda1);
+    _triangulator.computeRegular(p2, q2, &lambda2);
+    double pnorm = p1.norm();
+    lambda1 *= pnorm; //TODO change to lambda only?
+    lambda2 *= pnorm; 
+    
+    //result
+    sigma = abs(lambda2 - lambda1);
+    d = lambda1;
+}

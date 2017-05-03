@@ -50,13 +50,15 @@ void analyzeError(const Mat32f & depthGT, Mat32f & depth,
         {
             int ugt = scaleParams.uConv(u);
             int vgt = scaleParams.vConv(v);
+            if (depthGT(vgt, ugt) != 0) Ngt++;
+            
             if (depthGT(vgt, ugt) == 0 or depth(v, u) == 0 )
             {
                 depth(v, u) = 0;
                 continue;
                 
             }
-            Ngt++;
+            
             if (depthGT(vgt, ugt) != depthGT(vgt, ugt) or depth(v, u) != depth(v, u)) continue;
             Nmax++;
             dist += depthGT(vgt, ugt);
@@ -182,7 +184,7 @@ int main(int argc, char** argv)
                 {
                     depthStereo = motionStereo.compute(TleftRight, img2, depthStereo);
                 }
-//                depthStereo.filterNoise();
+                depthStereo.filterNoise();
                 depthStereo.toMat(depth);
                 depthStereo.sigmaToMat(sigmaMat);
                 analyzeError(depthGT, depth, sigmaMat, stereoParams);

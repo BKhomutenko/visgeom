@@ -89,10 +89,14 @@ public:
     
     double triangulate(double u1, double v1, double u2, double v2, CameraIdx camIdx = CAMERA_1) const;
     
+    //TODO remove this function, obsolete 
     bool triangulate(const double u1, const double v1, const double u21, const double v21,
             const double u22, const double v22, double & d, double & sigma,
             CameraIdx camIdx = CAMERA_1) const;
     
+    bool triangulate(const Vector2d pt11, const Vector2d pt12, const Vector2d pt21,
+        const Vector2d pt22, double & d, double & sigma) const;
+        
     const StereoEpipoles & epipoles() const { return _epipolarCurves.getEpipoles(); }
     
 protected:
