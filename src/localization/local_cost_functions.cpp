@@ -47,7 +47,7 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
     xiCam.inverseTransform(_dataPack.cloud, transformedPoints);
     
     // init the image interpolation
-    ceres::BiCubicInterpolator<Grid2D> imageInterpolator(_imageGrid);
+    ceres::BiCubicInterpolator<Grid2D<float>> imageInterpolator(_imageGrid);
     
     bool computeJac = (jacobian != NULL and jacobian[0] != NULL);
     if (computeJac)
@@ -116,7 +116,7 @@ bool MutualInformation::Evaluate(double const * parameters,
     vector<Vector3d> transformedPoints;
     T12.inverseTransform(_dataPack.cloud, transformedPoints);
     // init the image interpolation
-    ceres::BiCubicInterpolator<Grid2D> imageInterpolator(_imageGrid);
+    ceres::BiCubicInterpolator<Grid2D<float>> imageInterpolator(_imageGrid);
     
     bool computeGrad = (gradient != NULL);
     

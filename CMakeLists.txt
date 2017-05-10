@@ -18,11 +18,27 @@ include_directories(include)
 
 #Lib compilation
 
+#todo replace by render
 add_library( utils STATIC   
     src/utils/image_generator.cpp  
 )
 
 target_link_libraries( utils 
+    ${OpenCV_LIBS}  
+    ${CERES_LIBRARIES}
+    ${Boost_LIBRARIES}
+)
+
+
+add_library( render STATIC   
+    src/render/render.cpp
+    src/render/plane.cpp
+    src/render/background.cpp
+    src/render/texture.cpp
+    src/render/aa_filter_lt.cpp
+)
+
+target_link_libraries( render 
     ${OpenCV_LIBS}  
     ${CERES_LIBRARIES}
     ${Boost_LIBRARIES}
@@ -118,6 +134,17 @@ target_link_libraries( synthetic_planar
     reconstruction
     ${OpenCV_LIBS} 
 )
+
+
+add_executable( renderer_test 
+    test/reconstruction/renderer_test.cpp
+)
+
+target_link_libraries( renderer_test 
+    render
+    ${OpenCV_LIBS} 
+)
+
 
 add_executable( sgm_synthetic_planar 
     test/reconstruction/sgm_synthetic_planar.cpp

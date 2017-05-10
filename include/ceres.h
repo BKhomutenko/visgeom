@@ -39,11 +39,15 @@ using ceres::SoftLOneLoss;
 using ceres::GradientProblem;
 using ceres::GradientProblemSolver;
 
+//misc
+using ceres::BiCubicInterpolator;
+
+template <typename T>
 struct Grid2D
 {
     enum { DATA_DIMENSION = 1 };
     
-    Grid2D(int uMax, int vMax, const float * const data) :
+    Grid2D(int uMax, int vMax, const T * const data) :
             data(data), uMax(uMax), vMax(vMax) {}
             
     void GetValue(int v, int u, double* val) const
@@ -59,5 +63,5 @@ struct Grid2D
     }
     
     int uMax, vMax;
-    const float * const data;
+    const T * const data;
 };

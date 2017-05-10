@@ -49,8 +49,8 @@ public:
         *cost = 0;
         if (gradient != NULL) fill(gradient, gradient + 4, 0.);
         
-        ceres::BiCubicInterpolator<Grid2D> graduInter(_graduGrid);
-        ceres::BiCubicInterpolator<Grid2D> gradvInter(_gradvGrid);
+        ceres::BiCubicInterpolator<Grid2D<float>> graduInter(_graduGrid);
+        ceres::BiCubicInterpolator<Grid2D<float>> gradvInter(_gradvGrid);
         for (int direction = 0; direction < 2; direction++)
         {
             int thIdx = 2 + direction;
@@ -86,7 +86,7 @@ public:
 
     virtual int NumParameters() const { return 4; }
 
-    const Grid2D _graduGrid, _gradvGrid;
+    const Grid2D<float> _graduGrid, _gradvGrid;
     vector<double> stepVec;
 };
 

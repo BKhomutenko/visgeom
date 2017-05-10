@@ -73,7 +73,7 @@ struct PhotometricCostFunction : ceres::CostFunction
     ICamera * _camera;
     const Transf _xiBaseCam;
     const PhotometricPack & _dataPack;
-    const Grid2D _imageGrid;
+    const Grid2D<float> _imageGrid;
     const double _scale;
 };
 
@@ -105,7 +105,7 @@ struct PhotometricError
         }
         T12.inverseTransform(transformedPoints, transformedPoints);
         Projector<T> projector;
-        ceres::BiCubicInterpolator<Grid2D> imageInterpolator(_imageGrid);
+        ceres::BiCubicInterpolator<Grid2D<float>> imageInterpolator(_imageGrid);
         vector<T> projectionParamsT;
         projectionParamsT.reserve(_projectionParams.size());
         for (auto & x : _projectionParams)
@@ -131,7 +131,7 @@ struct PhotometricError
     
     const vector<double> & _projectionParams;
     const PhotometricPack & _dataPack;
-    const Grid2D _imageGrid;
+    const Grid2D<float> _imageGrid;
     const double _scale; 
 };
 
@@ -178,7 +178,7 @@ struct MutualInformation : public FirstOrderFunction
     
     ICamera * _camera;
     const PhotometricPack & _dataPack;
-    const Grid2D _imageGrid;
+    const Grid2D<float> _imageGrid;
     const double _scale;
     
     //histogram params

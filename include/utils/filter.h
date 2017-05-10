@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 */ 
 
-/*
-A timer to profile functions
-*/
-
 #pragma once
 
 #include "std.h"
