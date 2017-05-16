@@ -45,7 +45,7 @@ protected:
     const int MAX_SIZE = 25;
     const double SIGMA = 0.55;
     /*
-    sigma_x * sigma_f = 1 / (2 * pi)
+    sigma_x * sigma_f = 1 / (2 * pi) for gaussian filters
     if we want to cut everything that is higher than f = 0.5, then sigma_f must be at least 0.3
     from where we get sigma_x ~= 0.5
     */

@@ -25,7 +25,7 @@ const LookupFilter & LookupFilter::instance()
 
 double LookupFilter::computeKernel(double x) const
 {
-    return exp(-x*x / (2 * SIGMA * SIGMA)) - 0. * exp(-x*x / (1.5 * SIGMA * SIGMA));
+    return exp(-x*x / (2 * SIGMA * SIGMA)) - 0.35 * exp(-x*x / (1.3 * SIGMA * SIGMA));
 }
 
 const vector<double> & LookupFilter::getKernel(int length) const

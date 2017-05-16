@@ -16,9 +16,9 @@ include_directories(${Boost_INCLUDE_DIR})
 
 include_directories(include)
 
-#Lib compilation
+### LIB COMPILATION ###
 
-#todo replace by render
+#TODO replace by render
 add_library( utils STATIC   
     src/utils/image_generator.cpp  
 )
@@ -30,6 +30,8 @@ target_link_libraries( utils
 )
 
 
+#fisheye simulation
+#TODO add multi-camera system
 add_library( render STATIC   
     src/render/render.cpp
     src/render/plane.cpp
@@ -124,6 +126,14 @@ target_link_libraries( generate
 )
 
 ### RECONSTRUCTION ###
+
+add_executable( equalizer_test 
+    test/reconstruction/equalizer_test.cpp
+)
+
+target_link_libraries( equalizer_test
+    ${OpenCV_LIBS} 
+)
 
 add_executable( synthetic_planar 
     test/reconstruction/synthetic_planar.cpp
