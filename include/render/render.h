@@ -34,7 +34,7 @@ public:
     virtual ~Renderer();
   
     void setCameraTransform(const Transf & xi);
-    void setCameraParams(const double * params);
+    void setCamera(const ICamera * camera);
     
     //TODO put to a cpp file
     void fillBuffers();

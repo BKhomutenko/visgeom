@@ -37,8 +37,8 @@ int main(int argc, char** argv)
     read_json(argv[1], root);
     array<double, 6> params {0.5, 1, 150, 150, 250, 250};
     Renderer renderer(root);
-    
-    renderer.setCameraParams(params.data());
+    EnhancedCamera camera(params.data());
+    renderer.setCamera(&camera);
     for (int i = 0; i < 100; i++)
     {
         renderer.setCameraTransform(Transf(0, 0, i*0.007, i*0.001, 0, -i*0.001));

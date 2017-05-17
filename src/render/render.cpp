@@ -68,16 +68,13 @@ void Renderer::setCameraTransform(const Transf & xi)
     _xiCam = xi; 
 }
 
-void Renderer::setCameraParams(const double * params) 
+void Renderer::setCamera(const ICamera * camera) 
 {
     if (_camera != NULL)
     {
-        _camera->setParameters(params);
+        delete _camera;
     }
-    else //FIXME supports only one camera type so far
-    {
-        _camera = new EnhancedCamera(_width, _height, params);
-    }
+    _camera = camera->clone();
 }
 
 void Renderer::fillBuffers() 
@@ -85,9 +82,9 @@ void Renderer::fillBuffers()
     _idxMat.setTo(-1);
     _depthMat.setTo(1e6);
     Matrix3d R = _xiCam.rotMat();
-    for (int v = 0; v < _camera->height; v++)
+    for (int v = 0; v < _height; v++)
     {
-        for (int u = 0; u < _camera->width; u++)
+        for (int u = 0; u < _width; u++)
         {
             Vector3d dir;
             if (not  _camera->reconstructPoint(Vector2d(u, v), dir) ) continue;
@@ -116,10 +113,10 @@ void Renderer::fillImage(Mat8u & dst)
     
     vector<double> tVec(_objectVec.size(), 0);
     vector<int> pxCount(_objectVec.size(), 0);
-    dst.create(_camera->height, _camera->width);
-    for (int v = 0; v < _camera->height; v++)
+    dst.create(_height, _width);
+    for (int v = 0; v < _height; v++)
     {
-        for (int u = 0; u < _camera->width; u++)
+        for (int u = 0; u < _width; u++)
         {
             int idx = _idxMat(v, u);
             if (idx == -1) continue;
@@ -140,7 +137,7 @@ void Renderer::fillImage(Mat8u & dst)
                 uMin = _uMat(v, u - 1);
                 vMin = _vMat(v, u - 1);
             }
-            if (u < _camera->width - 1 and _idxMat(v, u + 1) == idx)
+            if (u < _width - 1 and _idxMat(v, u + 1) == idx)
             {
                 uCount++;
                 uMax = _uMat(v, u + 1);
@@ -163,7 +160,7 @@ void Renderer::fillImage(Mat8u & dst)
                 uMin = _uMat(v - 1, u);
                 vMin = _vMat(v - 1, u);
             }
-            if (v < _camera->height - 1 and _idxMat(v + 1, u) == idx)
+            if (v < _height - 1 and _idxMat(v + 1, u) == idx)
             {
                 vCount++;
                 uMax = _uMat(v + 1, u);
