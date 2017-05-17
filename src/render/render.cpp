@@ -24,7 +24,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "render/background.h"
 #include "render/plane.h"
 
-Renderer::Renderer(const ptree & params) :
+RenderDevice::RenderDevice(const ptree & params) :
     _width(params.get<int>("width")),
     _height(params.get<int>("height")),
     _camera(NULL)
@@ -45,7 +45,7 @@ Renderer::Renderer(const ptree & params) :
     //TODO init the objects
 }
     
-Renderer::~Renderer()
+RenderDevice::~RenderDevice()
 {
     if (_camera != NULL)
     {
@@ -63,12 +63,12 @@ Renderer::~Renderer()
     -for each pixel compute local basis
     -sample textures
 */    
-void Renderer::setCameraTransform(const Transf & xi) 
+void RenderDevice::setCameraTransform(const Transf & xi) 
 { 
     _xiCam = xi; 
 }
 
-void Renderer::setCamera(const ICamera * camera) 
+void RenderDevice::setCamera(const ICamera * camera) 
 {
     if (_camera != NULL)
     {
@@ -77,7 +77,7 @@ void Renderer::setCamera(const ICamera * camera)
     _camera = camera->clone();
 }
 
-void Renderer::fillBuffers() 
+void RenderDevice::fillBuffers() 
 {
     _idxMat.setTo(-1);
     _depthMat.setTo(1e6);
@@ -107,7 +107,7 @@ void Renderer::fillBuffers()
     }
 }
 
-void Renderer::fillImage(Mat8u & dst) 
+void RenderDevice::fillImage(Mat8u & dst) 
 {
     Timer timer;
     

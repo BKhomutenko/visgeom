@@ -19,35 +19,34 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "json.h"
 #include "std.h"
-#include "ocv.h"
 #include "eigen.h"
 #include "geometry/geometry.h"
 #include "projection/generic_camera.h"
 
-#include "render/object.h"
+#include "render/render.h"
 
-class RenderDevice
+class VirtualRobot
 {
 public:
-    RenderDevice(const ptree & params);
+    VirtualRobot(const ptree & params);
         
-    virtual ~RenderDevice();
+    virtual ~VirtualRobot();
   
-    void setCameraTransform(const Transf & xi);
-    void setCamera(const ICamera * camera);
     
-    //TODO put to a cpp file
+    void setVelocity(const Vector3d v, const Vector3d omega); //FIXME implement a separate data structure
+
+    void simulationStep(const double timeStep);
+    
+    void getImage(Mat8u & dst, int cameraIdx = 0);
+    
     void fillBuffers();
     
     void fillImage(Mat8u & dst);
     
-    vector<IObject * > _objectVec;
-    ICamera * _camera;
+    vector<ICamera*> _cameraVec;
+    vector<Transf> _xiBaseCamVec;
+    Transf _xiOrigBase;
     
-    //TODO init all the matrices
-    Mat16s _idxMat;
-    Mat32f _uMat, _vMat, _depthMat;
-    Transf _xiCam;
-    int _width, _height;
+    Renderer _renderDevice;
 };
 

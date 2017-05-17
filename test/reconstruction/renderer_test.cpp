@@ -36,20 +36,20 @@ int main(int argc, char** argv)
     ptree root;
     read_json(argv[1], root);
     array<double, 6> params {0.5, 1, 150, 150, 250, 250};
-    Renderer renderer(root);
+    RenderDevice device(root);
     EnhancedCamera camera(params.data());
-    renderer.setCamera(&camera);
+    device.setCamera(&camera);
     for (int i = 0; i < 100; i++)
     {
-        renderer.setCameraTransform(Transf(0, 0, i*0.007, i*0.001, 0, -i*0.001));
-//        renderer.setCameraTransform(Transf());
+        device.setCameraTransform(Transf(0, 0, i*0.007, i*0.001, 0, -i*0.001));
+//        device.setCameraTransform(Transf());
         cout << "initialized" << endl;
-        renderer.fillBuffers();
+        device.fillBuffers();
         cout << "buffers" << endl;
         Mat8u res;
-        renderer.fillImage(res);
+        device.fillImage(res);
         cout << "image" << endl;
-        imshow("depth", renderer._depthMat/5);
+        imshow("depth", device._depthMat/5);
         imshow("res", res);
         waitKey(1);
     }
