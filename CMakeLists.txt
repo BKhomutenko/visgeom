@@ -18,18 +18,6 @@ include_directories(include)
 
 ### LIB COMPILATION ###
 
-#TODO replace by render
-add_library( utils STATIC   
-    src/utils/image_generator.cpp  
-)
-
-target_link_libraries( utils 
-    ${OpenCV_LIBS}  
-    ${CERES_LIBRARIES}
-    ${Boost_LIBRARIES}
-)
-
-
 #fisheye simulation
 #TODO add multi-camera system
 add_library( render STATIC   
@@ -54,7 +42,6 @@ add_library( calibration STATIC
 )
 
 target_link_libraries( calibration 
-    utils
     ${OpenCV_LIBS}  
     ${CERES_LIBRARIES}
     ${Boost_LIBRARIES}
@@ -116,14 +103,14 @@ target_link_libraries( subpixel
     ${Boost_LIBRARIES}
 )
 
-add_executable(generate
-    test/calibration/generate_board.cpp
-)
+#add_executable(generate
+#    test/calibration/generate_board.cpp
+#)
 
-target_link_libraries( generate
-    calibration
-    ${OpenCV_LIBS}  
-)
+#target_link_libraries( generate
+#    calibration
+#    ${OpenCV_LIBS}  
+#)
 
 ### RECONSTRUCTION ###
 
@@ -135,15 +122,15 @@ target_link_libraries( equalizer_test
     ${OpenCV_LIBS} 
 )
 
-add_executable( synthetic_planar 
-    test/reconstruction/synthetic_planar.cpp
-)
+#add_executable( synthetic_planar 
+#    test/reconstruction/synthetic_planar.cpp
+#)
 
-target_link_libraries( synthetic_planar 
-    utils
-    reconstruction
-    ${OpenCV_LIBS} 
-)
+#target_link_libraries( synthetic_planar 
+#    utils
+#    reconstruction
+#    ${OpenCV_LIBS} 
+#)
 
 
 add_executable( renderer_test 
@@ -156,15 +143,15 @@ target_link_libraries( renderer_test
 )
 
 
-add_executable( sgm_synthetic_planar 
-    test/reconstruction/sgm_synthetic_planar.cpp
-)
+#add_executable( sgm_synthetic_planar 
+#    test/reconstruction/sgm_synthetic_planar.cpp
+#)
 
-target_link_libraries( sgm_synthetic_planar 
-    utils
-    reconstruction
-    ${OpenCV_LIBS} 
-)
+#target_link_libraries( sgm_synthetic_planar 
+#    utils
+#    reconstruction
+#    ${OpenCV_LIBS} 
+#)
 
 add_executable( stereo 
     test/reconstruction/stereo_test.cpp
@@ -250,15 +237,15 @@ target_link_libraries( merge_test
     ${OpenCV_LIBS} 
 )
 
-add_executable( motion_gradual
-    test/reconstruction/motion_gradual.cpp
-)
+#add_executable( motion_gradual
+#    test/reconstruction/motion_gradual.cpp
+#)
 
-target_link_libraries( motion_gradual 
-    reconstruction
-    utils
-    ${OpenCV_LIBS} 
-)
+#target_link_libraries( motion_gradual 
+#    reconstruction
+#    utils
+#    ${OpenCV_LIBS} 
+#)
 
 ## LOCALIZATION ###
 add_executable( odometry_test

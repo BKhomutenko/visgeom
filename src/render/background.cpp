@@ -17,9 +17,13 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "render/background.h"
 
-Background::Background(const Mat8u & img):
-    _texture(img)
+Background::Background(const ptree & params):
+    _texture( imread(params.get<string>("image_name"), 0) )
 {
+    _u0 = double(_texture.cols()) / 2;
+    _v0 = double(_texture.rows()) / 2;
+    _fu = _texture.cols() / (2 * M_PI);
+    _fv = _texture.rows() / (2 * M_PI);
     _ex << 1, 0, 0;
     _ey << 0, 1, 0;
     _ez << 0, 0, 1;

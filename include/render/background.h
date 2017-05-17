@@ -17,6 +17,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "json.h"
 #include "ocv.h"
 #include "eigen.h"
 #include "geometry/geometry.h"
@@ -27,7 +28,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 class Background : public IObject
 {
 public:
-    Background(const Mat8u & img);
+    Background(const ptree & params);
     
     virtual ~Background();
     

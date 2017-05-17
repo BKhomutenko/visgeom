@@ -17,33 +17,69 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "render/render.h"
 
-Renderer::Renderer(const ICamera * camera) : 
-    _camera(camera->clone())
+#include "timer.h"
+
+#include "projection/eucm.h"
+
+#include "render/background.h"
+#include "render/plane.h"
+
+Renderer::Renderer(const ptree & params) :
+    _width(params.get<int>("width")),
+    _height(params.get<int>("height")),
+    _camera(NULL)
 {
-    Size size(camera->width, camera->height);
+    Size size(_width, _height);
     _idxMat.create(size);
     _uMat.create(size);
     _vMat.create(size);
     _depthMat.create(size);
+    
+    _objectVec.push_back( new Background(params.get_child("background")) );
+    
+    for (auto & objParams : params.get_child("plains"))
+    {
+        _objectVec.push_back( new Plane(objParams.second) );
+    }
+    
+    //TODO init the objects
 }
     
 Renderer::~Renderer()
 {
-    delete _camera;
+    if (_camera != NULL)
+    {
+        delete _camera;
+    }
     for (auto obj : _objectVec)
     {
         delete obj;
     }
 }
+
 /*
     Algorithm:
     -fill up the buffers using object->intersect
     -for each pixel compute local basis
     -sample textures
 */    
-void Renderer::setCameraTransform(const Transf & xi) { _xiCam = xi; }
+void Renderer::setCameraTransform(const Transf & xi) 
+{ 
+    _xiCam = xi; 
+}
 
-//TODO put to a cpp file
+void Renderer::setCameraParams(const double * params) 
+{
+    if (_camera != NULL)
+    {
+        _camera->setParameters(params);
+    }
+    else //FIXME supports only one camera type so far
+    {
+        _camera = new EnhancedCamera(_width, _height, params);
+    }
+}
+
 void Renderer::fillBuffers() 
 {
     _idxMat.setTo(-1);
@@ -76,6 +112,10 @@ void Renderer::fillBuffers()
 
 void Renderer::fillImage(Mat8u & dst) 
 {
+    Timer timer;
+    
+    vector<double> tVec(_objectVec.size(), 0);
+    vector<int> pxCount(_objectVec.size(), 0);
     dst.create(_camera->height, _camera->width);
     for (int v = 0; v < _camera->height; v++)
     {
@@ -136,9 +176,16 @@ void Renderer::fillImage(Mat8u & dst)
                 basis(1, 1) = (vMax - vMin) / vCount;
             }
             
-            
+            timer.reset();            
             dst(v, u) = _objectVec[idx]->sample(pt, basis);
+            tVec[idx] += timer.elapsed();
+            pxCount[idx]++;
         }
+    }
+    if (false) //FIXME make verbose
+    for (int i = 0; i < tVec.size(); i++)
+    {
+        cout << setw(15) << pxCount[i] << setw(15) << tVec[i] << setw(15) << tVec[i] / pxCount[i] << endl;
     }
 }
 

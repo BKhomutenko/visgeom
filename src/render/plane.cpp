@@ -17,9 +17,16 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "render/plane.h"
 
-Plane::Plane(const Transf & xi, const Mat8u & img):
-    _texture(img)
+Plane::Plane(const ptree & params): 
+    _texture( imread(params.get<string>("image_name"), 0) )
 {
+    Transf xi = readTransform(params.get_child("pose"));
+    _u0 = double(_texture.cols()) / 2;
+    _v0 = double(_texture.rows()) / 2;
+    double width = params.get<double>("width");
+    double height = params.get<double>("height");
+    _fu = _texture.cols() / width;
+    _fv = _texture.rows() / height;
     _t = xi.trans();
     Matrix3d R = xi.rotMat();
     _ex = R.col(0);

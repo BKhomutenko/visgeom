@@ -17,6 +17,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "json.h"
 #include "ocv.h"
 #include "eigen.h"
 #include "geometry/geometry.h"
@@ -28,7 +29,7 @@ class Plane : public IObject
 {
 public:
 
-    Plane(const Transf & xi, const Mat8u & img);
+    Plane(const ptree & params);
     
     virtual ~Plane();
     

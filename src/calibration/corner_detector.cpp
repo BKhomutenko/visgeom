@@ -84,6 +84,7 @@ CornerDetector::CornerDetector(const Mat8u & img, const int initRadius) : //: _i
     _img(img.rows, img.cols, CV_32F),
     INIT_RADIUS(initRadius)
 {
+    //TODO instead of derivating the whole image, pass just a small patch to the optimization
     Sobel(img, _gradx, CV_32F, 1, 0, 3, 1e-3);
     Sobel(img, _grady, CV_32F, 0, 1, 3, 1e-3);
     img.copyTo(_img);
@@ -159,6 +160,7 @@ void CornerDetector::initPoin(const Vector2d & pt, double * data) const
     circle.k1 = pt[0] * pt[0] + pt[1] * pt[1] - INIT_RADIUS * INIT_RADIUS;
     
     Vector2i pti = round(pt);
+    Vector2i pt0(pti[0] + INIT_RADIUS, pti[1]);
     CurveRasterizer<int, Polynomial2> raster(pti[0] + INIT_RADIUS, pti[1],
                                              pti[0], pti[1] + INIT_RADIUS, circle);
     //////////
@@ -167,19 +169,29 @@ void CornerDetector::initPoin(const Vector2d & pt, double * data) const
 //    _img.copyTo(img);
 //    cout << img.size() << endl;
 
+    //TODO replace with central differences
     //go along the circle and save the transition strengths
+    vector<double> sampleVec;
     vector<double> transitionVec;
     Vector2iVec circleVec;
     for (int i = 0; i < ceil(2 * INIT_RADIUS * M_PI); i++, raster.step())
     {
-        Vector2d r(raster.u - pti[0], raster.v - pti[1]);
-        Vector2d g(_gradx(raster.v, raster.u), _grady(raster.v, raster.u));
-        transitionVec.push_back(g[0] * r[1] - g[1] * r[0]);
+        if (i > 5) //check whether whe have done a lap
+        {
+            // the actual point is in the neighborhood of the initial point?
+            if (abs(raster.u - pt0[0]) <= 1 and abs(raster.v - pt0[1]) <= 1) break;
+        }
+        sampleVec.push_back(_img(raster.v, raster.u));
         circleVec.emplace_back(raster.u, raster.v);
-        
-        /////////
-//        img(raster.v, raster.u) = 0;
-
+    }
+    //differentiate using the central differences
+    const int sampleCount = sampleVec.size();
+    transitionVec.resize(sampleCount);
+    for (int i = 0; i < sampleCount; i++)
+    {
+        int idx1 = (i + sampleCount - 1) % sampleCount;
+        int idx2 = (i + 1) % sampleCount;
+        transitionVec[i] = 0.5 * (sampleVec[idx2] - sampleVec[idx1]);
     }
     
     ////find the max elements

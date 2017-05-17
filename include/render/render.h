@@ -17,6 +17,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "json.h"
 #include "std.h"
 #include "ocv.h"
 #include "eigen.h"
@@ -28,18 +29,18 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 class Renderer
 {
 public:
-    Renderer(const ICamera * camera);
+    Renderer(const ptree & params);
         
     virtual ~Renderer();
   
     void setCameraTransform(const Transf & xi);
+    void setCameraParams(const double * params);
     
     //TODO put to a cpp file
     void fillBuffers();
     
     void fillImage(Mat8u & dst);
     
-//private:
     vector<IObject * > _objectVec;
     ICamera * _camera;
     
@@ -47,5 +48,6 @@ public:
     Mat16s _idxMat;
     Mat32f _uMat, _vMat, _depthMat;
     Transf _xiCam;
+    int _width, _height;
 };
 

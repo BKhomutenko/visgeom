@@ -69,15 +69,14 @@ public:
                 double fv, fvu, fvv;
                 gradvInter.Evaluate(vi , ui,
                             &fv, &fvv, &fvu);
-////                cout << fvu << "  " << fuv << endl;            
-                *cost += eta*(fu * s - fv * c);
+                *cost += eta*(fv * c - fu * s);
                 if (gradient != NULL)
                 {
-                    gradient[0] += eta * (fuu * s - fvu * c);
-                    gradient[1] += eta * (fuv * s - fvv * c);
-                    gradient[thIdx] += eta * (-fuu * length * s * s - fvv * length * c * c  
-                                    + (fuv + fvu) * length * s * c
-                                    + fu * c + fv * s);
+                    gradient[0] += eta * (fvu * c - fuu * s);
+                    gradient[1] += eta * (fvv * c - fuv * s);
+                    gradient[thIdx] += eta * (fuu * length * s * s + fvv * length * c * c  
+                                    - (fuv + fvu) * length * s * c
+                                    - fu * c - fv * s);
                 }
             }
         }

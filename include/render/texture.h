@@ -30,11 +30,13 @@ public:
 
     uchar sample(const Vector2d & pt, const Matrix2d & basis) const;
 
+
     int cols() const { return _textureMat.cols; }
     int rows() const { return _textureMat.rows; }
     
     const Mat8u _textureMat;
     const Grid2D<uchar> _grid;
     const BiCubicInterpolator<Grid2D<uchar>> _interpolator;
+    
 };
 
