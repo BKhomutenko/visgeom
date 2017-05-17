@@ -37,7 +37,7 @@ RenderDevice::RenderDevice(const ptree & params) :
     
     _objectVec.push_back( new Background(params.get_child("background")) );
     
-    for (auto & objParams : params.get_child("plains"))
+    for (auto & objParams : params.get_child("planes"))
     {
         _objectVec.push_back( new Plane(objParams.second) );
     }
