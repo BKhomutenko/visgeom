@@ -38,6 +38,7 @@ using cv::Mat_;
 using cv::MatND;
 using Mat32f = Mat_<float>;
 using Mat8u = cv::Mat_<uint8_t>;
+using Mat8uc3 = cv::Mat_<cv::Vec3b>;
 using Mat16s = cv::Mat_<int16_t>;
 using Mat32s = cv::Mat_<int32_t>;
 

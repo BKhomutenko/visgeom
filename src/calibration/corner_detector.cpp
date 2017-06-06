@@ -20,8 +20,77 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "eigen.h"
 #include "ceres.h"
 #include "ocv.h"
+#include "io.h"
 
 #include "utils/curve_rasterizer.h"
+
+//SubpixelCorner function definition
+
+SubpixelCorner::SubpixelCorner(const Mat32f & gradu, const Mat32f & gradv, const int steps, const double length) :    
+            _graduGrid(gradu.cols, gradu.rows, (float*)gradu.data),
+            _gradvGrid(gradv.cols, gradv.rows, (float*)gradv.data),
+            _stepLength(length / steps)
+{
+    stepVec.reserve(2*steps);
+    for (int i = 1; i <= steps; i++)
+    {
+        stepVec.push_back(-i * _stepLength);
+        stepVec.push_back(i * _stepLength);
+    }
+}
+            
+bool SubpixelCorner::Evaluate(const double* parameters,
+                    double* cost,
+                    double* gradient) const 
+{
+    const double & u = parameters[0];
+    const double & v = parameters[1];
+    
+    //TODO possibly merge
+    *cost = 0;
+    if (gradient != NULL) fill(gradient, gradient + 5, 0.);
+    
+    ceres::BiCubicInterpolator<Grid2D<float>> graduInter(_graduGrid);
+    ceres::BiCubicInterpolator<Grid2D<float>> gradvInter(_gradvGrid);
+    for (int direction = 0; direction < 2; direction++)
+    {
+        int thIdx = 2 + direction;
+        const double s = sin(parameters[thIdx]);
+        const double c = cos(parameters[thIdx]);
+        const double & h = parameters[4];
+        double flowDir = direction ? 1 : -1;
+        
+        for (double length : stepVec)
+        {
+            double eta = (length > 0 ? 1 : -1) * flowDir;
+            double ui = u + c * length - s * h * eta;
+            double vi = v + s * length + c * h * eta;
+            
+            double fu, fuu, fuv;
+            graduInter.Evaluate(vi , ui,
+                        &fu, &fuv, &fuu);
+            double fv, fvu, fvv;
+            gradvInter.Evaluate(vi , ui,
+                        &fv, &fvv, &fvu);
+            *cost += eta*(fv * c - fu * s);
+            if (gradient != NULL)
+            {
+                double dudth = -s * length - c * h * eta;
+                double dvdth = c * length - s * h * eta;
+                gradient[0] += eta * (fvu * c - fuu * s);
+                gradient[1] += eta * (fvv * c - fuv * s);
+                gradient[thIdx] += eta * ( (fvv * dvdth + fvu * dudth) * c 
+                                - (fuv * dvdth  + fuu * dudth) * s
+                                - fu * c - fv * s );
+                gradient[4] += fvv * c * c + fuu * s * s - s * c * (fvu + fuv); 
+            }
+        }
+    }
+    return true;
+}
+
+
+
 
 double findMinDistance(const Vector2dVec & cornerVec, const int rows, const int cols)
 {
@@ -48,13 +117,49 @@ double findMinDistance(const Vector2dVec & cornerVec, const int rows, const int 
     return sqrt(res);
 }
 
+void detected(Mat& img, const array<double, 5> & data, int size, 
+        const Scalar& color, const double scale=1, int thickness=1, int lineType=8, int shift=0)
+{
+    for (int direction = 0; direction < 2; direction++)
+    {
+    const double s = sin(data[2 + direction]);
+    const double c = cos(data[2 + direction]);
+    double u11 = data[0] - s * data[4];
+    double u12 = data[0] + c * size - s * data[4];
+    
+    double v11 = data[1] + c * data[4];
+    double v12 = data[1] + s * size + c * data[4];
+    
+    line(img, Point(u11*scale + 0.5 * scale, v11*scale+ 0.5 * scale),
+            Point(u12*scale+ 0.5 * scale, v12*scale+ 0.5 * scale),
+            color, thickness, lineType, shift);
+            
+    double u21 = data[0] + s * data[4];
+    double u22 = data[0] - c * size + s * data[4];
+    
+    double v21 = data[1] - c * data[4];
+    double v22 = data[1] - s * size - c * data[4];
+    
+    line(img, Point(u21*scale+ 0.5 * scale, v21*scale+ 0.5 * scale),
+            Point(u22*scale+ 0.5 * scale, v22*scale+ 0.5 * scale),
+            color, thickness, lineType, shift);
+    }
+}
+
+//CornerDetector function definition
+
 void CornerDetector::improveCorners(Vector2dVec & pointVec) const
 {
+//    Mat8uc3 img(_img.size());
+//    cvtColor(_img, img, CV_GRAY2BGR);
+//    resize(img, img, Size(0, 0), 4.5, 4.5);
+    
     for (auto & x : pointVec)
     {
-        array<double, 4> dataArr;
+        array<double, 5> dataArr;
         initPoin(x, dataArr.data());
         
+//        detected(img, dataArr, 15, Scalar(255, 200), 4.5);
         ceres::GradientProblem problem(new SubpixelCorner(_gradx, _grady));
         ceres::GradientProblemSolver::Options options;
 //        options.line_search_direction_type = ceres::NONLINEAR_CONJUGATE_GRADIENT;
@@ -72,78 +177,32 @@ void CornerDetector::improveCorners(Vector2dVec & pointVec) const
 //            << dataArr[1] << "   "
 //            << dataArr[2] << "   "
 //            << dataArr[3] << endl;
-            
+        /////////////
+//        detected(img, dataArr, 15, Scalar(0, 200, 255), 4.5);
+        
+        
+        
+//        
+//        cout << dataArr[4] << endl;
+//        imshow("transitions", img);
+//    waitKey();
+           
         x[0] = dataArr[0];
         x[1] = dataArr[1];
     }
+    
 }
 
 CornerDetector::CornerDetector(const Mat8u & img, const int initRadius) : //: _img(img)
-    _gradx(img.rows, img.cols, CV_32F),
-    _grady(img.rows, img.cols, CV_32F),
-    _img(img.rows, img.cols, CV_32F),
+    _gradx(img.rows, img.cols),
+    _grady(img.rows, img.cols),
+    _img(img.rows, img.cols),
     INIT_RADIUS(initRadius)
 {
     //TODO instead of derivating the whole image, pass just a small patch to the optimization
     Sobel(img, _gradx, CV_32F, 1, 0, 3, 1e-3);
     Sobel(img, _grady, CV_32F, 0, 1, 3, 1e-3);
     img.copyTo(_img);
-//    Mat32f Ixx(img.rows, img.cols, CV_32F), Ixy(img.rows, img.cols, CV_32F);
-//    Mat32f Iyx(img.rows, img.cols, CV_32F), Iyy(img.rows, img.cols, CV_32F);
-//    
-//    img.convertTo(_img, CV_32F);
-//    Grid2D imgGrid(_img.cols, _img.rows, (float*)_img.data);
-//    ceres::BiCubicInterpolator<Grid2D> imgInter(imgGrid);
-//    for (int r = 0; r < img.rows; r++)
-//    {
-//        for (int c = 0; c < img.cols; c++)
-//        {
-//            double foo, fx, fy;
-//            imgInter.Evaluate(r, c, &foo, &fy, &fx);
-//            _gradx(r, c) = fx / 10;
-//            _grady(r, c) = fy / 10;
-//        }
-//    }
-//    
-//    const double delta = 0.5;
-//    
-//    //Ixx Ixy
-//    Grid2D gxGrid(_img.cols, _img.rows, (float*)_gradx.data);
-//    ceres::BiCubicInterpolator<Grid2D> gxInter(gxGrid);
-//    for (int r = 0; r < img.rows; r++)
-//    {
-//        for (int c = 0; c < img.cols; c++)
-//        {
-//            double foo, fx, fy;
-//            gxInter.Evaluate(r + delta, c + delta, &foo, &fy, &fx); 
-//            Ixy(r, c) = fy+0.5;
-//            Ixx(r, c) = fx+0.5;
-//        }
-//    }
-//    
-//    //Iyx Iyy
-//    Grid2D gyGrid(_img.cols, _img.rows, (float*)_grady.data);
-//    ceres::BiCubicInterpolator<Grid2D> gyInter(gyGrid);
-//    for (int r = 0; r < img.rows; r++)
-//    {
-//        for (int c = 0; c < img.cols; c++)
-//        {
-//            double foo, fx, fy;
-//            gyInter.Evaluate(r + delta, c + delta, &foo, &fy, &fx); 
-//            Iyy(r, c) = fy+0.5;
-//            Iyx(r, c) = fx+0.5;
-//        }
-//    }
-//    
-//    imshow("img", img);
-//    imshow("gradx", _gradx);
-//    imshow("grady", _grady);
-//    
-//    imshow("Ixy", Ixy);
-//    imshow("Iyx", Iyx);
-//    imshow("err", Iyx - Ixy + 0.5);
-//    
-//    waitKey();
 }
 
 void CornerDetector::initPoin(const Vector2d & pt, double * data) const
@@ -164,11 +223,7 @@ void CornerDetector::initPoin(const Vector2d & pt, double * data) const
     CurveRasterizer<int, Polynomial2> raster(pti[0] + INIT_RADIUS, pti[1],
                                              pti[0], pti[1] + INIT_RADIUS, circle);
     //////////
-//    Mat32f img(_img.size());
-//    
-//    _img.copyTo(img);
-//    cout << img.size() << endl;
-
+    
     //TODO replace with central differences
     //go along the circle and save the transition strengths
     vector<double> sampleVec;
@@ -224,7 +279,6 @@ void CornerDetector::initPoin(const Vector2d & pt, double * data) const
     }
     
     ////find the min elements
-    
     auto minIter1 = min_element(transitionVec.begin(), transitionVec.end());
     
     //find the min element on the other side of the circle
@@ -254,22 +308,12 @@ void CornerDetector::initPoin(const Vector2d & pt, double * data) const
     }
     
     
-    
     //compute the angles and the intersection of the lines
     Vector2i A = circleVec[maxIdx1];
     Vector2i B = circleVec[minIdx1];
     Vector2i C = circleVec[maxIdx2];
     Vector2i D = circleVec[minIdx2];
     
-    ///////////////
-//    img(A[1], A[0]) = 255;
-//    img(B[1], B[0]) = 255;
-//    img(C[1], C[0]) = 255;
-//    img(D[1], D[0]) = 255;
-//    
-//    imshow("transitions", img / 255);
-//    waitKey();
-
     //to find the intersection E we solve:
     // {AC x AE = 0
     // {BD x BE = 0 
@@ -286,8 +330,7 @@ void CornerDetector::initPoin(const Vector2d & pt, double * data) const
     data[1] = E[1];
     data[2] = atan2(A[1] - C[1], A[0] - C[0]);
     data[3] = atan2(B[1] - D[1], B[0] - D[0]);
+    data[4] = 0;
 }
-    
-//    Mat32f _gradx, _grady;
-//    Mat8u _img;
+
     

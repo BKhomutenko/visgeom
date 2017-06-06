@@ -74,7 +74,13 @@ void RenderDevice::setCamera(const ICamera * camera)
     {
         delete _camera;
     }
-    _camera = camera->clone();
+    _camera = camera->clone(); //TODO check the size and reinit the buffers
+}
+
+void RenderDevice::render(Mat8u & dst)
+{
+    fillBuffers();
+    fillImage(dst);
 }
 
 void RenderDevice::fillBuffers() 

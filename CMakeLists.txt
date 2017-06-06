@@ -139,6 +139,7 @@ add_executable( renderer_test
 
 target_link_libraries( renderer_test 
     render
+    reconstruction
     ${OpenCV_LIBS} 
 )
 

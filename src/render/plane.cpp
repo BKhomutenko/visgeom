@@ -45,7 +45,7 @@ bool Plane::intersection(const Vector3d & pos, const Vector3d & dir,
     double lambdaNum = _ez.dot(_t - pos);
     double lambdaDen = _ez.dot(dir);
     
-    if (lambdaDen < 0.01 ) //TODO condition to rewise, perhaps define the literal elswhere
+    if (lambdaDen * lambdaNum < 0.01) //TODO condition to rewise, perhaps define the literal elswhere
     {
         return false;
     }

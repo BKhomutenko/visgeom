@@ -164,6 +164,11 @@ void GenericCameraCalibration::initTransformChainInfo(ImageData & data, const pt
         if (flagName == "check_extraction") data.checkExtraction = true;
         else if (flagName == "improve_detection") data.improveDetection = true;
         else if (flagName == "show_outliers") data.showOutliers = true;
+        else if (flagName == "draw_improved") 
+        {
+            data.drawImproved = true;
+            data.drawScale = node.get<double>("draw_scale");
+        }
         else
         {
             cout << "WARNING : UNKNOWN FLAG -- " << flagName << endl;
@@ -666,9 +671,10 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
 //            F0310 19:01:41.823675  1227 cubic_interpolation.h:72] Check failed: x >= 0.0 (-nan vs. 0) 
 //*** Check failure stack trace: ***
 //Aborted (core dumped)
-
-            drawChessboardCorners(frame, patternSize, Mat(centers), patternIsFound);
-            imshow("corners", frame);
+            Mat8uc3 cornerImg;
+            cvtColor(frame, cornerImg, CV_GRAY2BGR);
+            drawChessboardCorners(cornerImg, patternSize, Mat(centers), patternIsFound);
+            imshow("corners", cornerImg);
             char key = waitKey();
             if (key == 'n' or key == 'N')
             {
@@ -679,16 +685,39 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
         
         auto & cornerVec = data.detectedCornersVec.back();
         cornerVec.reserve(centers.size());
+        
+        Mat8uc3 cornerImg;
+        const double & K = data.drawScale;
+        if (data.drawImproved)
+        {
+            cvtColor(frame, cornerImg, CV_GRAY2BGR);
+            resize(cornerImg, cornerImg, Size(0, 0), K, K);
+        }
         for (auto pt : centers)
         {
             cornerVec.emplace_back(pt.x, pt.y);
+            if (data.drawImproved) 
+            {
+                cross(cornerImg, Point(pt.x * K + 0.5*K, pt.y * K + 0.5*K), 25, Scalar(255, 0, 0), 3);
+            }
         }
+        
         
         if (data.improveDetection)
         {
             double minDist = findMinDistance(cornerVec, data.Ny, data.Nx);
             CornerDetector detector(frame, min(minDist / 2., 15.));
             detector.improveCorners(cornerVec);
+        }
+        
+        if (data.drawImproved) 
+        {
+            for (auto pt : cornerVec)
+            {
+                cross(cornerImg, Point(pt[0] * K + 0.5*K, pt[1] * K + 0.5*K), 25, Scalar(0, 0, 255), 3);
+            }
+            imshow("corners", cornerImg);
+            waitKey();
         }
     }
     cout << endl;
@@ -738,8 +767,8 @@ void GenericCameraCalibration::computeTransforms(const ImageData & data, vector<
     }
 }
 
-//TODO put elsewhere
-void cross(Mat& img, Point pt, int size, const Scalar& color, int thickness=1, int lineType=8, int shift=0)
+//TODO put to ocv?
+void cross(Mat& img, Point pt, int size, const Scalar& color, int thickness, int lineType, int shift)
 {
     line(img, Point(pt.x - size, pt.y - size),
             Point(pt.x + size, pt.y + size),
@@ -795,7 +824,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
             }
         }
         
-        if (data.showOutliers and not outlierVec.empty()) //TODO make a flag to display the outliers
+        if (data.showOutliers and not outlierVec.empty())
         {
             cout << data.imageNameVec[transfIdx] << endl;
             cout << "standard deviation : " << sigma << endl;

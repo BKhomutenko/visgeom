@@ -25,68 +25,17 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 class SubpixelCorner : public ceres::FirstOrderFunction 
 {
 public:
-    SubpixelCorner(const Mat32f & gradu, const Mat32f & gradv, const int steps = 7, const double length = 7) :    
-            _graduGrid(gradu.cols, gradu.rows, (float*)gradu.data),
-            _gradvGrid(gradv.cols, gradv.rows, (float*)gradv.data)
-    {
-        double stepLength = length / steps;
-        stepVec.reserve(2*steps - 2);
-        for (int i = 1; i <= steps; i++)
-        {
-            stepVec.push_back(-i * stepLength);
-            stepVec.push_back(i * stepLength);
-        }
-    }
+    SubpixelCorner(const Mat32f & gradu, const Mat32f & gradv, const int steps = 7, const double length = 7);
             
-    virtual bool Evaluate(const double* parameters,
+    bool Evaluate(const double* parameters,
                         double* cost,
-                        double* gradient) const 
-    {
-        const double & u = parameters[0];
-        const double & v = parameters[1];
-        
-        //TODO possibly merge
-        *cost = 0;
-        if (gradient != NULL) fill(gradient, gradient + 4, 0.);
-        
-        ceres::BiCubicInterpolator<Grid2D<float>> graduInter(_graduGrid);
-        ceres::BiCubicInterpolator<Grid2D<float>> gradvInter(_gradvGrid);
-        for (int direction = 0; direction < 2; direction++)
-        {
-            int thIdx = 2 + direction;
-            const double s = sin(parameters[thIdx]);
-            const double c = cos(parameters[thIdx]);
-            double flowDir = direction ? 1 : -1;
-            for (int length : stepVec)
-            {
-                double eta = (length > 0 ? 1 : -1) * flowDir;
-                double ui = u + c * length;
-                double vi = v + s * length;
-                
-                double fu, fuu, fuv;
-                graduInter.Evaluate(vi , ui,
-                            &fu, &fuv, &fuu);
-                double fv, fvu, fvv;
-                gradvInter.Evaluate(vi , ui,
-                            &fv, &fvv, &fvu);
-                *cost += eta*(fv * c - fu * s);
-                if (gradient != NULL)
-                {
-                    gradient[0] += eta * (fvu * c - fuu * s);
-                    gradient[1] += eta * (fvv * c - fuv * s);
-                    gradient[thIdx] += eta * (fuu * length * s * s + fvv * length * c * c  
-                                    - (fuv + fvu) * length * s * c
-                                    - fu * c - fv * s);
-                }
-            }
-        }
-        return true;
-    }
+                        double* gradient) const;
 
-    virtual int NumParameters() const { return 4; }
+    virtual int NumParameters() const { return 5; }
 
     const Grid2D<float> _graduGrid, _gradvGrid;
     vector<double> stepVec;
+    const double _stepLength;
 };
 
 double findMinDistance(const Vector2dVec & cornerVec, const int rows, const int cols);
@@ -104,8 +53,8 @@ public:
     
 private:
     Mat32f _gradx, _grady;
-    Mat32f _img;
-//    Mat8u _img;
+//    Mat32f _img;
+    Mat8u _img;
     
     const int INIT_RADIUS;
     

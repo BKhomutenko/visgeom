@@ -35,8 +35,11 @@ public:
   
     void setCameraTransform(const Transf & xi);
     void setCamera(const ICamera * camera);
+    void render(Mat8u & dst);
     
-    //TODO put to a cpp file
+    const Mat32f & getDepthBuffer() const { return _depthMat; }
+    
+private:
     void fillBuffers();
     
     void fillImage(Mat8u & dst);

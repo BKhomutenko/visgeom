@@ -37,7 +37,7 @@ public:
 
     void simulationStep(const double timeStep);
     
-    void getImage(Mat8u & dst, int cameraIdx = 0);
+    void renderImage(RenderDevice & renderDevice, Mat8u & dst, int cameraIdx = 0);
     
     void fillBuffers();
     
@@ -46,7 +46,6 @@ public:
     vector<ICamera*> _cameraVec;
     vector<Transf> _xiBaseCamVec;
     Transf _xiOrigBase;
-    
-    Renderer _renderDevice;
+    Vector3d _v, _omega;
 };
 
