@@ -22,7 +22,6 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "geometry/geometry.h"
 #include "projection/eucm.h"
-#include "utils/image_generator.h"
 #include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 #include "reconstruction/eucm_motion_stereo.h"

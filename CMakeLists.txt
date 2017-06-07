@@ -103,15 +103,6 @@ target_link_libraries( subpixel
     ${Boost_LIBRARIES}
 )
 
-#add_executable(generate
-#    test/calibration/generate_board.cpp
-#)
-
-#target_link_libraries( generate
-#    calibration
-#    ${OpenCV_LIBS}  
-#)
-
 ### RECONSTRUCTION ###
 
 add_executable( equalizer_test 
@@ -121,17 +112,6 @@ add_executable( equalizer_test
 target_link_libraries( equalizer_test
     ${OpenCV_LIBS} 
 )
-
-#add_executable( synthetic_planar 
-#    test/reconstruction/synthetic_planar.cpp
-#)
-
-#target_link_libraries( synthetic_planar 
-#    utils
-#    reconstruction
-#    ${OpenCV_LIBS} 
-#)
-
 
 add_executable( renderer_test 
     test/reconstruction/renderer_test.cpp
