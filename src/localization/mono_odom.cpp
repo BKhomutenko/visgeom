@@ -30,16 +30,38 @@ Relative camera pose estimation based on photometric error and depth map
 #include "reconstruction/depth_map.h"
 #include "reconstruction/eucm_motion_stereo.h"
 
-    
+#include "localization/sparse_odom.h"
+   
 void MonoOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
 {
     switch (keyframeState)
     {
-    case STATE_EMPTY:
+    case STATE_BEGIN:
+        //the starting point
+        _xiLocal = Transf(0, 0, 0, 0, 0, 0);
         _xiOdom = xiOdomNew;
         motionStereo.setBaseImage(imageNew);
-        keyframeState = STATE_READY;   
-        break;     
+        sparseOdom.feedData(imageNew, _xiLocal);
+        keyframeState = STATE_SPARSE_INIT;   
+        break;    
+    case STATE_SPARSE_INIT:
+        //wait until the distance is sucfficient to do the saprce initialization
+        _xiLocal = _xiLocal.composeInverse(_xiOdom).compose(xiOdomNew);
+        if (MIN_INIT_DIST <= _xiLocal.trans().norm())
+        {
+            //compute accurate motion estimation
+            sparseOdom.feedData(imageNew, _xiLocal);
+            _xiLocal = _xiOdom.sparseOdom.getIncrement();
+            //compute the initial depth estimation
+            
+            //set SGM stereo base
+            
+            //compute SGM stereo
+    
+            //go to the next state
+            keyframeState = STATE_READY;
+        }
+        break; 
     case STATE_READY:
         //integrate WO
         _xiLocal = _xiLocal.composeInverse(_xiOdom).compose(xiOdomNew);

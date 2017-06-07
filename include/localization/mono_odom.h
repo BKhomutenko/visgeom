@@ -35,7 +35,6 @@ Relative camera pose estimation based on photometric error and depth map
 const double MIN_INIT_DIST = 0.25;   // minimal distance traveled befor VO is used
 const double MIN_STEREO_BASE = 0.05; // minimal acceptable stereo base
 
-
 class MonoOdometry
 {
 public:
@@ -43,6 +42,7 @@ public:
                 Transf xiBaseCam,
                 MotionStereoParameters params):
     _xiBaseCam(xiBaseCam),
+    sparseOdom(camera, xiBaseCam),
     motionStereo(camera, camera, params),
     photometricLocalizer(5, camera),
     depthState(STATE_EMPTY),
@@ -72,12 +72,13 @@ public:
     Transf _xiBaseCam; // extrinsic calibration
     DepthMap depthMap; 
 
-    enum DataState {STATE_EMPTY, STATE_READY};
+    enum DataState {STATE_BEGIN, STATE_SPARSE_INIT, STATE_READY};
 
     DataState depthState;
     DataState keyframeState;
     
     //utils
+    SparseOdometry sparseOdom;
     MotionStereo motionStereo;
     ScalePhotometric photometricLocalizer;
 };
