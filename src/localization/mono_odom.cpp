@@ -32,22 +32,30 @@ Relative camera pose estimation based on photometric error and depth map
 
 #include "localization/sparse_odom.h"
    
-void MonoOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
+void MonoOdometry::feedWheelOdometry(const Transf xiOdomNew)
+{
+    //integrate
+    _xiLocal = _xiLocal.composeInverse(_xiOdom).compose(xiOdomNew);
+    
+    //refresh
+    _xiOdom = xiOdomNew;
+}
+
+void MonoOdometry::feedImage(const Mat8u & imageNew)
 {
     switch (keyframeState)
     {
     case STATE_BEGIN:
         //the starting point
         _xiLocal = Transf(0, 0, 0, 0, 0, 0);
-        _xiOdom = xiOdomNew;
+        imageVec.implace_back(imageNew.clone());
         motionStereo.setBaseImage(imageNew);
         sparseOdom.feedData(imageNew, _xiLocal);
         keyframeState = STATE_SPARSE_INIT;   
         break;    
     case STATE_SPARSE_INIT:
         //wait until the distance is sucfficient to do the saprce initialization
-        _xiLocal = _xiLocal.composeInverse(_xiOdom).compose(xiOdomNew);
-        if (MIN_INIT_DIST <= _xiLocal.trans().norm())
+        if (_xiLocal.trans().norm() >= MIN_INIT_DIST)
         {
             //compute accurate motion estimation
             sparseOdom.feedData(imageNew, _xiLocal);
@@ -55,24 +63,18 @@ void MonoOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
             //compute the initial depth estimation
             
             //set SGM stereo base
+            Transf stereoBase = _xiBaseCam.inverseCompose(_xiLocal).compose(_xiBaseCam);
+            EnhancedSGM sgm(_xiLocal, _camera, _camera, _sgmParams);
             
             //compute SGM stereo
-    
+            sgm.compute(imageVec.back(), imageNew, depth);
             //go to the next state
             keyframeState = STATE_READY;
         }
         break; 
     case STATE_READY:
-        //integrate WO
-        _xiLocal = _xiLocal.composeInverse(_xiOdom).compose(xiOdomNew);
-        
-        if (depthState == STATE_READY)
-        {
-            computeVisualOdometry(imageNew);
-            //TODO check conditioning
-        }
-        
-        refineDepth(imageNew);
+        //TODO add code here
+        break;
     }
 }
     
