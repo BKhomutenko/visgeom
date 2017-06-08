@@ -73,7 +73,7 @@ int main(int argc, char** argv)
 
     
     
-    SGMParameters stereoParams;
+    SgmParameters stereoParams;
     stereoParams.verbosity = 3;
     stereoParams.salientPoints = false;
     paramFile >> stereoParams.u0;
@@ -108,7 +108,7 @@ int main(int argc, char** argv)
         
         Mat8u img2 = imread(imageDir + imageName, 0);
 
-        EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
+        EnhancedSgm stereo(TleftRight, &camera, &camera, stereoParams);
 
         DepthMap depth;
         auto t2 = clock();

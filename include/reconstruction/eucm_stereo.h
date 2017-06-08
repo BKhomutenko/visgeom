@@ -27,7 +27,7 @@ NOTE:
 
 #include "std.h"
 #include "eigen.h"
-
+#include "json.h"
 #include "geometry/geometry.h"
 #include "projection/eucm.h"
 
@@ -39,17 +39,20 @@ NOTE:
 
 struct StereoParameters : public ScaleParameters
 {
-    StereoParameters() {}
+//    StereoParameters() {}
     StereoParameters(const ScaleParameters & scaleParams) : ScaleParameters(scaleParams) {}
+    
+    StereoParameters(const ptree & params);
     
     int dispMax = 48;
   
     int maxError = 25;
-    int maxBias = 10;
+//    int maxBias = 10;
     
     int verbosity = 0;
 
     //multi-hypoteses
+    //TODO remove?
     int hypMax = 1;
     int maxHypDiff = 10;
     

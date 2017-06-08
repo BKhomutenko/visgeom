@@ -66,7 +66,7 @@ int main(int argc, char** argv)
     
     string prefix = root.get<string>("prefix");
     
-    vector<double> intrinsic = readVector(root.get_child("intrinsic"));
+    vector<double> intrinsic = readVector<double>(root.get_child("intrinsic"));
     EnhancedCamera camera(intrinsic.data());
     
     /************************/

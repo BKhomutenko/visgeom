@@ -28,6 +28,7 @@ NOTE:
 #include "std.h"
 #include "ocv.h"
 #include "eigen.h"
+#include "json.h"
 
 #include "geometry/geometry.h"
 #include "projection/eucm.h"
@@ -37,8 +38,22 @@ NOTE:
 #include "reconstruction/depth_map.h"
 #include "reconstruction/eucm_stereo.h"
 
-struct SGMParameters : public StereoParameters
+struct SgmParameters : public StereoParameters
 {
+    SgmParameters(const ptree & params):
+            StereoParameters(params)
+    {
+        for (auto & item : params.get_child("sgm_stereo_parameters"))
+        {
+            const string & pname = item.first;
+            if (pname == "step_cost")               lambdaStep = item.second.get_value<int>();
+            else if (pname == "jump_cost")          lambdaJump = item.second.get_value<int>();
+            else if (pname == "image_based_cost")       imageBasedCost = item.second.get_value<bool>();
+            else if (pname == "salient_points_only")    salientPoints = item.second.get_value<bool>();
+            else if (pname == "use_uv_cache")           useUVCache = item.second.get_value<bool>();
+        }
+    }
+    
     // cost parameters
     int lambdaStep = 5;
     int lambdaJump = 32;
@@ -50,16 +65,17 @@ struct SGMParameters : public StereoParameters
     //all non-salient points are discarded
     bool salientPoints = true;
     
+    //precompute all the epipolar curves
     bool useUVCache = true;
 };
 
 //TODO revamp, take MotionStereo as a model
-class EnhancedSGM : private EnhancedStereo
+class EnhancedSgm : private EnhancedStereo
 {
 public:
     
-    EnhancedSGM(Transf T12, const EnhancedCamera * cam1,
-            const EnhancedCamera * cam2, const SGMParameters & params) :
+    EnhancedSgm(Transf T12, const EnhancedCamera * cam1,
+            const EnhancedCamera * cam2, const SgmParameters & params) :
             EnhancedStereo(cam1, cam2, params),
             _params(params)
     { 
@@ -72,7 +88,7 @@ public:
         if (params.useUVCache) computeUVCache();
     }
     
-    virtual ~EnhancedSGM()
+    virtual ~EnhancedSgm()
     {
     }
     
@@ -153,6 +169,6 @@ private:
     Mat32s _finalErrorMat;
     
     
-    const SGMParameters _params;
+    const SgmParameters _params;
 };
 

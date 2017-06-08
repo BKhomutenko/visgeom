@@ -54,6 +54,7 @@ add_library( reconstruction STATIC
     src/reconstruction/eucm_epipolar.cpp
     src/reconstruction/depth_map.cpp
     src/reconstruction/triangulator.cpp
+    src/reconstruction/scale_parameters.cpp
 )
 
 target_link_libraries( reconstruction ${OpenCV_LIBS} )
@@ -123,7 +124,7 @@ target_link_libraries( renderer_test
     ${OpenCV_LIBS} 
 )
 
-
+# TODO eventually remove
 #add_executable( sgm_synthetic_planar 
 #    test/reconstruction/sgm_synthetic_planar.cpp
 #)
@@ -134,14 +135,15 @@ target_link_libraries( renderer_test
 #    ${OpenCV_LIBS} 
 #)
 
-add_executable( stereo 
-    test/reconstruction/stereo_test.cpp
-)
+# TODO eventually remove
+#add_executable( stereo 
+#    test/reconstruction/stereo_test.cpp
+#)
 
-target_link_libraries( stereo 
-    reconstruction
-    ${OpenCV_LIBS} 
-)
+#target_link_libraries( stereo 
+#    reconstruction
+#    ${OpenCV_LIBS} 
+#)
 
 add_executable( epipolar 
     test/reconstruction/epipolar_trace.cpp
@@ -162,24 +164,26 @@ target_link_libraries( descriptor_step
     ${OpenCV_LIBS} 
 )
 
+# TODO eventually remove
+#add_executable( multistereo 
+#    test/reconstruction/stereo_multibase.cpp
+#)
 
-add_executable( multistereo 
-    test/reconstruction/stereo_multibase.cpp
-)
+#target_link_libraries( multistereo 
+#    reconstruction
+#    ${OpenCV_LIBS} 
+#)
 
-target_link_libraries( multistereo 
-    reconstruction
-    ${OpenCV_LIBS} 
-)
 
-add_executable( generate_plane 
-    test/reconstruction/generate_plane.cpp
-)
+# TODO eventually remove
+#add_executable( generate_plane 
+#    test/reconstruction/generate_plane.cpp
+#)
 
-target_link_libraries( generate_plane 
-    reconstruction
-    ${OpenCV_LIBS} 
-)
+#target_link_libraries( generate_plane 
+#    reconstruction
+#    ${OpenCV_LIBS} 
+#)
 
 
 add_executable( reproject_plane
@@ -200,24 +204,27 @@ target_link_libraries( depth_reconstruct_test
     ${OpenCV_LIBS} 
 )
 
-add_executable( motion_test
-    test/reconstruction/motion_test.cpp
-)
+# TODO eventually remove
+#add_executable( motion_test
+#    test/reconstruction/motion_test.cpp
+#)
 
-target_link_libraries( motion_test 
-    reconstruction
-    ${OpenCV_LIBS} 
-)
+#target_link_libraries( motion_test 
+#    reconstruction
+#    ${OpenCV_LIBS} 
+#)
 
-add_executable( merge_test
-    test/reconstruction/merge_test.cpp
-)
+# TODO eventually remove
+#add_executable( merge_test
+#    test/reconstruction/merge_test.cpp
+#)
 
-target_link_libraries( merge_test 
-    reconstruction
-    ${OpenCV_LIBS} 
-)
+#target_link_libraries( merge_test 
+#    reconstruction
+#    ${OpenCV_LIBS} 
+#)
 
+# TODO eventually remove
 #add_executable( motion_gradual
 #    test/reconstruction/motion_gradual.cpp
 #)
@@ -235,7 +242,8 @@ add_executable( odometry_test
 
 target_link_libraries( odometry_test  
     reconstruction
-    localization 
+    localization
+    render
     ${OpenCV_LIBS}
     ${CERES_LIBRARIES}
     ${Boost_LIBRARIES}

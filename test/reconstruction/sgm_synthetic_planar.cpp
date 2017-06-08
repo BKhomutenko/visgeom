@@ -69,7 +69,7 @@ int main(int argc, char** argv)
 {
     ptree root;
     read_json(argv[1], root);
-    const vector<double> intrinsic = readVector(root.get_child("camera_intrinsics"));
+    const vector<double> intrinsic = readVector<double>(root.get_child("camera_intrinsics"));
     const int width = root.get<int>("image.width");
     const int height = root.get<int>("image.height");
     Transf xiCam0 = readTransform(root.get_child("camera_transform"));
@@ -79,7 +79,7 @@ int main(int argc, char** argv)
     EnhancedCamera camera(width, height, intrinsic.data());
     
     //init stereoParameters
-    SGMParameters stereoParams;
+    SgmParameters stereoParams;
     
     stereoParams.verbosity = root.get<int>("stereo.verbosity");
     stereoParams.salientPoints = true;
@@ -88,7 +88,7 @@ int main(int argc, char** argv)
     stereoParams.dispMax = root.get<int>("stereo.disparity_max");
     stereoParams.scale = root.get<int>("stereo.scale");
     stereoParams.flawCost = root.get<int>("stereo.flaw_cost");
-    stereoParams.scaleVec = readIntVector(root.get_child("stereo.scale_vector"));
+    stereoParams.scaleVec = readVector<int>(root.get_child("stereo.scale_vector"));
     stereoParams.uMax = width;
     stereoParams.vMax = height;
     stereoParams.setEqualMargin();
@@ -142,7 +142,7 @@ int main(int argc, char** argv)
                     img2 -= noise;
                 }
                 Transf TleftRight = xiCam0.inverseCompose(xiCam);
-                EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
+                EnhancedSgm stereo(TleftRight, &camera, &camera, stereoParams);
                 results << TleftRight.trans().norm() << "    ";
                 DepthMap depthStereo;
                 stereo.computeStereo(img1, img2, depthStereo);

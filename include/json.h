@@ -61,28 +61,19 @@ Transformation<T> transformFromData(const vector<T> & valVec)
     }
 }
 
-inline vector<double> readVector(const ptree & node)
+template <typename T>
+vector<T> readVector(const ptree & node)
 {
-    vector<double> valVec;
+    vector<T> valVec;
     for (auto & x : node)
     {
-        valVec.push_back(x.second.get_value<double>());
-    }
-    return valVec;
-}
-
-inline vector<int> readIntVector(const ptree & node)
-{
-    vector<int> valVec;
-    for (auto & x : node)
-    {
-        valVec.push_back(x.second.get_value<int>());
+        valVec.push_back(x.second.get_value<T>());
     }
     return valVec;
 }
 
 inline Transformation<double> readTransform(const ptree & node)
 {
-    return transformFromData(readVector(node));
+    return transformFromData(readVector<double>(node));
 }
 

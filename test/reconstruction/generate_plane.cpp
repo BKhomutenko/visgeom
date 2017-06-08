@@ -89,10 +89,9 @@ int main(int argc, char** argv)
     paramFile.ignore();
     Transformation<double> TbasePlane(cameraPose.data());
     
-    SGMParameters stereoParams;
+    SgmParameters stereoParams;
     stereoParams.verbosity = 2;
     stereoParams.salientPoints = false;
-    stereoParams.maxBias = 8;
     paramFile >> stereoParams.u0;
     paramFile >> stereoParams.v0;
     paramFile >> stereoParams.dispMax;
@@ -128,7 +127,7 @@ int main(int argc, char** argv)
         Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
         
         Mat8u img2 = imread(imageDir + imageName, 0);
-        EnhancedSGM stereo(TleftRight, &camera, &camera, stereoParams);
+        EnhancedSgm stereo(TleftRight, &camera, &camera, stereoParams);
 
         DepthMap depthStereo;
         Mat32f distMat;

@@ -43,15 +43,15 @@ void MonoOdometry::feedWheelOdometry(const Transf xiOdomNew)
 
 void MonoOdometry::feedImage(const Mat8u & imageNew)
 {
-    switch (keyframeState)
+    switch (state)
     {
     case STATE_BEGIN:
         //the starting point
         _xiLocal = Transf(0, 0, 0, 0, 0, 0);
-        imageVec.implace_back(imageNew.clone());
+        imageVec.emplace_back(imageNew.clone());
         motionStereo.setBaseImage(imageNew);
         sparseOdom.feedData(imageNew, _xiLocal);
-        keyframeState = STATE_SPARSE_INIT;   
+        state = STATE_SPARSE_INIT;   
         break;    
     case STATE_SPARSE_INIT:
         //wait until the distance is sucfficient to do the saprce initialization
@@ -59,17 +59,17 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         {
             //compute accurate motion estimation
             sparseOdom.feedData(imageNew, _xiLocal);
-            _xiLocal = _xiOdom.sparseOdom.getIncrement();
+            _xiLocal = sparseOdom.getIncrement();
             //compute the initial depth estimation
             
-            //set SGM stereo base
+            //set Sgm stereo base
             Transf stereoBase = _xiBaseCam.inverseCompose(_xiLocal).compose(_xiBaseCam);
-            EnhancedSGM sgm(_xiLocal, _camera, _camera, _sgmParams);
+            EnhancedSgm sgm(_xiLocal, _camera, _camera, _sgmParams);
             
-            //compute SGM stereo
-            sgm.compute(imageVec.back(), imageNew, depth);
+            //compute Sgm stereo
+            sgm.computeStereo(imageVec.back(), imageNew, depth);
             //go to the next state
-            keyframeState = STATE_READY;
+            state = STATE_READY;
         }
         break; 
     case STATE_READY:
@@ -105,26 +105,26 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
 //    // update the states
 //}
 
-void MonoOdometry::computeVisualOdometry(const Mat8u & imageNew)
-{
-    Transf xiCam12 = _xiBaseCam.inverseCompose(_xiLocal.compose(_xiBaseCam));;
-    
-    photometricLocalizer.depth() = depthMap; //TODO make a method setDepth()
-    
-    photometricLocalizer.computePose(imageNew, xiCam12); //TODO optimize directly xiLocal
-                            //TODO get the covariance matrix
-                            //TODO introduce the odometry prior with its propoer covariance
-    
-    _xiLocal = _xiBaseCam.compose(xiCam12.composeInverse(_xiBaseCam));
-}
+//void MonoOdometry::computeVisualOdometry(const Mat8u & imageNew)
+//{
+//    Transf xiCam12 = _xiBaseCam.inverseCompose(_xiLocal.compose(_xiBaseCam));;
+//    
+//    photometricLocalizer.depth() = depthMap; //TODO make a method setDepth()
+//    
+//    photometricLocalizer.computePose(imageNew, xiCam12); //TODO optimize directly xiLocal
+//                            //TODO get the covariance matrix
+//                            //TODO introduce the odometry prior with its propoer covariance
+//    
+//    _xiLocal = _xiBaseCam.compose(xiCam12.composeInverse(_xiBaseCam));
+//}
 
-void MonoOdometry::refineDepth(const Mat8u & imageNew)
-{
-    Transf xiCam12 = _xiBaseCam.inverseCompose(_xiLocal).compose(_xiBaseCam);
-    double base = xiCam12.trans().norm();
-    if (base < MIN_STEREO_BASE) return; 
-    depthMap = motionStereo.compute(xiCam12, imageNew, depthMap);
-    if (depthState == STATE_EMPTY and base > MIN_INIT_DIST) depthState = STATE_READY;
-}
+//void MonoOdometry::refineDepth(const Mat8u & imageNew)
+//{
+//    Transf xiCam12 = _xiBaseCam.inverseCompose(_xiLocal).compose(_xiBaseCam);
+//    double base = xiCam12.trans().norm();
+//    if (base < MIN_STEREO_BASE) return; 
+//    depthMap = motionStereo.compute(xiCam12, imageNew, depthMap);
+//    if (depthState == STATE_EMPTY and base > MIN_INIT_DIST) depthState = STATE_READY;
+//}
     
 

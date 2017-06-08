@@ -31,6 +31,7 @@ Relative camera pose estimation based on photometric error and depth map
 #include "reconstruction/eucm_motion_stereo.h"
 #include "reconstruction/eucm_sgm.h"
 #include "localization/photometric.h"
+#include "localization/sparse_odom.h"
 
 //TODO make a parameter structure
 const double MIN_INIT_DIST = 0.25;   // minimal distance traveled befor VO is used
@@ -40,16 +41,14 @@ const double MIN_STEREO_BASE = 0.05; // minimal acceptable stereo base
 class MonoOdometry
 {
 public:
-    MonoOdometry(const EnhancedCamera * camera,
-                Transf xiBaseCam,
-                MotionStereoParameters params):
-    _camera(camera->clone()),
-    _xiBaseCam(xiBaseCam),
-    sparseOdom(camera, xiBaseCam),
-    motionStereo(camera, camera, params),
-    photometricLocalizer(5, camera),
-    depthState(STATE_EMPTY),
-    keyframeState(STATE_EMPTY)
+    MonoOdometry(const ptree & params):
+        _xiBaseCam( readTransform(params.get_child("xi_base_camera")) ),
+        _sgmParams(params.get_child("stereo_parameters")),
+        _camera( new EnhancedCamera(readVector<double>(params.get_child("camera_params")).data()) ),
+        sparseOdom(_camera, _xiBaseCam),
+        motionStereo(_camera, _camera, params.get_child("stereo_parameters")),
+        photometricLocalizer(5, _camera),
+        state(STATE_BEGIN)
     {
         photometricLocalizer.setVerbosity(0);
     }
@@ -87,8 +86,8 @@ public:
     DataState state;
     
     //utils
-    //are used to create an SGM object to init the keyframe
-    SGMParameters _sgmParams; 
+    //are used to create an Sgm object to init the keyframe
+    SgmParameters _sgmParams; 
     
     //used to initialize the first transformation
     SparseOdometry sparseOdom;

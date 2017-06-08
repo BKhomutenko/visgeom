@@ -34,7 +34,7 @@ uchar Texture::sample(const Vector2d & pt, const Matrix2d & basis) const
     const LookupFilter &  filter = LookupFilter::instance();
     int nu = min(max(round(eu.norm() * filter.getRadius()), 1.), 24.); //FIXME make mipmap
     int nv = min(max(round(ev.norm() * filter.getRadius()), 1.), 24.);
-    if (nu == 1 and nv == 1 or 1) 
+    if (nu == 1 and nv == 1) 
     {
         _interpolator.Evaluate(pt[1], pt[0], &res, NULL, NULL);
 //        res = bilinear<double>(_textureMat, pt[0], pt[1]);

@@ -29,7 +29,7 @@ int main(int argc, char** argv)
 {
     ptree root;
     read_json(argv[1], root);
-    const vector<double> intrinsic = readVector(root.get_child("camera_intrinsics"));
+    const vector<double> intrinsic = readVector<double>(root.get_child("camera_intrinsics"));
     const int width = root.get<int>("image.width");
     const int heigth = root.get<int>("image.height");
     Transf xiCam0 = readTransform(root.get_child("camera_transform"));

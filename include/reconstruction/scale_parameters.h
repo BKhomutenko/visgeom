@@ -25,55 +25,33 @@ NOTE:
 
 #pragma once
 
+#include "json.h"
+
+
 struct ScaleParameters
 {
+    ScaleParameters() {} //TODO remove, for backward compatibility purposes
+    ScaleParameters(const ptree & params);
     // basic parameters
     int scale = 1;
     int u0 = 0, v0 = 0;
-    int uMax = 1, vMax = 1;
-    int xMax = 1, yMax = 1;
+    int uMax = 1, vMax = 1; //image size
+    int xMax = 1, yMax = 1; //scaled size
     
-    void setEqualMargin()
-    {
-        xMax = (uMax - 2*u0) / scale + 1;
-        yMax = (vMax - 2*v0) / scale + 1;
-        if (xMax < 1 or yMax < 1)
-        {
-            throw std::runtime_error("The scaled image is empty: xMax < 1 or yMax < 1");
-        }
-    }
+    void setEqualMargin();
     
-    void setXMargin(int val)
-    {
-        xMax = (uMax - u0 - val) / scale + 1;
-        if (xMax < 1)
-        {
-            throw std::runtime_error("The scaled image is empty: xMax < 1");
-        }
-    }
+    void setXMargin(int val);
     
-    void setYMargin(int val)
-    {
-        yMax = (vMax - v0 - val) / scale + 1;
-        if (yMax < 1)
-        {
-            throw std::runtime_error("The scaled image is empty: yMax < 1");
-        }
-    }
+    void setYMargin(int val);
     
     // from image to small disparity coordiante transform
-    int xConv(double u) const { return round((u - u0) / scale); }
-    int yConv(double v) const { return round((v - v0) / scale); }
+    int xConv(double u) const;
+    int yConv(double v) const;
     
     // from small disparity to image coordiante transform    
-    int uConv(int x) const { return x * scale + u0; }
-    int vConv(int y) const { return y * scale + v0; }
+    int uConv(int x) const;
+    int vConv(int y) const;
     
-    bool operator == (const ScaleParameters & other) const
-    {
-        return scale == other.scale and u0 == other.u0 and v0 == other.v0 and
-                uMax == other.uMax and vMax == other.vMax and 
-                xMax == other.xMax and yMax == other.yMax;
-    }
+    bool operator == (const ScaleParameters & other) const;
 };
 

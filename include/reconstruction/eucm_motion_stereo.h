@@ -36,7 +36,16 @@ Depth-from-motion class for semidense depth estimation
 //TODO add errorMax threshold
 struct MotionStereoParameters : public StereoParameters
 {
-    MotionStereoParameters() {}
+    MotionStereoParameters(const ptree & params):
+            StereoParameters(params)
+    {
+        for (auto & item : params.get_child("motion_stereo_parameters"))
+        {
+            const string & pname = item.first;
+            if (pname == "gradient_thresh") gradientThresh = item.second.get_value<int>();
+        }
+    }
+    
     MotionStereoParameters(const StereoParameters & stereoParams) : StereoParameters(stereoParams) {}
     int gradientThresh = 2;
 };

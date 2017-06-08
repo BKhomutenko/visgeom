@@ -99,7 +99,7 @@ int main(int argc, char** argv)
     
     Transformation<double> TleftRight = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
     
-    SGMParameters stereoParams;
+    SgmParameters stereoParams;
     stereoParams.flawCost = 5;
     stereoParams.verbosity = 0;
     stereoParams.hypMax = 1;
@@ -138,7 +138,7 @@ int main(int argc, char** argv)
         
         Timer timer;
         EnhancedCamera camera1(params1.data()), camera2(params2.data());
-        EnhancedSGM stereo(TleftRight, &camera1, &camera2, stereoParams);
+        EnhancedSgm stereo(TleftRight, &camera1, &camera2, stereoParams);
         cout << "    initialization time : " << timer.elapsed() << endl;
         Mat8u out1, out2;
         

@@ -30,7 +30,7 @@ Semi-global block matching algorithm for non-rectified images
 #include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 
-CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser1(int idx) const
+CurveRasterizer<int, Polynomial2> EnhancedSgm::getCurveRasteriser1(int idx) const
 {
     Vector2i pt = _pointPxVec1[idx];
     CurveRasterizer<int, Polynomial2> raster(pt, epipoles().getFirstPx(),
@@ -39,7 +39,7 @@ CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser1(int idx) cons
     return raster;
 }
 
-CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser2(int idx) const
+CurveRasterizer<int, Polynomial2> EnhancedSgm::getCurveRasteriser2(int idx) const
 {
     Vector2i _pinfPx = _pinfPxVec[idx];
     CurveRasterizer<int, Polynomial2> raster(_pinfPx, epipoles().getSecondPx(),
@@ -49,7 +49,7 @@ CurveRasterizer<int, Polynomial2> EnhancedSGM::getCurveRasteriser2(int idx) cons
 }
 
 //TODO reconstruct the depth points, not everything
-void EnhancedSGM::computeReconstructed()
+void EnhancedSgm::computeReconstructed()
 {
     _pointVec1.resize(_params.yMax*_params.xMax);
     _pointPxVec1.resize(_params.yMax*_params.xMax);
@@ -65,13 +65,13 @@ void EnhancedSGM::computeReconstructed()
     _camera1->reconstructPointCloud(_pointVec1, _reconstVec, _maskVec);
 }
 
-void EnhancedSGM::computeRotated()
+void EnhancedSgm::computeRotated()
 {
     transf().inverseRotate(_reconstVec, _reconstRotVec);
 }
 
 //FIXME _maskVec must be recomputed to discard not projected pInf
-void EnhancedSGM::computePinf()
+void EnhancedSgm::computePinf()
 {
     _camera2->projectPointCloud(_reconstRotVec, _pinfVec);
     _pinfPxVec.resize(_pinfVec.size());
@@ -82,7 +82,7 @@ void EnhancedSGM::computePinf()
     }
 }
 
-void EnhancedSGM::computeUVCache()
+void EnhancedSgm::computeUVCache()
 {
     for (int y = 0; y < _params.yMax; y++)
     {
@@ -115,9 +115,9 @@ void EnhancedSGM::computeUVCache()
     }
 }
 
-void EnhancedSGM::createBuffer()
+void EnhancedSgm::createBuffer()
 {
-    if (_params.verbosity > 1) cout << "EnhancedSGM::createBuffer" << endl;
+    if (_params.verbosity > 1) cout << "EnhancedSgm::createBuffer" << endl;
     assert(_params.hypMax > 0);
     int bufferWidth = _params.xMax*_params.dispMax;
     _stepBuffer.create(_params.yMax, _params.xMax);
@@ -138,7 +138,7 @@ void EnhancedSGM::createBuffer()
     }
 }
 
-void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depth)
+void EnhancedSgm::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depth)
 {
     computeCurveCost(img1, img2);
     
@@ -151,11 +151,11 @@ void EnhancedSGM::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap
 
 }
 
-void EnhancedSGM::reconstructDepth(DepthMap & depth) const
+void EnhancedSgm::reconstructDepth(DepthMap & depth) const
 {
     if (_params.verbosity > 2) 
     {
-        cout << "EnhancedSGM::reconstructDepth(DepthMap & depth)" << endl;
+        cout << "EnhancedSgm::reconstructDepth(DepthMap & depth)" << endl;
     }
     depth = DepthMap(_camera1, _params, _params.hypMax);
     for (int h = 0; h < _params.hypMax; h++)
@@ -217,9 +217,9 @@ void EnhancedSGM::reconstructDepth(DepthMap & depth) const
     }
 }
 
-void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
+void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 {
-    if (_params.verbosity > 0) cout << "EnhancedSGM::computeCurveCost" << endl;
+    if (_params.verbosity > 0) cout << "EnhancedSgm::computeCurveCost" << endl;
     
     // compute the weights for matching cost
     
@@ -355,7 +355,7 @@ void EnhancedSGM::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     }
 }
 
-void EnhancedSGM::fillGaps(uint8_t * const data, const int step)
+void EnhancedSgm::fillGaps(uint8_t * const data, const int step)
 {
     assert(step > 0);
     //linear interpolation for all intermediate points
@@ -398,7 +398,7 @@ void EnhancedSGM::fillGaps(uint8_t * const data, const int step)
     }
 }
 
-void EnhancedSGM::computeDynamicStep(const int32_t* inCost, const uint8_t * error, int32_t * outCost)
+void EnhancedSgm::computeDynamicStep(const int32_t* inCost, const uint8_t * error, int32_t * outCost)
 {
     int bestCost = inCost[0];
     for (int i = 1; i < _params.dispMax; i++)
@@ -426,9 +426,9 @@ void EnhancedSGM::computeDynamicStep(const int32_t* inCost, const uint8_t * erro
     vald += error[_params.dispMax - 1];
 }
 
-void EnhancedSGM::computeDynamicProgramming()
+void EnhancedSgm::computeDynamicProgramming()
 {
-    if (_params.verbosity > 0) cout << "EnhancedSGM::computeDynamicProgramming" << endl;
+    if (_params.verbosity > 0) cout << "EnhancedSgm::computeDynamicProgramming" << endl;
     if (_params.verbosity > 1) cout << "    left" << endl;
     
     if (not _params.imageBasedCost) _jumpCost = _params.lambdaJump;
@@ -500,9 +500,9 @@ void EnhancedSGM::computeDynamicProgramming()
     
 }
 
-void EnhancedSGM::reconstructDisparity()
+void EnhancedSgm::reconstructDisparity()
 {
-    if (_params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparity" << endl;
+    if (_params.verbosity > 0) cout << "EnhancedSgm::reconstructDisparity" << endl;
 //    int sizeAcc = 0;
 //    int sizeCount = 0;
     for (int y = 0; y < _params.yMax; y++)
@@ -543,9 +543,9 @@ void EnhancedSGM::reconstructDisparity()
     }
 }
 
-void EnhancedSGM::reconstructDisparityMH()
+void EnhancedSgm::reconstructDisparityMH()
 {
-    if (_params.verbosity > 0) cout << "EnhancedSGM::reconstructDisparityMH" << endl;
+    if (_params.verbosity > 0) cout << "EnhancedSgm::reconstructDisparityMH" << endl;
     const int hypShift = _params.xMax*_params.yMax;
 //    int sizeAcc = 0;
 //    int sizeCount = 0;

@@ -42,7 +42,7 @@ void analyzeError(const Mat32f & depthGT, Mat32f & depth,
     double err = 0, err2 = 0;
     double err3 = 0;
     std::ofstream ofs;
-  ofs.open (histDataName, std::ofstream::out | std::ofstream::app);
+    ofs.open (histDataName, std::ofstream::out | std::ofstream::app);
 
 
  
@@ -91,73 +91,33 @@ int main(int argc, char** argv)
     
     ptree root;
     read_json(argv[1], root);
-    vector<double> params = readVector(root.get_child("camera_params"));
+    vector<double> params = readVector<double>(root.get_child("camera_params"));
     RenderDevice device(root);
     EnhancedCamera camera(params.data());
     device.setCamera(&camera);
     
-    results.open("results.txt");
+    Transf xi1(0., 0., 0., 0., 0., 0.);
     for (int i = 1; i < 10; i++)
     {
         
-        Transf xi1(0., 0., 0., 0., 0., 0.);
+        
         Transf xi2(0.1 * i, 0., 0., 0., 0., 0.);
         
-        SGMParameters stereoParams;
-        stereoParams.flawCost = 5;
-        stereoParams.verbosity = 0;
-        stereoParams.hypMax = 1;
-        stereoParams.salientPoints = false;
-        stereoParams.u0 = 10;
-        stereoParams.v0 = 10;
-        stereoParams.dispMax = 128;
-        stereoParams.scale = 2;
-        
-        stereoParams.uMax = root.get<int>("width");
-        stereoParams.vMax = root.get<int>("height");
-        stereoParams.setEqualMargin();
            
         Mat8u img1, img2;    
         device.setCameraTransform(xi1);
         device.render(img1);
         
-        Mat32f depthGT = device.getDepthBuffer().clone();
         
+//        
         device.setCameraTransform(xi2);
         device.render(img2);
-        
-        EnhancedSGM stereo(xi2, &camera, &camera, stereoParams);
-        
-        DepthMap depth;
-        Mat32f depthMat, sigmaMat;
-        stereo.computeStereo(img1, img2, depth);
-        
-        depth.toMat(depthMat);
-        depth.sigmaToMat(sigmaMat);
-        
-        
-        analyzeError(depthGT, depthMat, sigmaMat, stereoParams);
-        
-        imshow("res", depthMat / 10);
+        Mat32f depthGT = device.getDepthBuffer().clone();
         imshow("depth", device.getDepthBuffer() / 10);
-         imshow("rendered", img1);
+         imshow("rendered", img2);
         waitKey();
     }
     
-    results.close();
-//    for (int i = 0; i < 100; i++)
-//    {
-//        device.setCameraTransform(Transf(0, 0, i*0.007, i*0.001, 0, -i*0.001));
-////        device.setCameraTransform(Transf());
-//        cout << "initialized" << endl;
-//        cout << "buffers" << endl;
-//        Mat8u res;
-//        device.render(res);
-//        cout << "image" << endl;
-//        imshow("depth", device.getDepthBuffer() / 10);
-//        imshow("res", res);
-//        waitKey();
-//    }
     
     return 0;
 }

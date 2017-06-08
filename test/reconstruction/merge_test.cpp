@@ -84,7 +84,7 @@ int main(int argc, char** argv)
     Transformation<double> T03(robotPose3.data()), T04(robotPose4.data());
     Transformation<double> TleftRight1 = T01.compose(TbaseCamera).inverseCompose(T02.compose(TbaseCamera));
     Transformation<double> TleftRight3 = T03.compose(TbaseCamera).inverseCompose(T04.compose(TbaseCamera));
-    SGMParameters stereoParams;
+    SgmParameters stereoParams;
     stereoParams.verbosity = 1;
     stereoParams.hypMax = 1;
     paramFile >> stereoParams.u0;
@@ -113,8 +113,8 @@ int main(int argc, char** argv)
     Timer timer, timer1;
     timer1.reset();
     EnhancedCamera camera1(params1.data()), camera2(params2.data());
-    EnhancedSGM stereo1(TleftRight1, &camera1, &camera2, stereoParams);
-    EnhancedSGM stereo3(TleftRight3, &camera1, &camera2, stereoParams);
+    EnhancedSgm stereo1(TleftRight1, &camera1, &camera2, stereoParams);
+    EnhancedSgm stereo3(TleftRight3, &camera1, &camera2, stereoParams);
     cout << "    initialization time : " << timer.elapsed() << endl;
     
     DepthMap depth1, depth3;

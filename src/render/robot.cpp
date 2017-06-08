@@ -23,7 +23,7 @@ VirtualRobot::VirtualRobot(const ptree & params)
     for (auto & element : params.get_child("cameras"))
     {
         auto camParams = element.second;
-        vector<double> intrinsics = readVector(camParams.get_child("intrinsics"));
+        vector<double> intrinsics = readVector<double>(camParams.get_child("intrinsics"));
         _cameraVec.push_back( new EnhancedCamera(intrinsics.data()) );
         _xiBaseCamVec.push_back( readTransform(camParams.get_child("extrinsics")) );
     }

@@ -17,6 +17,23 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "reconstruction/eucm_stereo.h"
 
+StereoParameters::StereoParameters(const ptree & params) :
+        ScaleParameters(params)
+{
+    for (auto & item : params.get_child("stereo_parameters"))
+    {
+        const string & pname = item.first;
+        if (pname == "disparity_max")       dispMax = item.second.get_value<int>();
+        else if (pname == "error_max")      maxError = item.second.get_value<int>();
+        else if (pname == "verbosity")      verbosity = item.second.get_value<int>();
+        else if (pname == "hypotheses")     hypMax = item.second.get_value<int>();
+        else if (pname == "hypo_difference")    maxHypDiff = item.second.get_value<int>();
+        else if (pname == "flaw_cost")    flawCost = item.second.get_value<int>();
+        else if (pname == "descriptor_size")    descLength = item.second.get_value<int>();
+        else if (pname == "scales")    scaleVec = readVector<int>(item.second);
+        else if (pname == "descriptor_response_thresh") descRespThresh = item.second.get_value<int>();
+    }
+}
 
 EnhancedStereo::EnhancedStereo(const EnhancedCamera * cam1, const EnhancedCamera * cam2,
         const StereoParameters & params) :
