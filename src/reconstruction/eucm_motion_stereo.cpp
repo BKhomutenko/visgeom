@@ -330,6 +330,7 @@ bool MotionStereo::computeUncertainty(double d, double s)
         int delta = round((ptFin - gptStart).norm());
         gdispMax = min( _params.dispMax, delta + 1);
         ptStartRound = round(gptStart);
+        ptFinRound = round(ptFin);
         flags |= GLB_START_POINT | GLB_DISP_MAX;
     }
     return true;
@@ -343,11 +344,10 @@ bool MotionStereo::sampleImage(const Mat8u & img2)
     if ((ptStartRound - epipoles().getSecondPx()).squaredNorm() < 2500) return false;
     int distance = gdispMax / gstep + MARGIN;
     
-    CurveRasterizer<int, Polynomial2> raster(ptStartRound, epipoles().getSecondPx(),
+    CurveRasterizer<int, Polynomial2> raster(ptStartRound, ptFinRound,
                                 _epipolarCurves.getSecond(gX));
     //Important : Epipolar curves are accessed by the reconstructed point in the FIRST frame
                                 
-    if (epipoles().secondIsInverted()) raster.setStep(-1);
     raster.setStep(gstep);
     raster.steps(-HALF_LENGTH);
 
@@ -362,13 +362,14 @@ bool MotionStereo::sampleImage(const Mat8u & img2)
         if (raster.v < 0 or raster.v >= img2.rows 
             or raster.u < 0 or raster.u >= img2.cols) 
         {
-            break;
+            return false;
         }//sampleVec.push_back(0);
         
         gsampleVec.push_back(img2(raster.v, raster.u));
         guVec.push_back(raster.u);
         gvVec.push_back(raster.v);
     }
+    assert(gsampleVec.size() > MARGIN);
     flags |= GLB_SAMPLE_VEC | GLB_UV_VEC;
     return true;
 }
@@ -427,7 +428,12 @@ void MotionStereo::reconstruct(double & dist, double & sigma, double & cost)
                     Vector2d(guVec[dBest], gvVec[dBest]), 
                     Vector2d(guVec[dBest + 1], gvVec[dBest + 1]),
                     distNew, sigmaNew); 
-         
+        
+        if (abs(distNew - dist) > 2.5*sigma) 
+        {
+            cout << gu << " " << gv << " ; " << guVec[dBest] << " " << gvVec[dBest] << " " ;
+            cout << dist << "+-" << sigma << " ; " << distNew << "+-" << sigmaNew << endl;
+        }
         //temporal filtering       
         const double K = 1 / (sigma + sigmaNew);
         dist = (sigma * distNew + sigmaNew * dist) * K;

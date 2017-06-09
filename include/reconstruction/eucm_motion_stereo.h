@@ -143,8 +143,10 @@ private:
     int gu, gv;
     int gu2, gv2;
     Vector3d gX;
+    
     Vector2d gptStart;
     Vector2i ptStartRound;
+    Vector2i ptFinRound;
     int gdispMax;
     int gstep;
     

@@ -47,10 +47,11 @@ public:
         _camera( new EnhancedCamera(readVector<double>(params.get_child("camera_params")).data()) ),
         sparseOdom(_camera, _xiBaseCam),
         motionStereo(_camera, _camera, params.get_child("stereo_parameters")),
-        photometricLocalizer(5, _camera),
+        localizer(5, _camera),
         state(STATE_BEGIN)
     {
-        photometricLocalizer.setVerbosity(0);
+        localizer.setVerbosity(0);
+        localizer.setXiBaseCam(_xiBaseCam);
     }
         
     ~MonoOdometry() 
@@ -60,6 +61,8 @@ public:
     
     void feedWheelOdometry(const Transf xiOdomNew);
     void feedImage(const Mat8u & imageNew);
+    
+    Transf getCameraMotion() const;
     
 //private:
     EnhancedCamera * _camera;
@@ -95,7 +98,7 @@ public:
     //gradually improves the depth map
     MotionStereo motionStereo;
     
-    ScalePhotometric photometricLocalizer;
+    ScalePhotometric localizer;
 };
 
 

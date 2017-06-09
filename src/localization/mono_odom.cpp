@@ -51,6 +51,7 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         imageVec.emplace_back(imageNew.clone());
         motionStereo.setBaseImage(imageNew);
         sparseOdom.feedData(imageNew, _xiLocal);
+        localizer.computeBaseScaleSpace(imageNew);
         state = STATE_SPARSE_INIT;   
         break;    
     case STATE_SPARSE_INIT:
@@ -63,21 +64,31 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
             //compute the initial depth estimation
             
             //set Sgm stereo base
-            Transf stereoBase = _xiBaseCam.inverseCompose(_xiLocal).compose(_xiBaseCam);
-            EnhancedSgm sgm(_xiLocal, _camera, _camera, _sgmParams);
-            
+            EnhancedSgm sgm(getCameraMotion(), _camera, _camera, _sgmParams);
             //compute Sgm stereo
             sgm.computeStereo(imageVec.back(), imageNew, depth);
+            
             //go to the next state
             state = STATE_READY;
         }
         break; 
     case STATE_READY:
+        localizer.depth() = depth;
+        
+        localizer.computePose(imageNew, _xiLocal);
+        cout << _xiLocal << endl << endl;
+        
+        depth = motionStereo.compute(getCameraMotion(), imageNew, depth);
+//        depth.filterNoise();
         //TODO add code here
         break;
     }
 }
-    
+
+Transf MonoOdometry::getCameraMotion() const
+{
+    return _xiBaseCam.inverseCompose(_xiLocal).compose(_xiBaseCam);
+}
 //void MonoOdometry::initFirstKeyFrame(const Mat8u & imageNew)
 //{
 //    imageVec.emplace_back();

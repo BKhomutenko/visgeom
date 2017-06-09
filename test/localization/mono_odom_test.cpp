@@ -37,6 +37,7 @@ int main(int argc, char** argv)
         Mat8u img1;
         device.render(img1);
         
+        cout << xi << endl;
         odom.feedWheelOdometry(xi);
         odom.feedImage(img1);
         
