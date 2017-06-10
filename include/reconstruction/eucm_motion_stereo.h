@@ -150,6 +150,9 @@ private:
     int gdispMax;
     int gstep;
     
+    //TODO for debug, count erroneus reconstructions
+    int count_in, count_out;
+    
     vector<uint8_t> gdescriptor;
     vector<uint8_t> gsampleVec;
     vector<int> guVec, gvVec;

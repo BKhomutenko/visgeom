@@ -79,8 +79,10 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         cout << _xiLocal << endl << endl;
         
         depth = motionStereo.compute(getCameraMotion(), imageNew, depth);
-//        depth.filterNoise();
-        //TODO add code here
+        depth.filterNoise();
+        
+        //TODO check whether a new keyframe is needed
+        
         break;
     }
 }
