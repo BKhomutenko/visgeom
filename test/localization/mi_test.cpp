@@ -107,7 +107,7 @@ int main (int argc, char const* argv[])
     // Init the localizer
     ScalePhotometric localizer(6, &camera);
     localizer.setVerbosity(0);
-    localizer.computeBaseScaleSpace(img1);
+    localizer.setBaseImage(img1);
     localizer.depth() = DepthMap::generatePlane(&camera, scaleParams,
              T0Camera.inverseCompose(TbasePlane),
             vector<Vector3d>{Vector3d(-0.1, -0.1, 0), Vector3d(-0.1 + 3 * 0.45, -0.1, 0),
@@ -141,7 +141,8 @@ int main (int argc, char const* argv[])
         for (int iter = 0; iter < 1; iter++)
         {
             Timer timer;
-            localizer.computePoseMI(img2, T12);
+            localizer.setTargetImage(img2);
+            T12 = localizer.computePoseMI(T12);
             cout << timer.elapsed() << endl;
             cout << T12 << endl;
             

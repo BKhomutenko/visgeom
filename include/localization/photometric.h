@@ -61,13 +61,14 @@ public:
     DepthMap & depth() { return depthMap; }
     void setDepth(const DepthMap & newDepth) { depthMap = newDepth; }
     
-    void computeBaseScaleSpace(const Mat8u & img1);
+    void setBaseImage(const Mat8u & img1);
+    void setTargetImage(const Mat8u & img2);
     
-    void computePose(const Mat8u & img2, Transf & T12);
+    Transf computePose(const Transf & T12);
     
     void setVerbosity(int newVerbosity) { verbosity = newVerbosity; }
     
-    void computePoseMI(const Mat8u & img2, Transf & T12);
+    Transf computePoseMI(const Transf & T12);
 
     //TODO make enum for choosing the camera
     array<double, 6> covarianceEigenValues(const int scaleIdx, 
@@ -91,7 +92,7 @@ private:
     
     //TODO make a parameter structure
     // minimal squared norm of gradient for a pixel to be accepted
-    const double GRAD_THRESH = 50;
+    const double GRAD_THRESH = 100;
     const double GRAD_MAX = 255;
     int verbosity;
 };

@@ -66,10 +66,20 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
                         &f, &grad[1], &grad[0]);
                 grad /= _scale;  // normalize according to the scale
                 
-                jacobianCalculator.dfdxi(transformedPoints[i], grad, jacobian[0] + i*6);
-                for (int j = 0; j < 6; j++) *(jacobian[0] + i*6 + j) /= (_dataPack.valVec[i] + 10); 
+                residual[i] = (f - _dataPack.valVec[i]); // / (_dataPack.valVec[i] + 10);
+                if (abs(residual[i]) > 10)
+                {
+                    residual[i] = 0.;
+                    fill(jacobian[0] + i*6, jacobian[0] + i*6 + 6, 0.);
+                }
+                else
+                {                
+                    jacobianCalculator.dfdxi(transformedPoints[i], grad, jacobian[0] + i*6);
+                }
                 
-                residual[i] = (f - _dataPack.valVec[i]) / (_dataPack.valVec[i] + 10);
+//                for (int j = 0; j < 6; j++) *(jacobian[0] + i*6 + j) /= (_dataPack.valVec[i] + 10); 
+                
+                
             }
             else
             {
@@ -90,7 +100,8 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
             {
                 double f;
                 imageInterpolator.Evaluate(pt[1] / _scale, pt[0] / _scale, &f);
-                residual[i] = (f - _dataPack.valVec[i]) / (_dataPack.valVec[i] + 10);
+                residual[i] = (f - _dataPack.valVec[i]);// / (_dataPack.valVec[i] + 10);
+                if (abs(residual[i]) > 10) residual[i] = 0.;
             }
             else
             {
@@ -110,11 +121,12 @@ bool MutualInformation::Evaluate(double const * parameters,
     {
         if (std::isnan(parameters[i]) or std::isinf(parameters[i])) return false;
     }
-    Transf T12(parameters);
+    Transf xiBase(parameters);
+    Transf xiCam = xiBase.compose(_xiBaseCam);
     
     // point cloud in frame 2
     vector<Vector3d> transformedPoints;
-    T12.inverseTransform(_dataPack.cloud, transformedPoints);
+    xiCam.inverseTransform(_dataPack.cloud, transformedPoints);
     // init the image interpolation
     ceres::BiCubicInterpolator<Grid2D<float>> imageInterpolator(_imageGrid);
     
@@ -176,7 +188,7 @@ bool MutualInformation::Evaluate(double const * parameters,
         Map<Covector6d> dMIdxi(gradient);
         dMIdxi << 0, 0, 0, 0, 0, 0;
         // L_uTheta
-        CameraJacobian jacobianCalculator(_camera, T12);
+        CameraJacobian jacobianCalculator(_camera, xiBase, _xiBaseCam);
         for (int i = 0; i < transformedPoints.size(); i++)
         {
             Covector6d dfdxi;

@@ -142,10 +142,11 @@ Mutual Information cost function
 struct MutualInformation : public FirstOrderFunction
 {
 
-    MutualInformation(const ICamera * camera, const PhotometricPack & dataPack,
+    MutualInformation(const ICamera * camera, const PhotometricPack & dataPack, const Transf xiBaseCam,
             const Mat32f & img2, double scale, int numBins, double valMax = 1.) :
             _camera(camera->clone()),
             _dataPack(dataPack),
+            _xiBaseCam(xiBaseCam),
             _imageGrid(img2.cols, img2.rows, (float*)img2.data),
             _scale(scale),
             _numBins(numBins),
@@ -184,6 +185,8 @@ struct MutualInformation : public FirstOrderFunction
     //histogram params
     const int _numBins;
     const double _histStep;
+    
+    const Transf _xiBaseCam;
     
     //variable must be initialize for MutualInformation::computeShares
     double _increment;

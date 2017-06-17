@@ -51,7 +51,7 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         imageVec.emplace_back(imageNew.clone());
         motionStereo.setBaseImage(imageNew);
         sparseOdom.feedData(imageNew, _xiLocal);
-        localizer.computeBaseScaleSpace(imageNew);
+        localizer.setBaseImage(imageNew);
         state = STATE_SPARSE_INIT;   
         break;    
     case STATE_SPARSE_INIT:
@@ -69,18 +69,41 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
             sgm.computeStereo(imageVec.back(), imageNew, depth);
             
             //go to the next state
+            localizer.setDepth(depth);
             state = STATE_READY;
+            
+            //Check the localization eigenvalues
+            
+            localizer.setTargetImage(imageNew);
+            Transf xiPhoto = localizer.computePose(_xiLocal);
+            Transf xiMI = localizer.computePoseMI(_xiLocal);
+            cout << "xiPhoto" << endl << xiPhoto << endl;
+            cout << "xiMI" << endl << xiMI << endl;
+            cout << "xiFeature" << endl << _xiLocal << endl;
+            array<double, 6>  eigen1 = localizer.covarianceEigenValues(1, _xiLocal, false);
+            for (int i = 0; i < 6; i++)
+            {
+                cout << setw(16) << eigen1[i];
+            }
+            cout << endl;
         }
         break; 
     case STATE_READY:
-        localizer.depth() = depth;
         
-        localizer.computePose(imageNew, _xiLocal);
+        localizer.setTargetImage(imageNew);
+        _xiLocal = localizer.computePoseMI(_xiLocal);
+        array<double, 6>  eigen1 = localizer.covarianceEigenValues(1, _xiLocal, false);
+            for (int i = 0; i < 6; i++)
+            {
+                cout << setw(16) << eigen1[i];
+            }
+            cout << endl;
         cout << _xiLocal << endl << endl;
         
         depth = motionStereo.compute(getCameraMotion(), imageNew, depth);
         depth.filterNoise();
         
+        localizer.setDepth(depth);
         //TODO check whether a new keyframe is needed
         
         break;

@@ -26,10 +26,16 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "projection/eucm.h"
 #include "reconstruction/mh_pack.h"
 
-void ScalePhotometric::computeBaseScaleSpace(const Mat8u & img1)
+void ScalePhotometric::setBaseImage(const Mat8u & img1)
 {
     if (verbosity > 0) cout << "ScalePhotometric::computeBaseScaleSpace" << endl;
     scaleSpace1.generate(img1);
+}
+
+void ScalePhotometric::setTargetImage(const Mat8u & img2)
+{
+    if (verbosity > 0) cout << "ScalePhotometric::computeTargetScaleSpace" << endl;
+    scaleSpace2.generate(img2);
 }
 
 PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
@@ -75,18 +81,19 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
     return dataPack;
 }
 
-void ScalePhotometric::computePose(const Mat8u & img2, Transf & T12)
+Transf ScalePhotometric::computePose(const Transf & T12)
 {
     if (verbosity > 0) 
     {
         cout << "ScalePhotometric::computePose" << endl;
     }
-    scaleSpace2.generate(img2);
     //TODO set the optimization depth with the parameters   v
+    Transf xi = T12;
     for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 2; scaleIdx--)
     {
-        computePose(scaleIdx, T12);
+        computePose(scaleIdx, xi);
     }
+    return xi;
 }
 
 void ScalePhotometric::computePose(int scaleIdx, Transf & T12)
@@ -101,7 +108,7 @@ void ScalePhotometric::computePose(int scaleIdx, Transf & T12)
     Problem problem;
     PhotometricCostFunction * costFunction = new PhotometricCostFunction(camPtr2, _xiBaseCam, dataPack,
                                             scaleSpace2.get(), scaleSpace2.getActiveScale());
-    problem.AddResidualBlock(costFunction, new SoftLOneLoss(1), pose.data());
+    problem.AddResidualBlock(costFunction, NULL /*new SoftLOneLoss(1)*/, pose.data());
     
     
     //run the solver
@@ -116,18 +123,19 @@ void ScalePhotometric::computePose(int scaleIdx, Transf & T12)
     T12 = Transf(pose.data());
 }
 
-void ScalePhotometric::computePoseMI(const Mat8u & img2, Transf & T12)
+Transf ScalePhotometric::computePoseMI(const Transf & T12)
 {
     if (verbosity > 0) 
     {
         cout << "ScalePhotometric::computePoseMI" << endl;
     }
-    scaleSpace2.generate(img2);
+    Transf xi = T12;
     //TODO set the optimization depth with the parameters   v
-    for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 2; scaleIdx--)
+    for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 1; scaleIdx--)
     {
-        computePoseMI(scaleIdx, T12);
+        computePoseMI(scaleIdx, xi);
     }
+    return xi;
 }
 
 //TODO put to a separate file   
@@ -171,12 +179,25 @@ array<double, 6> ScalePhotometric::covarianceEigenValues(const int scaleIdx,
     }
     cout << "Cost function is created" << endl;
     Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> J(dataPack.valVec.size(), 6);
+    
     //TODO fix this mess
-    array<double, 6> residual;
+    vector<double> residual(dataPack.valVec.size());
     array<double, 6> pose = T12.toArray();
     double * jacPtr = J.data();
     double * paramPtr = pose.data();
     costFunction->Evaluate(&paramPtr, residual.data(), &jacPtr);
+    
+    vector<int> errHist(255);
+    for(double err : residual)
+    {
+        int idx = min( 255, max( 0, int(round(abs(err))) ) );
+        errHist[idx]++;
+    }
+    
+    for (int h : errHist)
+    {
+        cout << h << endl;
+    }
     cout << "Jacobian is evaluated" << endl;
     MatrixXd JtJ = J.transpose() * J;
     Eigen::SelfAdjointEigenSolver<MatrixXd> es(JtJ);
@@ -196,7 +217,7 @@ void ScalePhotometric::computePoseMI(int scaleIdx, Transf & T12)
     PhotometricPack dataPack = initPhotometricData(scaleIdx);
     scaleSpace2.setActiveScale(scaleIdx);
     array<double, 6> pose = T12.toArray();
-    MutualInformation * costFunction = new MutualInformation(camPtr2, dataPack,
+    MutualInformation * costFunction = new MutualInformation(camPtr2, dataPack, _xiBaseCam,
                                 scaleSpace2.get(), scaleSpace2.getActiveScale(), 8, 255);
     
     //TODO put to a separate file                                                    

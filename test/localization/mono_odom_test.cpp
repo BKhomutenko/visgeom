@@ -41,12 +41,14 @@ int main(int argc, char** argv)
         odom.feedWheelOdometry(xi);
         odom.feedImage(img1);
         
-        Mat32f depthMat;
-        odom.depth.toMat(depthMat);
-        
-        
         imshow("rendered", img1);
-        imshow("depth", depthMat / 10);
+        
+        Mat32f depthMat;
+        if (not odom.depth.empty())
+        { 
+            odom.depth.toMat(depthMat);
+            imshow("depth", depthMat / 10);
+        }
         waitKey();
     }
     
