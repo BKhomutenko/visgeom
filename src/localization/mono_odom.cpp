@@ -65,8 +65,9 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
     {
     case STATE_BEGIN:
         //the starting point
-        _xiLocal = Transf(0, 0, 0, 0, 0, 0);
+        _xiGlobal = _xiLocal = Transf(0, 0, 0, 0, 0, 0);
         imageVec.emplace_back(imageNew.clone());
+        transfVec.push_back(_xiLocal);
         motionStereo.setBaseImage(imageNew);
         sparseOdom.feedData(imageNew, _xiLocal);
         localizer.setBaseImage(imageNew);
@@ -117,7 +118,7 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
 //                cout << setw(16) << eigen1[i];
 //            }
 //            cout << endl;
-        cout << _xiLocal << endl << endl;
+        cout << _xiGlobal.compose(_xiLocal) << endl << endl;
         
         depth = motionStereo.compute(getCameraMotion(), imageNew, depth);
         depth.filterNoise();
@@ -125,8 +126,29 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         localizer.setDepth(depth);
         //TODO check whether a new keyframe is needed
         
+        if (isNewKeyframeNeeded())
+        {
+            pushKeyFrame(imageNew);
+        }
+        
         break;
     }
+}
+
+void MonoOdometry::pushKeyFrame(const Mat8u & imageNew)
+{
+    _xiGlobal = _xiGlobal.compose(_xiLocal);
+    transfVec.push_back(_xiLocal);
+    _xiLocal = Transf(0, 0, 0, 0, 0, 0);
+    imageVec.push_back(imageNew.clone());
+    localizer.setBaseImage(imageNew);
+    //Project the depth forward
+    depth = depth.wrapDepth(_xiLocal);
+}
+
+bool MonoOdometry::isNewKeyframeNeeded()
+{
+    return (_xiLocal.trans().norm() > MAX_DIST or _xiLocal.rot().norm() > MAX_ANGLE);
 }
 
 Transf MonoOdometry::getCameraMotion() const

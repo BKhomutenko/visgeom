@@ -711,14 +711,13 @@ void DepthMap::wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
 }
 
 //TODO - Add support to insert multiple hypotheses into output depthmap
-DepthMap DepthMap::wrapDepth(const Transformation<double> T12, 
-    const ScaleParameters & scaleParams) const
+DepthMap DepthMap::wrapDepth(const Transformation<double> T12) const
 {
-    DepthMap dMap2(cameraPtr, scaleParams);
+    DepthMap dMap2(cameraPtr, *this);
 
     //Step 1 : Get point-cloud of current frame
     MHPack cloud11MH;
-    this->reconstruct(cloud11MH, 0);
+    reconstruct(cloud11MH, 0);
 
     //Step 2 : Transform cloud into keyframe
     Vector3dVec cloud12;
@@ -726,19 +725,19 @@ DepthMap DepthMap::wrapDepth(const Transformation<double> T12,
 
     //Step 3 : Project point cloud on keyframe
     Vector2dVec point12Vec;
-    dMap2.project(cloud12, point12Vec);
+    cameraPtr->projectPointCloud(cloud12, point12Vec);
 
     //Step 4 : Fill in data for depthmap
     vector<int> idx12Vec = getIdxVec(point12Vec);
     for (int i = 0; i < idx12Vec.size(); i++)
     {
         const int idx2 = idx12Vec[i];
-        const int idx1 = cloud11MH.idxVec[idx2];
-        if(isValid(point12Vec[i]))
+        const int idx1 = cloud11MH.idxVec[i];
+        if(idx2 != -1)
         {
-            dMap2.at(idx2) = cloud12[idx2].norm();
-            dMap2.sigma(idx2) = this->sigma(idx1);
-            dMap2.cost(idx2) = this->cost(idx1);
+            dMap2.at(idx2) = cloud12[i].norm();
+            dMap2.sigma(idx2) = sigma(idx1);
+            dMap2.cost(idx2) = cost(idx1);
         }
     }
 

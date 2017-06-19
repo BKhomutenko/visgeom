@@ -77,8 +77,11 @@ public:
 
     virtual ~DepthMap() 
     {
-        delete cameraPtr;
-        cameraPtr = NULL;
+        if (cameraPtr != NULL)
+        {
+            delete cameraPtr;
+            cameraPtr = NULL;
+        }
     }
     
     DepthMap & operator = (const DepthMap & other)
@@ -224,8 +227,7 @@ public:
     void wrapDepth(const DepthMap& dMap1, const DepthMap& dMap2,
             const Transformation<double> T12, DepthMap& output) const;
 
-    DepthMap wrapDepth(const Transformation<double> T12,
-            const ScaleParameters & scaleParams) const;
+    DepthMap wrapDepth(const Transformation<double> T12) const;
 
     // Filters all hypotheses to remove noise, using either a median filter or 
     // average filter, depending on the number of matching neighbour hypotheses

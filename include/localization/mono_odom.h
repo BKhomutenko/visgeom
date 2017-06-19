@@ -37,6 +37,10 @@ Relative camera pose estimation based on photometric error and depth map
 const double MIN_INIT_DIST = 0.25;   // minimal distance traveled befor VO is used
 const double MIN_STEREO_BASE = 0.05; // minimal acceptable stereo base
 
+//constants to create new keyframes, TODO put elsewhere
+const double MAX_DIST = 0.5;
+const double MAX_ANGLE = M_PI / 4;
+
 //TODO parameters initialization via .json
 class MonoOdometry
 {
@@ -48,9 +52,14 @@ public:
     void feedWheelOdometry(const Transf xiOdomNew);
     void feedImage(const Mat8u & imageNew);
     
+    
     Transf getCameraMotion() const;
     
 //private:
+
+    void pushKeyFrame(const Mat8u & imageNew);
+    bool isNewKeyframeNeeded();
+    
     EnhancedCamera * _camera;
     // memory
     vector<Mat8u> imageVec; //.back() is the actual key frame
@@ -60,7 +69,7 @@ public:
     // state
     // pose wrt current keyframe
     Transf _xiLocal; 
-    
+    Transf _xiGlobal;
     // the last WO measuremen to compute odometry increment
     Transf _xiOdom; 
     

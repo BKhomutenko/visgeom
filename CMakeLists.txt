@@ -176,14 +176,14 @@ target_link_libraries( descriptor_step
 
 
 # TODO eventually remove
-#add_executable( generate_plane 
-#    test/reconstruction/generate_plane.cpp
-#)
+add_executable( generate_plane 
+    test/reconstruction/generate_plane.cpp
+)
 
-#target_link_libraries( generate_plane 
-#    reconstruction
-#    ${OpenCV_LIBS} 
-#)
+target_link_libraries( generate_plane 
+    reconstruction
+    ${OpenCV_LIBS} 
+)
 
 
 add_executable( reproject_plane
