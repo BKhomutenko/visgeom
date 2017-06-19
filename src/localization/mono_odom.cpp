@@ -32,6 +32,24 @@ Relative camera pose estimation based on photometric error and depth map
 
 #include "localization/sparse_odom.h"
    
+MonoOdometry::MonoOdometry(const ptree & params):
+    _xiBaseCam( readTransform(params.get_child("xi_base_camera")) ),
+    _sgmParams(params.get_child("stereo_parameters")),
+    _camera( new EnhancedCamera(readVector<double>(params.get_child("camera_params")).data()) ),
+    sparseOdom(_camera, _xiBaseCam),
+    motionStereo(_camera, _camera, params.get_child("stereo_parameters")),
+    localizer(5, _camera),
+    state(STATE_BEGIN)
+{
+    localizer.setVerbosity(0);
+    localizer.setXiBaseCam(_xiBaseCam);
+}
+    
+MonoOdometry::~MonoOdometry() 
+{
+    delete _camera;
+}
+   
 void MonoOdometry::feedWheelOdometry(const Transf xiOdomNew)
 {
     //integrate
@@ -75,7 +93,8 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
             //Check the localization eigenvalues
             
             localizer.setTargetImage(imageNew);
-            Transf xiPhoto = localizer.computePose(_xiLocal);
+            double epsilon = 0.00;
+            Transf xiPhoto = localizer.computePose(_xiLocal).compose(Transf(epsilon, -epsilon, epsilon, epsilon, -epsilon, -epsilon));
             Transf xiMI = localizer.computePoseMI(_xiLocal);
             cout << "xiPhoto" << endl << xiPhoto << endl;
             cout << "xiMI" << endl << xiMI << endl;
@@ -91,13 +110,13 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
     case STATE_READY:
         
         localizer.setTargetImage(imageNew);
-        _xiLocal = localizer.computePoseMI(_xiLocal);
-        array<double, 6>  eigen1 = localizer.covarianceEigenValues(1, _xiLocal, false);
-            for (int i = 0; i < 6; i++)
-            {
-                cout << setw(16) << eigen1[i];
-            }
-            cout << endl;
+        _xiLocal = localizer.computePose(_xiLocal);
+//        array<double, 6>  eigen1 = localizer.covarianceEigenValues(1, _xiLocal, false);
+//            for (int i = 0; i < 6; i++)
+//            {
+//                cout << setw(16) << eigen1[i];
+//            }
+//            cout << endl;
         cout << _xiLocal << endl << endl;
         
         depth = motionStereo.compute(getCameraMotion(), imageNew, depth);

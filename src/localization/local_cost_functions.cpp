@@ -32,6 +32,17 @@ Cost functions for localization based on photometric data and mutual information
 #include "projection/jacobian.h"
 #include "reconstruction/triangulator.h"
 
+
+void PhotometricCostFunction::lossFunction(const double x, double & rho, double & drhodx) const
+{
+    double s = sign(x);
+    const double e = exp(-abs(x) / LOSS_FACTOR);
+    rho = s * LOSS_FACTOR * (1. - e);
+    drhodx = e;
+
+    return;
+}
+
 /*
 A cost function with analytic jacobian
 works faster than autodiff version and works with any ICamera
@@ -67,15 +78,21 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
                 grad /= _scale;  // normalize according to the scale
                 
                 residual[i] = (f - _dataPack.valVec[i]); // / (_dataPack.valVec[i] + 10);
-                if (abs(residual[i]) > 10)
+//                if (abs(residual[i]) > 10)
+//                {
+//                    residual[i] = 0.;
+//                    fill(jacobian[0] + i*6, jacobian[0] + i*6 + 6, 0.);
+//                }
+//                else
+//                {                
+                jacobianCalculator.dfdxi(transformedPoints[i], grad, jacobian[0] + i*6);
+                double k;
+                lossFunction(residual[i], residual[i], k);
+                for (int j = 0; j < 6; j++)
                 {
-                    residual[i] = 0.;
-                    fill(jacobian[0] + i*6, jacobian[0] + i*6 + 6, 0.);
+                    jacobian[0][i*6 + j] *= k;
                 }
-                else
-                {                
-                    jacobianCalculator.dfdxi(transformedPoints[i], grad, jacobian[0] + i*6);
-                }
+//                }
                 
 //                for (int j = 0; j < 6; j++) *(jacobian[0] + i*6 + j) /= (_dataPack.valVec[i] + 10); 
                 
@@ -101,7 +118,9 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
                 double f;
                 imageInterpolator.Evaluate(pt[1] / _scale, pt[0] / _scale, &f);
                 residual[i] = (f - _dataPack.valVec[i]);// / (_dataPack.valVec[i] + 10);
-                if (abs(residual[i]) > 10) residual[i] = 0.;
+                double k;
+                lossFunction(residual[i], residual[i], k);
+//                if (abs(residual[i]) > 10) residual[i] = 0.;
             }
             else
             {

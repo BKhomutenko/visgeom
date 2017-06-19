@@ -41,23 +41,9 @@ const double MIN_STEREO_BASE = 0.05; // minimal acceptable stereo base
 class MonoOdometry
 {
 public:
-    MonoOdometry(const ptree & params):
-        _xiBaseCam( readTransform(params.get_child("xi_base_camera")) ),
-        _sgmParams(params.get_child("stereo_parameters")),
-        _camera( new EnhancedCamera(readVector<double>(params.get_child("camera_params")).data()) ),
-        sparseOdom(_camera, _xiBaseCam),
-        motionStereo(_camera, _camera, params.get_child("stereo_parameters")),
-        localizer(5, _camera),
-        state(STATE_BEGIN)
-    {
-        localizer.setVerbosity(0);
-        localizer.setXiBaseCam(_xiBaseCam);
-    }
+    MonoOdometry(const ptree & params);
         
-    ~MonoOdometry() 
-    {
-        delete _camera;
-    }
+    ~MonoOdometry();
     
     void feedWheelOdometry(const Transf xiOdomNew);
     void feedImage(const Mat8u & imageNew);

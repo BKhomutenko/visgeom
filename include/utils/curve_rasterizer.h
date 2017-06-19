@@ -53,11 +53,6 @@ struct Polynomial2
     
 };
 
-inline int sign(double x)
-{
-    return 2*int(x > 0) - 1;
-}
-
 /*
 //TODO int or double?
 template<typename T, typename Surface>

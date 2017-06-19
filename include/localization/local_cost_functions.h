@@ -29,6 +29,8 @@ Cost functions for localization based on photometric data and mutual information
 #include "geometry/geometry.h"
 #include "projection/generic_camera.h"
 
+
+
 // to store the data for the photometric optimization
 struct PhotometricPack
 {
@@ -70,11 +72,13 @@ struct PhotometricCostFunction : ceres::CostFunction
     
     virtual bool Evaluate(double const * const * parameters, double * residual, double ** jacobian) const;
 
+    void lossFunction(const double x, double & rho, double & drhodx) const;
     ICamera * _camera;
     const Transf _xiBaseCam;
     const PhotometricPack & _dataPack;
     const Grid2D<float> _imageGrid;
     const double _scale;
+    const double LOSS_FACTOR = 3;     // defines how quickly the impact of data points is reduced with error
 };
 
 

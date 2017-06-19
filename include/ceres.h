@@ -35,6 +35,8 @@ using ceres::Problem;
 using ceres::Solver;
 using ceres::Solve;
 using ceres::SoftLOneLoss;
+using ceres::CauchyLoss;
+using ceres::LossFunction;
 //gradient-based
 using ceres::GradientProblem;
 using ceres::GradientProblemSolver;

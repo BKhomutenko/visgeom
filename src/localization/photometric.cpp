@@ -108,9 +108,21 @@ void ScalePhotometric::computePose(int scaleIdx, Transf & T12)
     Problem problem;
     PhotometricCostFunction * costFunction = new PhotometricCostFunction(camPtr2, _xiBaseCam, dataPack,
                                             scaleSpace2.get(), scaleSpace2.getActiveScale());
-    problem.AddResidualBlock(costFunction, NULL /*new SoftLOneLoss(1)*/, pose.data());
     
+    const double LOSS_THRESH = 10;
+//    RobustLoss myLoss(LOSS_THRESH);
+//    CauchyLoss myLoss(LOSS_THRESH);
+//    for (int i = 0; i < 100; i+=5)
+//    {
+//        double out[3];
+//        myLoss.Evaluate(i*i, out);
+//        cout << setw(15) << i      << setw(15) << out[0]
+//             << setw(15) << out[1] << setw(15) << out[2] << endl;
+//    }
     
+//    problem.AddResidualBlock(costFunction, new RobustLoss(LOSS_THRESH), pose.data());
+//    problem.AddResidualBlock(costFunction, new CauchyLoss(LOSS_THRESH), pose.data());
+    problem.AddResidualBlock(costFunction, NULL, pose.data());    
     //run the solver
     Solver::Options options;
     options.linear_solver_type = ceres::DENSE_QR;
@@ -194,10 +206,10 @@ array<double, 6> ScalePhotometric::covarianceEigenValues(const int scaleIdx,
         errHist[idx]++;
     }
     
-    for (int h : errHist)
-    {
-        cout << h << endl;
-    }
+//    for (int h : errHist)
+//    {
+//        cout << h << endl;
+//    }
     cout << "Jacobian is evaluated" << endl;
     MatrixXd JtJ = J.transpose() * J;
     Eigen::SelfAdjointEigenSolver<MatrixXd> es(JtJ);
@@ -260,7 +272,7 @@ void ScalePhotometric::computePoseMI(int scaleIdx, Transf & T12)
     if (verbosity > 2) cout << summary.FullReport() << endl;
     else if (verbosity > 1) cout << summary.BriefReport() << endl;
     T12 = Transf(pose.data());
-    cout << T12 << endl;
+//    cout << T12 << endl;
 //    saveSurface("surf01.txt", costFunction, 2, 3, 0.0005, 50, pose.data());
 }
 
