@@ -130,7 +130,7 @@ double SparseOdometry::computeTransfSparse(const Vector3dVec & xVec1, const Vect
     
     array<double, 6> xiArr = xiOdom.toArray();
     
-    OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.01, 0.03, xiOdom);
+    OdometryPrior * odometryCost = new OdometryPrior(0.01, 0.01, 0.005, 0.01, xiOdom);
     problem.AddResidualBlock(odometryCost, NULL, xiArr.data());
     
     SparseReprojectCost * projectionCost = new SparseReprojectCost(camera,

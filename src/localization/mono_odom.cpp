@@ -64,7 +64,8 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
     switch (state)
     {
     case STATE_BEGIN:
-        //the starting point
+        //the starting point, position 0
+        //TODO refactor
         _xiGlobal = _xiLocal = Transf(0, 0, 0, 0, 0, 0);
         imageVec.emplace_back(imageNew.clone());
         transfVec.push_back(_xiLocal);
@@ -78,40 +79,20 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         if (_xiLocal.trans().norm() >= MIN_INIT_DIST)
         {
             //compute accurate motion estimation
-            sparseOdom.feedData(imageNew, _xiLocal);
-            _xiLocal = sparseOdom.getIncrement();
-            //compute the initial depth estimation
+//            sparseOdom.feedData(imageNew, _xiLocal);
+//            _xiLocal = sparseOdom.getIncrement();
             
-            //set Sgm stereo base
-            EnhancedSgm sgm(getCameraMotion(), _camera, _camera, _sgmParams);
-            //compute Sgm stereo
-            sgm.computeStereo(imageVec.back(), imageNew, depth);
+            //create a keyframe
+            pushKeyFrame(imageNew);
             
-            //go to the next state
-            localizer.setDepth(depth);
-            state = STATE_READY;
-            
-            //Check the localization eigenvalues
-            
-            localizer.setTargetImage(imageNew);
-            double epsilon = 0.00;
-            Transf xiPhoto = localizer.computePose(_xiLocal).compose(Transf(epsilon, -epsilon, epsilon, epsilon, -epsilon, -epsilon));
-            Transf xiMI = localizer.computePoseMI(_xiLocal);
-            cout << "xiPhoto" << endl << xiPhoto << endl;
-            cout << "xiMI" << endl << xiMI << endl;
-            cout << "xiFeature" << endl << _xiLocal << endl;
-            array<double, 6>  eigen1 = localizer.covarianceEigenValues(1, _xiLocal, false);
-            for (int i = 0; i < 6; i++)
-            {
-                cout << setw(16) << eigen1[i];
-            }
-            cout << endl;
+            //change the state
+            state = STATE_READY;   
         }
         break; 
     case STATE_READY:
-        
+        localizer.setDepth(depth);
         localizer.setTargetImage(imageNew);
-        _xiLocal = localizer.computePose(_xiLocal);
+//        _xiLocal = localizer.computePose(_xiLocal);
 //        array<double, 6>  eigen1 = localizer.covarianceEigenValues(1, _xiLocal, false);
 //            for (int i = 0; i < 6; i++)
 //            {
@@ -123,7 +104,7 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         depth = motionStereo.compute(getCameraMotion(), imageNew, depth);
         depth.filterNoise();
         
-        localizer.setDepth(depth);
+        
         //TODO check whether a new keyframe is needed
         
         if (isNewKeyframeNeeded())
@@ -133,17 +114,45 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         
         break;
     }
+    cout << "MOTION ESTIMATION :" << endl;
+    cout << "    " << _xiLocal << endl;
+    cout << "    " << _xiGlobal << endl;
+    cout << "composed :" << endl;
+    cout << "    " << _xiGlobal.compose(_xiLocal) << endl;
 }
 
 void MonoOdometry::pushKeyFrame(const Mat8u & imageNew)
 {
+
+    //set Sgm stereo base
+    EnhancedSgm sgm(getCameraMotion().inverse(), _camera, _camera, _sgmParams);
+    //compute Sgm stereo 1-0
+    DepthMap depthNew;
+    sgm.computeStereo(imageNew, imageVec.back(), depthNew);
+    
+    if (state == STATE_READY)
+    {
+        // project the prior depth estimation       
+//        depth = depth.wrapDepth(_xiLocal);
+//        depth.merge(depthNew);
+        depth = depthNew;
+    }
+    else
+    {
+        depth = depthNew;
+    }
+    
+    //store the motion estimation
     _xiGlobal = _xiGlobal.compose(_xiLocal);
     transfVec.push_back(_xiLocal);
+    
+    //reset the local position
     _xiLocal = Transf(0, 0, 0, 0, 0, 0);
-    imageVec.push_back(imageNew.clone());
+    imageVec.emplace_back(imageNew.clone());
     localizer.setBaseImage(imageNew);
+    
     //Project the depth forward
-    depth = depth.wrapDepth(_xiLocal);
+    
 }
 
 bool MonoOdometry::isNewKeyframeNeeded()

@@ -161,9 +161,9 @@ bool DepthMap::match(const double v1, const double s1, const double v2, const do
 
 void DepthMap::filter(double & v1, double & s1, const double v2, const double s2)
 {
-    double denom = s1 + s2;
-    v1 = (v1 * s2 + v2 * s1) / denom;
-    s1 = s1 * s2 / denom;
+    double K = 1. / (s1 + s2);
+    v1 = (v1 * s2 + v2 * s1) * K;
+    s1 = max(s1 * s2 * K, 0.1);
 }
 
 bool DepthMap::filterPushHypothesis(const Vector3d & X, const double sigmaVal)
@@ -715,29 +715,34 @@ DepthMap DepthMap::wrapDepth(const Transformation<double> T12) const
 {
     DepthMap dMap2(cameraPtr, *this);
 
-    //Step 1 : Get point-cloud of current frame
+    // Get point-cloud of current frame
     MHPack cloud11MH;
     reconstruct(cloud11MH, 0);
 
-    //Step 2 : Transform cloud into keyframe
+    // Transform cloud into keyframe
     Vector3dVec cloud12;
     T12.inverseTransform(cloud11MH.cloud, cloud12);
 
-    //Step 3 : Project point cloud on keyframe
+    // Project point cloud on keyframe
     Vector2dVec point12Vec;
     cameraPtr->projectPointCloud(cloud12, point12Vec);
 
-    //Step 4 : Fill in data for depthmap
+    // Fill in data for depthmap
     vector<int> idx12Vec = getIdxVec(point12Vec);
     for (int i = 0; i < idx12Vec.size(); i++)
     {
         const int idx2 = idx12Vec[i];
         const int idx1 = cloud11MH.idxVec[i];
-        if(idx2 != -1)
+        if(idx2 != -1) //TODO figure out why not equivalent to isValid(...)
         {
-            dMap2.at(idx2) = cloud12[i].norm();
-            dMap2.sigma(idx2) = sigma(idx1);
-            dMap2.cost(idx2) = cost(idx1);
+            const double depthNew = cloud12[i].norm();
+            double & depthOld = dMap2.at(idx2);
+            if (depthOld == OUT_OF_RANGE or depthNew < depthOld)
+            {
+                dMap2.at(idx2) = cloud12[i].norm();
+                dMap2.sigma(idx2) = sigma(idx1);
+                dMap2.cost(idx2) = cost(idx1);
+            }
         }
     }
 
@@ -895,6 +900,7 @@ void DepthMap::filterNoise()
 
 }
 
+//TODO remove multihyp thing
 void DepthMap::merge(const DepthMap & depth2)
 {
     assert((ScaleParameters)(*this) == (ScaleParameters)depth2);
@@ -904,19 +910,38 @@ void DepthMap::merge(const DepthMap & depth2)
     {
         for (int x = 0; x < xMax; x++)
         {
-            for (int h2 = 0; h2 < depth2.hMax; h2++)
+            const double d2 = depth2.at(x, y);
+            if (d2 < MIN_DEPTH or d2 == OUT_OF_RANGE) continue;
+            const double s2 = depth2.sigma(x, y);
+            
+            double & d = at(x, y);
+            double & s = sigma(x, y);
+            if (d == OUT_OF_RANGE)
             {
-                const double d2 = depth2.at(x, y, h2);
-                if (d2 < MIN_DEPTH) continue;
-                const double sigma2 = depth2.sigma(x, y, h2);
-                if (sigma2 > 3) continue;
-                filterPushHypothesis(x, y, d2, sigma2);
+                d = d2;
+                s = s2;
             }
+            else
+            {
+                const double delta = abs(d - d2);
+                if (delta > 2.5*s and delta > 2.5*s2 and d2 < d)
+                {
+                    d = d2;
+                    sigma(x, y) = s2;
+                }
+                else
+                {
+                    filter(d, s, d2, s2);
+                }
+            }
+            
+            //TODO check the function
+//            filterPushHypothesis(x, y, d2, sigma2);
         }
     }
 
     // Remove bad hypotheses
-    costRejection();
+//    costRejection();
 }
 
 void DepthMap::regularize()

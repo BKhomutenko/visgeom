@@ -307,12 +307,12 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2, const DepthMap & 
             reconstruct(depthOut.at(x, y), depthOut.sigma(x, y), depthOut.cost(x, y));
         }
     }
-    cout << count1 << endl;
-    cout << count2 << endl;
-    cout << count3 << endl;
-    cout << count4 << endl << endl;
-    cout << count_in << endl;
-    cout << count_out << endl;
+//    cout << count1 << endl;
+//    cout << count2 << endl;
+//    cout << count3 << endl;
+//    cout << count4 << endl << endl;
+//    cout << count_in << endl;
+//    cout << count_out << endl;
     return depthOut;
 }
 

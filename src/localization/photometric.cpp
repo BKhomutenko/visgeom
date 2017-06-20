@@ -38,6 +38,11 @@ void ScalePhotometric::setTargetImage(const Mat8u & img2)
     scaleSpace2.generate(img2);
 }
 
+void ScalePhotometric::setMotionPriorStatus(const bool val)
+{
+    useMotionPrior = val;
+}
+
 PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
 {
     if (verbosity > 2) cout << "ScalePhotometric::initPhotometricData" << endl;
@@ -89,6 +94,7 @@ Transf ScalePhotometric::computePose(const Transf & T12)
     }
     //TODO set the optimization depth with the parameters   v
     Transf xi = T12;
+    _xiPrior = T12;
     for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 2; scaleIdx--)
     {
         computePose(scaleIdx, xi);
@@ -123,6 +129,14 @@ void ScalePhotometric::computePose(int scaleIdx, Transf & T12)
 //    problem.AddResidualBlock(costFunction, new RobustLoss(LOSS_THRESH), pose.data());
 //    problem.AddResidualBlock(costFunction, new CauchyLoss(LOSS_THRESH), pose.data());
     problem.AddResidualBlock(costFunction, NULL, pose.data());    
+    
+    //add an odometry prior
+    if (useMotionPrior)
+    {
+        OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.01, 0.03, _xiPrior);
+        problem.AddResidualBlock(odometryCost, NULL, pose.data());
+    }
+    
     //run the solver
     Solver::Options options;
     options.linear_solver_type = ceres::DENSE_QR;

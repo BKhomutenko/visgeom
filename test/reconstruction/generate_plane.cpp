@@ -58,8 +58,8 @@ int main(int argc, char** argv)
     EnhancedCamera camera(cameraParams.data());
     const double L = 0.3;
     Vector3dVec polygonVec{ Vector3d(   -L,     -L,     0),
-                            Vector3d(   L,      -L,      0),
-                            Vector3d(   L,       L,      0),
+                            Vector3d(    L,     -L,     0),
+                            Vector3d(    L,      L,     0),
                             Vector3d(   -L,      L,     0) };
     DepthMap depth = DepthMap::generatePlane(&camera, params, Transf(0, 0, 0.5, 0.1, 0.1, 0.1), polygonVec);
     

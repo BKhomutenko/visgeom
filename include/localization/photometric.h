@@ -41,7 +41,8 @@ public:
             scaleSpace2(nScales, false),
             camPtr2(cam2->clone()),
             _xiBaseCam(0, 0, 0, 0, 0, 0),
-            verbosity(0) {}
+            verbosity(0),
+            useMotionPrior(true) {}
             
            
     virtual ~ScalePhotometric()
@@ -63,7 +64,7 @@ public:
     
     void setBaseImage(const Mat8u & img1);
     void setTargetImage(const Mat8u & img2);
-    
+    void setMotionPriorStatus(const bool val);
     Transf computePose(const Transf & T12);
     
     void setVerbosity(int newVerbosity) { verbosity = newVerbosity; }
@@ -84,7 +85,8 @@ private:
     PhotometricPack initPhotometricData(int scaleIdx);
 
     Transf _xiBaseCam;
-
+    Transf _xiPrior;
+    bool useMotionPrior;
     BinaryScalSpace scaleSpace1;
     BinaryScalSpace scaleSpace2;
     ICamera * camPtr2;

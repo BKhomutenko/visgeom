@@ -37,10 +37,14 @@ int main(int argc, char** argv)
         Mat8u img1;
         device.render(img1);
         
-        cout << xi << endl;
+        
+        Vector6d noise = Vector6d::Random() / 100;
+        Transf eps(noise.data());
+//        odom.feedWheelOdometry(xi.compose(eps));
         odom.feedWheelOdometry(xi);
         odom.feedImage(img1);
-        
+        cout << "GROUND TRUTH : " << endl;
+        cout << "    " << xi << endl;
         imshow("rendered", img1);
         
         Mat32f depthMat;

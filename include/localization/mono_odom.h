@@ -38,7 +38,7 @@ const double MIN_INIT_DIST = 0.25;   // minimal distance traveled befor VO is us
 const double MIN_STEREO_BASE = 0.05; // minimal acceptable stereo base
 
 //constants to create new keyframes, TODO put elsewhere
-const double MAX_DIST = 0.5;
+const double MAX_DIST = 0.3;
 const double MAX_ANGLE = M_PI / 4;
 
 //TODO parameters initialization via .json

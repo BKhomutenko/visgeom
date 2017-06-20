@@ -51,6 +51,8 @@ works faster than autodiff version and works with any ICamera
 bool PhotometricCostFunction::Evaluate(double const * const * parameters,
         double * residual, double ** jacobian) const
 {
+    const int POINT_NUMBER = _dataPack.cloud.size();
+    const double NORMALIZER = 1. / POINT_NUMBER;
     Transf xiBase(parameters[0]);
     Transf xiCam = xiBase.compose(_xiBaseCam);
     // point cloud in frame 2
@@ -65,7 +67,7 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
     {
         // L_uTheta
         CameraJacobian jacobianCalculator(_camera, xiBase, _xiBaseCam);
-        for (int i = 0; i < transformedPoints.size(); i++)
+        for (int i = 0; i < POINT_NUMBER; i++)
         {
             Vector2d pt;
             if (_camera->projectPoint(transformedPoints[i], pt)) 
@@ -88,6 +90,8 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
                 jacobianCalculator.dfdxi(transformedPoints[i], grad, jacobian[0] + i*6);
                 double k;
                 lossFunction(residual[i], residual[i], k);
+                residual[i] *= NORMALIZER;
+                k *= NORMALIZER;
                 for (int j = 0; j < 6; j++)
                 {
                     jacobian[0][i*6 + j] *= k;
@@ -110,7 +114,7 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
     }
     else
     {
-        for (int i = 0; i < transformedPoints.size(); i++)
+        for (int i = 0; i < POINT_NUMBER; i++)
         {
             Vector2d pt;
             if (_camera->projectPoint(transformedPoints[i], pt)) 
@@ -120,6 +124,7 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
                 residual[i] = (f - _dataPack.valVec[i]);// / (_dataPack.valVec[i] + 10);
                 double k;
                 lossFunction(residual[i], residual[i], k);
+                residual[i] *= NORMALIZER;
 //                if (abs(residual[i]) > 10) residual[i] = 0.;
             }
             else
@@ -136,6 +141,7 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
 bool MutualInformation::Evaluate(double const * parameters,
         double * cost, double * gradient) const
 {
+    const int POINT_NUMBER = _dataPack.cloud.size();
     for (int i = 0; i < 6; i++)
     {
         if (std::isnan(parameters[i]) or std::isinf(parameters[i])) return false;
@@ -151,14 +157,14 @@ bool MutualInformation::Evaluate(double const * parameters,
     
     bool computeGrad = (gradient != NULL);
     
-    vector<double> valVec2(transformedPoints.size(), 0);
+    vector<double> valVec2(POINT_NUMBER, 0);
     vector<Covector2d> gradVec;
     if (computeGrad)
     {
-        gradVec.resize(transformedPoints.size(), Covector2d(0, 0));
+        gradVec.resize(POINT_NUMBER, Covector2d(0, 0));
     }
     *cost = 0;
-    for (int i = 0; i < transformedPoints.size(); i++)
+    for (int i = 0; i < POINT_NUMBER; i++)
     {
         Vector2d pt;
         auto & X = transformedPoints[i];
@@ -208,7 +214,7 @@ bool MutualInformation::Evaluate(double const * parameters,
         dMIdxi << 0, 0, 0, 0, 0, 0;
         // L_uTheta
         CameraJacobian jacobianCalculator(_camera, xiBase, _xiBaseCam);
-        for (int i = 0; i < transformedPoints.size(); i++)
+        for (int i = 0; i < POINT_NUMBER; i++)
         {
             Covector6d dfdxi;
             jacobianCalculator.dfdxi(transformedPoints[i], gradVec[i], dfdxi.data());
