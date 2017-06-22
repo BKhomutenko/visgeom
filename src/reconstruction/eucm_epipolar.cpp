@@ -139,7 +139,7 @@ Polynomial2 EnhancedEpipolar::computePolynomial(Vector3d plane) const
     double BB = B * B;
     double CC = C * C;
     double CCfufv = CC * fufv;
-    if (CCfufv/(AA + BB) < 2e-1) // the curve passes through the projection center
+    if (CCfufv/(AA + BB) < 1e-1) // the curve passes through the projection center
     {
         surf.kuu = surf.kuv = surf.kvv = 0;
         surf.ku = A/fu;
@@ -173,12 +173,14 @@ void EnhancedEpipolar::prepareCamera(CameraIdx camIdx)
     if (camIdx == CAMERA_1)
     {
         params = camera1->getParams();
-        epipole = epipoles.getFirst();
+        epipole = epipoles->getFirst();
+        cout << "epipole : " << epipole.transpose() << endl;
     } 
     else if (camIdx == CAMERA_2) 
     {
         params = camera2->getParams();
-        epipole = epipoles.getSecond();
+        epipole = epipoles->getSecond();
+        cout << "epipole : " << epipole.transpose() << endl;
     }
     activeCamera = camIdx;
     alpha = params[0];
@@ -209,16 +211,22 @@ void EnhancedEpipolar::traceEpipolarLine(int u, int v, Mat & out, CameraIdx camI
         if (not camera1->reconstructPoint(Vector2d(u, v), X1)) return;
         X2 = Transform12.rotMatInv() * X1;
         if (not camera2->projectPoint(X2, pt)) return;
-        raster1 = new CurveRasterizer<int, Polynomial2>(round(pt), epipoles.getSecondPx(), getSecond(X1));
-        if (epipoles.secondIsInverted()) raster1->setStep(-1);  
+        Vector2i pti = round(pt); //FIXME make a function. where to put?
+        bool useInverted = epipoles->useInvertedEpipoleSecond(pti);
+        Vector2i goal = epipoles->getSecondPx(useInverted);
+        raster1 = new CurveRasterizer<int, Polynomial2>(pti, goal, getSecond(X1));
+        if (useInverted) raster1->setStep(-1);  
     }
     else if (camIdx == CAMERA_2)
     {
         if (not camera2->reconstructPoint(Vector2d(u, v), X2)) return;
         X1 = Transform12.rotMat() * X2;
         if (not camera1->projectPoint(X1, pt)) return;
-        raster1 = new CurveRasterizer<int, Polynomial2>(round(pt), epipoles.getFirstPx(), getFirst(X1));
-        if (epipoles.firstIsInverted()) raster1->setStep(-1);
+        Vector2i pti = round(pt);
+        bool useInverted = epipoles->useInvertedEpipoleFirst(pti);
+        Vector2i goal = epipoles->getFirstPx(useInverted);
+        raster1 = new CurveRasterizer<int, Polynomial2>(pti, goal, getFirst(X1));
+        if (useInverted) raster1->setStep(-1);
     }
     CurveRasterizer<int, Polynomial2> * raster2 = new CurveRasterizer<int, Polynomial2>(*raster1);
     cv::circle(out, Point(raster1->u, raster1->v), 1, Scalar(128), -1);

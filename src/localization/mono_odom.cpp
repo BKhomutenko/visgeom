@@ -41,6 +41,7 @@ MonoOdometry::MonoOdometry(const ptree & params):
     localizer(5, _camera),
     state(STATE_BEGIN)
 {
+    cout << "verbosity " << _sgmParams.verbosity << endl; 
     localizer.setVerbosity(0);
     localizer.setXiBaseCam(_xiBaseCam);
 }
@@ -76,11 +77,14 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         break;    
     case STATE_SPARSE_INIT:
         //wait until the distance is sucfficient to do the saprce initialization
+//        motionStereo.setBaseImage(imageNew);
+//        depth = motionStereo.compute(getCameraMotion().inverse(), imageVec.back());
+//        pushKeyFrame(imageNew);
         if (_xiLocal.trans().norm() >= MIN_INIT_DIST)
         {
             //compute accurate motion estimation
-//            sparseOdom.feedData(imageNew, _xiLocal);
-//            _xiLocal = sparseOdom.getIncrement();
+            sparseOdom.feedData(imageNew, _xiLocal);
+            _xiLocal = sparseOdom.getIncrement();
             
             //create a keyframe
             pushKeyFrame(imageNew);
@@ -92,7 +96,8 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
     case STATE_READY:
         localizer.setDepth(depth);
         localizer.setTargetImage(imageNew);
-//        _xiLocal = localizer.computePose(_xiLocal);
+//        _xiLocal = localizer.computePose( _xiLocal.compose(Transf(0.01, 0.01, 0.01, 0.01, 0.01, 0.01)) );
+        _xiLocal = localizer.computePose( _xiLocal );
 //        array<double, 6>  eigen1 = localizer.covarianceEigenValues(1, _xiLocal, false);
 //            for (int i = 0; i < 6; i++)
 //            {
@@ -130,12 +135,21 @@ void MonoOdometry::pushKeyFrame(const Mat8u & imageNew)
     DepthMap depthNew;
     sgm.computeStereo(imageNew, imageVec.back(), depthNew);
     
+    
+//    //set Sgm stereo base
+//    EnhancedSgm sgm(getCameraMotion(), _camera, _camera, _sgmParams);
+//    //compute Sgm stereo 1-0
+//    DepthMap depthNew;
+//    sgm.computeStereo(imageVec.back(), imageNew, depthNew);
+//    
+    
+    
     if (state == STATE_READY)
     {
         // project the prior depth estimation       
-//        depth = depth.wrapDepth(_xiLocal);
-//        depth.merge(depthNew);
-        depth = depthNew;
+        depth = depth.wrapDepth(_xiLocal);
+        depth.merge(depthNew);
+//        depth = depthNew;
     }
     else
     {
@@ -150,7 +164,7 @@ void MonoOdometry::pushKeyFrame(const Mat8u & imageNew)
     _xiLocal = Transf(0, 0, 0, 0, 0, 0);
     imageVec.emplace_back(imageNew.clone());
     localizer.setBaseImage(imageNew);
-    
+    motionStereo.setBaseImage(imageNew);
     //Project the depth forward
     
 }

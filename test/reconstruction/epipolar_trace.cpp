@@ -24,9 +24,11 @@ void CallBackFunc1(int event, int x, int y, int flags, void* userdata)
         Vector3d X;
         Vector2d pt;
         cam1->reconstructPoint(Vector2d(x, y), X);
-        CurveRasterizer<int, Polynomial2> raster(Vector2i(x, y), epipoles->getFirstPx(),
+        Vector2i pti(x, y);
+        bool useInverted = epipoles->useInvertedEpipoleFirst(pti);
+        CurveRasterizer<int, Polynomial2> raster(pti, epipoles->getFirstPx(useInverted),
                              epipolar->getFirst(X));
-        if (epipoles->firstIsInverted()) raster.setStep(-1);
+        if (useInverted) raster.setStep(-1);
         vector<uint8_t> descriptor;
         const int step = epipolarDescriptor->compute(orig1, raster, descriptor);
         cout << "step :" << step << endl;
@@ -39,9 +41,11 @@ void CallBackFunc1(int event, int x, int y, int flags, void* userdata)
         
         //get the sample sequence
         cam2->projectPoint(TleftRight.rotMatInv() * X, pt);
-        CurveRasterizer<int, Polynomial2> raster2(round(pt), epipoles->getSecondPx(),
+        Vector2i pti2 = round(pt);
+        useInverted = epipoles->useInvertedEpipoleSecond(pti2);
+        CurveRasterizer<int, Polynomial2> raster2(pti2, epipoles->getSecondPx(useInverted),
                              epipolar->getSecond(X));
-        if (epipoles->secondIsInverted()) raster2.setStep(-1);                     
+        if (useInverted) raster2.setStep(-1);                     
         raster2.setStep(step);                     
         vector<uint8_t> samleVec;
         raster2.steps(-5);
@@ -106,6 +110,17 @@ int main(int argc, char** argv)
     cout << "simple " << double(tr2 - tr1) / CLOCKS_PER_SEC << endl;
     cout << x1 << " " << x2 << endl;
     return 0;*/
+    
+    
+    
+    //Create two images and trace only epipolar lines
+    
+    
+    
+    
+    
+    /*
+    //TODO NOT TO DELETE, MIGHT BE USEFUL IN FUTURE
     ifstream paramFile(argv[1]);
     if (not paramFile.is_open())
     {
@@ -204,6 +219,8 @@ int main(int argc, char** argv)
         waitKey(); 
     }
     delete epipolar;
+    
+    */
     return 0;
 }
 

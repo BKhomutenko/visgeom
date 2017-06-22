@@ -36,43 +36,66 @@ public:
     StereoEpipoles() {}
     
     StereoEpipoles(const ICamera * camera1, const ICamera * camera2,
-            const Transf & Transform12)
-    {
-        if (camera1->projectPoint(Transform12.trans(), epipole1))
-        {
-            epipoleInverted1 = false;
-        }
-        else
-        {
-            camera1->projectPoint(-Transform12.trans(), epipole1);
-            epipoleInverted1 = true;
-        }
-        
-        if (camera2->projectPoint(Transform12.transInv(), epipole2))
-        {
-            epipoleInverted2 = false;
-        }
-        else
-        {
-            camera2->projectPoint(-Transform12.transInv(), epipole2);
-            epipoleInverted2 = true;
-        }
-        
-        epipolePx1 = round(epipole1);
-        epipolePx2 = round(epipole2);
+            const Transf & Transform12);
     
+    const Vector2d & getFirst(bool inverted) const 
+    { 
+        if (inverted) return antiEpipole1;
+        else return epipole1;
     }
     
-    const Vector2d & getFirst() const { return epipole1; }
-    const Vector2i & getFirstPx() const { return epipolePx1; }
-    const Vector2d & getSecond() const { return epipole2; }
-    const Vector2i & getSecondPx() const { return epipolePx2; }
-    bool firstIsInverted() const { return epipoleInverted1; } 
-    bool secondIsInverted() const { return epipoleInverted2; }
+    const Vector2d & getFirst() const 
+    { 
+        if (epipole1projected) return epipole1;
+        else return antiEpipole1;
+    }
     
-private:
-    bool epipoleInverted1, epipoleInverted2;
+    const Vector2i & getFirstPx(bool inverted) const 
+    { 
+        if (inverted) return antiEpipolePx1;
+        else return epipolePx1;
+    }
+    
+    const Vector2i & getFirstPx() const 
+    { 
+        if (epipole1projected) return epipolePx1;
+        else return antiEpipolePx1;
+    }
+    
+    const Vector2d & getSecond(bool inverted) const 
+    { 
+        if (inverted) return antiEpipole2;
+        else return epipole2;
+    }
+    
+    const Vector2d & getSecond() const 
+    { 
+        if (epipole2projected) return epipole2;
+        else return antiEpipole2;
+    }
+    
+    const Vector2i & getSecondPx(bool inverted) const 
+    { 
+        if (inverted) return antiEpipolePx2;
+        else return epipolePx2;
+    }
+    
+    const Vector2i & getSecondPx() const 
+    { 
+        if (epipole2projected) return epipolePx2;
+        else return antiEpipolePx2;
+    }
+    
+    //TODO testing
+    bool useInvertedEpipoleSecond(const Vector2i pt) const;
+    bool useInvertedEpipoleFirst(const Vector2i pt) const;
+    
+//private:
+    bool epipole1projected, epipole2projected;
+    bool antiEpipole1projected, antiEpipole2projected;
     Vector2d epipole1, epipole2;  // projection of the first camera center onto the second camera
+    Vector2d antiEpipole1, antiEpipole2;  // projection of the first camera center onto the second camera
     Vector2i epipolePx1, epipolePx2;
+    Vector2i antiEpipolePx1, antiEpipolePx2;
 };
 

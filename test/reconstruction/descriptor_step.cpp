@@ -100,9 +100,11 @@ int main(int argc, char** argv)
                 Vector3d X;
                 
                 cam1.reconstructPoint(Vector2d(u, v), X);
-                CurveRasterizer<int, Polynomial2> raster(Vector2i(u, v), epipoles.getFirstPx(),
+                Vector2i pti(u, v);
+                bool isInverted = epipoles.useInvertedEpipoleFirst(pti);
+                CurveRasterizer<int, Polynomial2> raster(pti, epipoles.getFirstPx(isInverted),
                                          epipolar.getFirst(X));
-                if (epipoles.firstIsInverted()) raster.setStep(-1);
+                if (isInverted) raster.setStep(-1);
                 vector<uint8_t> descriptor;
                 const int step = epipolarDescriptor.compute(img1, raster, descriptor);
                 if (step > 0)  descStepMat(v, u) = (10 - step) * 25; 

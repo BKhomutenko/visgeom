@@ -32,19 +32,25 @@ Semi-global block matching algorithm for non-rectified images
 
 CurveRasterizer<int, Polynomial2> EnhancedSgm::getCurveRasteriser1(int idx) const
 {
-    Vector2i pt = _pointPxVec1[idx];
-    CurveRasterizer<int, Polynomial2> raster(pt, epipoles().getFirstPx(),
-                                            _epipolarCurves.getFirst(_reconstVec[idx]));
-    if (epipoles().firstIsInverted()) raster.setStep(-1);
+    //TODO make a function
+    Vector2i pti = _pointPxVec1[idx];
+    bool useInverted = epipoles().useInvertedEpipoleFirst(pti);
+    Vector2i goal = epipoles().getFirstPx(useInverted);
+    CurveRasterizer<int, Polynomial2> raster(pti, goal,
+                            _epipolarCurves.getFirst(_reconstVec[idx]));
+    if (useInverted) raster.setStep(-1);
     return raster;
 }
 
 CurveRasterizer<int, Polynomial2> EnhancedSgm::getCurveRasteriser2(int idx) const
 {
-    Vector2i _pinfPx = _pinfPxVec[idx];
-    CurveRasterizer<int, Polynomial2> raster(_pinfPx, epipoles().getSecondPx(),
-             _epipolarCurves.getSecond(_reconstVec[idx]));
-    if (epipoles().secondIsInverted()) raster.setStep(-1);
+    //TODO make a function
+    Vector2i pti = _pinfPxVec[idx];
+    bool useInverted = epipoles().useInvertedEpipoleSecond(pti);
+    Vector2i goal = epipoles().getSecondPx(useInverted);
+    CurveRasterizer<int, Polynomial2> raster(pti, goal,
+                            _epipolarCurves.getSecond(_reconstVec[idx]));
+    if (useInverted) raster.setStep(-1);
     return raster;
 }
 
@@ -230,7 +236,7 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
         for (int x = 0; x < _params.xMax; x++)
         {
             int idx = getLinearIndex(x, y);
-            if (_params.verbosity > 4) 
+            if (_params.verbosity > 5) 
             {
                 cout << "    x: " << x << " y: " << y << "  idx: " << idx; 
                 cout << "  mask: " << _maskVec[idx] <<  endl;
@@ -309,7 +315,7 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 }
             }
             vector<int> costVec = compareDescriptor(descriptor, sampleVec, _params.flawCost);
-            if (y == 350 and x > 469 and x < 481)
+            /*if (y == 15)
             {
                 cout << "Point : " << x << " " << y << endl;
                 cout << "Step : " << step << endl;
@@ -331,7 +337,7 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                     cout << setw(6) << int(x);
                 }
                 cout << endl;
-            }
+            }*/
             
 //            //compute the bias;
 //            int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
@@ -347,12 +353,20 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 //                                descriptor.begin(), sampleVec.begin() + d, bias);
 //                *outPtr = acc / NORMALIZER;
 
-                *outPtr = *costIter / _params.descLength;
+                *outPtr = min(*costIter, 255);
                 ++costIter;
             }
             if (step > 1) fillGaps(_errorBuffer.row(y).data + x*_params.dispMax, step);
         }
     }
+//    cout << "Epipoles : " << endl;
+//    cout << epipoles().useInvertedEpipoleSecond(Vector2i(250, 250)) << endl;
+//    cout << epipoles().getSecond(true).transpose() << "     "  << epipoles().getSecond(false).transpose() << endl;
+//    cout << epipoles().getSecondPx(true).transpose() << "     "  << epipoles().getSecondPx(false).transpose() << endl;
+//    
+//    
+//    cout << epipoles().epipole1projected<< epipoles().epipole2projected
+//        << epipoles().antiEpipole1projected<< epipoles().antiEpipole2projected << endl;
 }
 
 void EnhancedSgm::fillGaps(uint8_t * const data, const int step)
@@ -523,21 +537,25 @@ void EnhancedSgm::reconstructDisparity()
             int32_t & bestCost = _finalErrorMat(y, x);
             bestCost = INT32_MAX;
             bestDisp = -1;
+            const int base = x * _params.dispMax;
+            if (_params.verbosity > 4) cout << "Err : ";
             for (int d = 0; d < _params.dispMax; d++)
             {
-                int base = x * _params.dispMax;
                 const int & err = errRow[base + d];
+                if (_params.verbosity > 4) cout << setw(8) << err;
                 if (err > _params.maxError) continue;
                 int cost = dynRow1[base + d] + dynRow2[base + d] 
                         + dynRow3[base + d] + dynRow4[base + d] - 2*err;
+                
                 if ( bestCost > cost)
                 {
                     bestDisp = d;
                     bestCost = cost;
                 }
             }
+             if (_params.verbosity > 4) cout << endl;
             if (_params.verbosity > 4) cout << "    x: " << x << " best error: " 
-                    << _finalErrorMat(y, x) << endl;
+                    << _finalErrorMat(y, x) << "   d : " << bestDisp <<  endl;
         }
         if (_params.verbosity > 3) cout << "    y: " << y << endl;
     }

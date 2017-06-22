@@ -32,7 +32,20 @@ Cost functions for localization based on photometric data and mutual information
 #include "projection/jacobian.h"
 #include "reconstruction/triangulator.h"
 
-
+PhotometricCostFunction::PhotometricCostFunction(const ICamera * camera, const Transf & xiBaseCam,
+            const PhotometricPack & dataPack,
+            const Mat32f & img2, double scale) :
+            _camera(camera->clone()),
+            _dataPack(dataPack),
+            _xiBaseCam(xiBaseCam),
+            _imageGrid(img2.cols, img2.rows, (float*)(img2.data)),
+            _scale(scale) 
+    {
+        mutable_parameter_block_sizes()->clear();
+        mutable_parameter_block_sizes()->push_back(6);
+        set_num_residuals(_dataPack.cloud.size());
+    }
+    
 void PhotometricCostFunction::lossFunction(const double x, double & rho, double & drhodx) const
 {
     double s = sign(x);
@@ -52,7 +65,7 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
         double * residual, double ** jacobian) const
 {
     const int POINT_NUMBER = _dataPack.cloud.size();
-    const double NORMALIZER = 1. / POINT_NUMBER;
+    const double NORMALIZER = 1.;
     Transf xiBase(parameters[0]);
     Transf xiCam = xiBase.compose(_xiBaseCam);
     // point cloud in frame 2

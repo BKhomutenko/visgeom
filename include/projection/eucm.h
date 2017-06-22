@@ -43,7 +43,7 @@ struct EnhancedProjector
         const T & z = src[2];
         
         T denom = alpha * sqrt(z*z + beta*(x*x + y*y)) + (T(1.) - alpha) * z;
-        if (denom < 1e-3) return false;
+        if (denom < T(1e-3)) return false;
         
         // Check that the point is in the upper hemisphere in case of ellipsoid
         if (alpha > T(0.5))

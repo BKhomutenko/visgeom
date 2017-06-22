@@ -135,13 +135,15 @@ private:
         GLB_START_POINT = 16,
         GLB_DISP_MAX = 32,
         GLB_SAMPLE_VEC = 64,
-        GLB_UV_VEC = 128
+        GLB_UV_VEC = 128,
+        GLB_INVERTED_SAMPLING = 256
     };
     
     uint32_t flags;
     
     int gu, gv;
     int gu2, gv2;
+    vector<int> guTmpVec, gvTmpVec;
     Vector3d gX;
     
     Vector2d gptStart;

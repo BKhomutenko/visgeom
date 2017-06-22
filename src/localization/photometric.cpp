@@ -131,8 +131,9 @@ void ScalePhotometric::computePose(int scaleIdx, Transf & T12)
     problem.AddResidualBlock(costFunction, NULL, pose.data());    
     
     //add an odometry prior
-    if (useMotionPrior)
+    if (useMotionPrior) //FIXME experimental
     {
+        //A proper nose model on the depth map localization must be applied
         OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.01, 0.03, _xiPrior);
         problem.AddResidualBlock(odometryCost, NULL, pose.data());
     }

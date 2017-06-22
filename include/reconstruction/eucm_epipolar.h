@@ -43,6 +43,7 @@ public:
         camera2(cam2->clone()),
         step(4. / numberSteps),
         nSteps(numberSteps),
+        epipoles(NULL),
         verbosity(verbosity)
     { }
     
@@ -52,7 +53,7 @@ public:
         Transform12(T12),
         camera1(cam1->clone()),
         camera2(cam2->clone()),
-        epipoles(cam1, cam2, T12),
+        epipoles(new StereoEpipoles(cam1, cam2, T12)),
         step(4. / numberSteps),
         nSteps(numberSteps),
         verbosity(verbosity)
@@ -64,16 +65,16 @@ public:
     virtual ~EnhancedEpipolar()
     {
         delete camera1;
-        camera1 = NULL;
         delete camera2;
-        camera2 = NULL;
+        delete epipoles;
     }
     
     void setTransformation(const Transf & transf)
     {
         assert(transf.trans().squaredNorm() > 1e-10);
         Transform12 = transf;
-        epipoles = StereoEpipoles(camera1, camera2, transf);
+        delete epipoles;
+        epipoles = new StereoEpipoles(camera1, camera2, transf);
         initialize();
     }
     
@@ -86,7 +87,7 @@ public:
     
     void initialize();
     
-    const StereoEpipoles & getEpipoles() const { return epipoles; }
+    const StereoEpipoles & getEpipoles() const { return *epipoles; }
     
 private:
     
@@ -111,7 +112,7 @@ private:
     double fvfv;
     
     //stores the epipoles
-    StereoEpipoles epipoles;
+    StereoEpipoles * epipoles;
     
     //defines which camera is active right now
     CameraIdx activeCamera;

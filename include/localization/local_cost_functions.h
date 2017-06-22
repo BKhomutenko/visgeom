@@ -52,17 +52,7 @@ struct PhotometricCostFunction : ceres::CostFunction
 
     PhotometricCostFunction(const ICamera * camera, const Transf & xiBaseCam,
             const PhotometricPack & dataPack,
-            const Mat32f & img2, double scale) :
-            _camera(camera->clone()),
-            _dataPack(dataPack),
-            _xiBaseCam(xiBaseCam),
-            _imageGrid(img2.cols, img2.rows, (float*)(img2.data)),
-            _scale(scale) 
-    {
-        mutable_parameter_block_sizes()->clear();
-        mutable_parameter_block_sizes()->push_back(6);
-        set_num_residuals(_dataPack.cloud.size());
-    }
+            const Mat32f & img2, double scale);
     
     virtual ~PhotometricCostFunction()  
     {

@@ -55,6 +55,7 @@ add_library( reconstruction STATIC
     src/reconstruction/depth_map.cpp
     src/reconstruction/triangulator.cpp
     src/reconstruction/scale_parameters.cpp
+    src/reconstruction/epipoles.cpp
 )
 
 target_link_libraries( reconstruction ${OpenCV_LIBS} )
