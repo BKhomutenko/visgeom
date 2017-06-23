@@ -30,29 +30,21 @@ Semi-global block matching algorithm for non-rectified images
 #include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 
-CurveRasterizer<int, Polynomial2> EnhancedSgm::getCurveRasteriser1(int idx) const
+CurveRasterizer<int, Polynomial2> EnhancedSgm::getCurveRasteriser(CameraIdx camIdx, 
+        int idx, uint32_t * flags) const
 {
-    //TODO make a function
-    Vector2i pti = _pointPxVec1[idx];
-    bool useInverted = epipoles().useInvertedEpipoleFirst(pti);
-    Vector2i goal = epipoles().getFirstPx(useInverted);
+    Vector2i pti;
+    if (camIdx == CAMERA_1) pti = _pointPxVec1[idx];
+    else if (camIdx == CAMERA_2) pti = _pinfPxVec[idx]; 
+    uint32_t useInverted = epipoles().chooseEpipole(camIdx, pti);
+    Vector2i goal = epipoles().getPx(camIdx, useInverted);
     CurveRasterizer<int, Polynomial2> raster(pti, goal,
-                            _epipolarCurves.getFirst(_reconstVec[idx]));
-    if (useInverted) raster.setStep(-1);
+                            _epipolarCurves.get(camIdx, _reconstVec[idx]));
+    if (useInverted & EPIPOLE_INVERTED) raster.setStep(-1);
+    if (flags != NULL) *flags = useInverted;
     return raster;
 }
 
-CurveRasterizer<int, Polynomial2> EnhancedSgm::getCurveRasteriser2(int idx) const
-{
-    //TODO make a function
-    Vector2i pti = _pinfPxVec[idx];
-    bool useInverted = epipoles().useInvertedEpipoleSecond(pti);
-    Vector2i goal = epipoles().getSecondPx(useInverted);
-    CurveRasterizer<int, Polynomial2> raster(pti, goal,
-                            _epipolarCurves.getSecond(_reconstVec[idx]));
-    if (useInverted) raster.setStep(-1);
-    return raster;
-}
 
 //TODO reconstruct the depth points, not everything
 void EnhancedSgm::computeReconstructed()
@@ -96,7 +88,7 @@ void EnhancedSgm::computeUVCache()
         {
             int idx = getLinearIndex(x, y);
             if (not _maskVec[idx]) continue;
-            CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
+            CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser(CAMERA_2, idx);
             raster.steps(-DISPARITY_MARGIN);
             const int u_vCacheStep = _params.dispMax + 2 * DISPARITY_MARGIN;
             int32_t * uPtr = (int32_t *)_uCache.row(y).data + x*u_vCacheStep;
@@ -206,7 +198,7 @@ void EnhancedSgm::reconstructDepth(DepthMap & depth) const
                 }
                 else
                 {       
-                    CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
+                    CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser(CAMERA_2, idx);
                     raster.steps(disparity);
                     u21 = raster.u;
                     v21 = raster.v;
@@ -251,7 +243,7 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
             // compute the local image descriptor,
             // a piece of the epipolar curve on the first image
             vector<uint8_t> descriptor;
-            CurveRasterizer<int, Polynomial2> descRaster = getCurveRasteriser1(idx);
+            CurveRasterizer<int, Polynomial2> descRaster = getCurveRasteriser(CAMERA_1, idx);
             const int step = _epipolarDescriptor.compute(img1, descRaster, descriptor);
             _stepBuffer(y, x) = step;
             if (step < 1) 
@@ -303,7 +295,7 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
             }
             else
             {
-                CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser2(idx);
+                CurveRasterizer<int, Polynomial2> raster = getCurveRasteriser(CAMERA_2, idx);
                 raster.setStep(step); 
                 raster.steps(-HALF_LENGTH);           
                 

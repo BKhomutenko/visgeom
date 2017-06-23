@@ -125,16 +125,15 @@ target_link_libraries( renderer_test
     ${OpenCV_LIBS} 
 )
 
-# TODO eventually remove
-#add_executable( sgm_synthetic_planar 
-#    test/reconstruction/sgm_synthetic_planar.cpp
-#)
+add_executable( sgm_synthetic_planar 
+    test/reconstruction/sgm_synthetic_planar.cpp
+)
 
-#target_link_libraries( sgm_synthetic_planar 
-#    utils
-#    reconstruction
-#    ${OpenCV_LIBS} 
-#)
+target_link_libraries( sgm_synthetic_planar 
+    render
+    reconstruction
+    ${OpenCV_LIBS} 
+)
 
 # TODO eventually remove
 #add_executable( stereo 

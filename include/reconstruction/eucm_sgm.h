@@ -133,8 +133,8 @@ public:
     // index of an object in a linear array corresponding to pixel [row, col] 
     int getLinearIndex(int x, int y) const { return _params.xMax*y + x; }
       
-    CurveRasterizer<int, Polynomial2> getCurveRasteriser1(int idx) const;
-    CurveRasterizer<int, Polynomial2> getCurveRasteriser2(int idx) const;
+    CurveRasterizer<int, Polynomial2> getCurveRasteriser(CameraIdx camIdx, int idx,
+                                                         uint32_t * flags = NULL) const;
     
     // reconstruction
     void fillGaps(uint8_t * const data, const int step);

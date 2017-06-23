@@ -58,10 +58,11 @@ bool MotionStereo::selectPoint(int x, int y)
     flags |= GLB_X;
     
     Vector2i pti = round(pt);
-    bool useInverted = epipoles().useInvertedEpipoleFirst(pti);
-    Vector2i goal = epipoles().getFirstPx(useInverted);
+    auto useInverted = epipoles().chooseEpipole(CAMERA_1, pti, _params.epipoleMargin);
+    if (useInverted & EPIPOLE_TOO_CLOSE) return false;
+    Vector2i goal = epipoles().getPx(CAMERA_1, useInverted);
     CurveRasterizer<int, Polynomial2> descRaster(round(pt), goal,
-                                _epipolarCurves.getFirst(gX));
+                                _epipolarCurves.get(CAMERA_1, gX));
     if (useInverted) descRaster.setStep(-1);
 
     //to compute one step for the uncertainty estimation
@@ -94,19 +95,19 @@ bool MotionStereo::computeUncertainty(double d, double s)
 //        return false; //FIXME
         Vector3d Xmax = R21() * gX;
         if (not _camera2->projectPoint(Xmax, gptStart)) return false;
-        ptStartRound = round(gptStart);
-        bool useInverted = epipoles().useInvertedEpipoleSecond(ptStartRound);
-        ptFinRound = epipoles().getSecondPx(useInverted);
-//        cout << gptStart.transpose() << setw(15) << useInverted << endl;
-        if (useInverted)
+        gptStartRound = round(gptStart);
+        auto useInverted = epipoles().chooseEpipole(CAMERA_2, gptStartRound, _params.epipoleMargin);
+        if (useInverted & EPIPOLE_TOO_CLOSE) return false;
+        gptFinRound = epipoles().getPx(CAMERA_2, useInverted);
+        if (useInverted & EPIPOLE_INVERTED)
         {
             gdispMax = _params.dispMax;
             flags |= GLB_INVERTED_SAMPLING;
         }
         else
         {
-            int delta = round( max( abs(ptStartRound[0] - ptFinRound[0]),
-                                     abs(ptStartRound[1] - ptFinRound[1]) ) );
+            int delta = round( max( abs(gptStartRound[0] - gptFinRound[0]),
+                                     abs(gptStartRound[1] - gptFinRound[1]) ) );
             gdispMax = min(_params.dispMax, delta);
         }
         
@@ -124,8 +125,8 @@ bool MotionStereo::computeUncertainty(double d, double s)
         if (not _camera2->projectPoint(Xmin, ptFin)) return false;
         int delta = round( max(abs(ptFin[0] - gptStart[0]), abs(ptFin[1] - gptStart[1])) );
         gdispMax = min( _params.dispMax, delta);
-        ptStartRound = round(gptStart);
-        ptFinRound = round(ptFin);
+        gptStartRound = round(gptStart);
+        gptFinRound = round(ptFin);
         flags |= GLB_START_POINT | GLB_DISP_MAX;
     }
     return true;
@@ -136,11 +137,10 @@ bool MotionStereo::sampleImage(const Mat8u & img2)
     uint32_t neededFlag = GLB_START_POINT | GLB_DISP_MAX | GLB_STEP | GLB_X;
     assert(flags & neededFlag == neededFlag);
     
-    if ((ptStartRound - epipoles().getSecondPx()).squaredNorm() < 2500) return false;
     int distance = gdispMax / gstep + MARGIN;
     
-    CurveRasterizer<int, Polynomial2> raster(ptStartRound, ptFinRound,
-                                _epipolarCurves.getSecond(gX));
+    CurveRasterizer<int, Polynomial2> raster(gptStartRound, gptFinRound,
+                                _epipolarCurves.get(CAMERA_2, gX));
     if (flags & GLB_INVERTED_SAMPLING)
     {
         raster.setStep(-1);
@@ -150,53 +150,13 @@ bool MotionStereo::sampleImage(const Mat8u & img2)
     raster.setStep(gstep);
     raster.steps(-HALF_LENGTH);
     
-    
-    //TODO temporary thing, sampling the same image to find the bug
-    
-    Vector2d pt(gu, gv);
-    Vector2i pti = round(pt);
-    bool useInverted = epipoles().useInvertedEpipoleFirst(pti);
-    Vector2i goal = epipoles().getFirstPx(useInverted);
-    CurveRasterizer<int, Polynomial2> rasterTmp(pti, goal,
-                                _epipolarCurves.getFirst(gX));
-    if (useInverted) rasterTmp.setStep(-1);
-    
-    
-    
-    if (gu > 110 and gu < 126  and gv > 255 and gv < 265 )
-    {
-    
-    
-        cout << "Epipole : " << goal.transpose() << endl;
-        cout << "Starting : " << pti.transpose() << endl;
-        cout << " USE INVERTED : " << useInverted << endl;
-        
-    }
-    
-    
-    
-    
-    
-    
-    
-    rasterTmp.setStep(-gstep); //AS long as it is the same image, on change the sampling direction
-    rasterTmp.steps(-HALF_LENGTH);
-    ////////
-    
-    
-    
     guVec.clear();
     guVec.reserve(distance);
     gvVec.clear();
     gvVec.reserve(distance);
-    
-    //FIXME tmp
-    guTmpVec.clear();
-    gvTmpVec.clear();
-    
     gsampleVec.clear();
     gsampleVec.reserve(distance);
-    for (int d = 0; d < distance; d++, raster.step(), rasterTmp.step())
+    for (int d = 0; d < distance; d++, raster.step())
     {
         if (raster.v < 0 or raster.v >= img2.rows 
             or raster.u < 0 or raster.u >= img2.cols) 
@@ -207,10 +167,6 @@ bool MotionStereo::sampleImage(const Mat8u & img2)
         gsampleVec.push_back(img2(raster.v, raster.u));
         guVec.push_back(raster.u);
         gvVec.push_back(raster.v);
-//FIXME temporary thing
-//        gsampleVec.push_back(_img1(rasterTmp.v, rasterTmp.u));
-        guTmpVec.push_back(rasterTmp.u);
-        gvTmpVec.push_back(rasterTmp.v);
     }
     assert(gsampleVec.size() > MARGIN);
     flags |= GLB_SAMPLE_VEC | GLB_UV_VEC;
@@ -308,17 +264,6 @@ void MotionStereo::reconstruct(double & dist, double & sigma, double & cost)
             cout << setw(6) << int(x);
         }
         cout << endl;
-        cout << "desc coordinates:" << endl;
-        for (auto & x : guTmpVec)
-        {
-            cout << setw(6) << int(x);
-        }
-        cout << endl;
-        for (auto & x : gvTmpVec)
-        {
-            cout << setw(6) << int(x);
-        }
-        cout << endl;
         cout << "cost:" << endl;
         for (auto & x : costVec)
         {
@@ -326,7 +271,6 @@ void MotionStereo::reconstruct(double & dist, double & sigma, double & cost)
         }
         cout << endl<< endl;
         
-        cout << " USE INVERTED : " << epipoles().useInvertedEpipoleSecond(Vector2i(gu, gv)) << endl;
         
     }*/
 }
@@ -371,16 +315,6 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2)
 //    cout << count3 << endl;
 //    cout << count4 << endl;
     
-//    cout << "Epipoles : " << endl;
-//    cout << epipoles().useInvertedEpipoleSecond(Vector2i(250, 250)) << endl;
-//    cout << epipoles().getSecond(true).transpose() << "     "  << epipoles().getSecond(false).transpose() << endl;
-//    cout << epipoles().getSecondPx(true).transpose() << "     "  << epipoles().getSecondPx(false).transpose() << endl;
-//    
-//    
-//    cout << epipoles().epipole1projected<< epipoles().epipole2projected
-//        << epipoles().antiEpipole1projected<< epipoles().antiEpipole2projected << endl;
-//        imshow("img1__", _img1);
-//        imshow("img2__", img2);
     return depthOut;
 }
 

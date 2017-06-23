@@ -78,9 +78,11 @@ public:
         initialize();
     }
     
-    const Polynomial2 & getFirst(Vector3d X) const { return epipolar1Vec[index(X)]; }
-    
-    const Polynomial2 & getSecond(Vector3d X) const { return epipolar2Vec[index(X)]; }
+    const Polynomial2 & get(CameraIdx camIdx, Vector3d X) const
+    { 
+        if (camIdx == CAMERA_1) return epipolar1Vec[index(X)]; 
+        else return epipolar2Vec[index(X)];
+    }
     
     // draws an epipolar line  on the right image that corresponds to (x, y) on the left image
     void traceEpipolarLine(int u, int v, Mat & out, CameraIdx camIdx, int count = 150) const;

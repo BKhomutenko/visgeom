@@ -24,70 +24,73 @@ Computes and keeps the epipoles or aniepipoles
 
 #include "reconstruction/epipoles.h"
 
+void limitVector(Vector2d & x)
+{
+    const double MAX_VAL = 1e6;
+    if (x[0] > MAX_VAL) x[0] = MAX_VAL;
+    if (x[0] < -MAX_VAL) x[0] = -MAX_VAL;
+    if (x[1] > MAX_VAL) x[1] = MAX_VAL;
+    if (x[1] < -MAX_VAL) x[1] = -MAX_VAL;
+}
     
 StereoEpipoles::StereoEpipoles(const ICamera * camera1, const ICamera * camera2,
         const Transf & Transform12)
 {
-    epipole1projected = camera1->projectPoint(Transform12.trans(), epipole1);
-    antiEpipole1projected = camera1->projectPoint(-Transform12.trans(), antiEpipole1); 
-    epipole2projected = camera2->projectPoint(Transform12.transInv(), epipole2);
-    antiEpipole2projected =  camera2->projectPoint(-Transform12.transInv(), antiEpipole2);
+    epipoleProjected[CAMERA_1] = camera1->projectPoint(Transform12.trans(), epipole[CAMERA_1]);
+    antiEpipoleProjected[CAMERA_1] = camera1->projectPoint(-Transform12.trans(), antiEpipole[CAMERA_1]); 
+    
+    Vector3d transInv = Transform12.transInv();
+    epipoleProjected[CAMERA_2] = camera2->projectPoint(transInv, epipole[CAMERA_2]);
+    antiEpipoleProjected[CAMERA_2] =  camera2->projectPoint(-transInv, antiEpipole[CAMERA_2]);
     
     
-    //bound the epipole coordinates
-    vector<Vector2d *> epipoleVec = {&epipole1, &epipole2, &antiEpipole1, &antiEpipole2};
-    for (auto xptr : epipoleVec)
+    
+    for (int i = 0; i < 2; i++)
     {
-        Vector2d & x = *xptr;
-        for (int i = 0; i < 2; i++)
-        {
-            if (x[i] > 1e6) x[i] = 1e6;
-            if (x[i] < -1e6) x[i] = -1e6; 
-        }
+        //bound the epipole coordinates
+        limitVector(epipole[i]);
+        limitVector(antiEpipole[i]);
         
+        // convert to integer pixels
+        if (epipoleProjected[i]) epipolePx[i] = round(epipole[i]);
+        if (antiEpipoleProjected[i]) antiEpipolePx[i] = round(antiEpipole[i]);
     }
-    
-    
-    if (epipole1projected) epipolePx1 = round(epipole1);
-    if (antiEpipole1projected) antiEpipolePx1 = round(antiEpipole1);
-    if (epipole2projected) epipolePx2 = round(epipole2);
-    if (antiEpipole2projected) antiEpipolePx2 = round(antiEpipole2);
 }
     
 
     
 //TODO testing
-bool StereoEpipoles::useInvertedEpipoleSecond(const Vector2i pt) const
+uint32_t StereoEpipoles::chooseEpipole(CameraIdx idx, const Vector2i pt, int threshSquared) const
 {
-    if (epipole2projected and antiEpipole2projected)
+    uint32_t res = 0;
+    if (epipoleProjected[idx] and antiEpipoleProjected[idx])
     {
-        double dist = (pt - epipolePx2).squaredNorm();
-        double antiDist = (pt - antiEpipolePx2).squaredNorm();
-        return dist > antiDist;
+        double dist = (pt - epipolePx[idx]).squaredNorm();
+        double antiDist = (pt - antiEpipolePx[idx]).squaredNorm();
+        if (dist > antiDist)
+        {
+            res |= EPIPOLE_INVERTED;
+            if (antiDist < threshSquared) res |= EPIPOLE_TOO_CLOSE;
+        }
+        else if (dist < threshSquared) res |= EPIPOLE_TOO_CLOSE;
+        
     }
-    else if (epipole2projected) return false;
-    else if (antiEpipole2projected) return true;
+    else if (epipoleProjected[idx])
+    {
+        double dist = (pt - epipolePx[idx]).squaredNorm();
+        if (dist < threshSquared) res |= EPIPOLE_TOO_CLOSE;
+    }
+    else if (antiEpipoleProjected[idx])
+    {
+        double antiDist = (pt - antiEpipolePx[idx]).squaredNorm();
+        res |= EPIPOLE_INVERTED;
+        if (antiDist < threshSquared) res |= EPIPOLE_TOO_CLOSE;
+    }
     else
     {
         throw;
     }
-    
+    return res;
 }
 
-bool StereoEpipoles::useInvertedEpipoleFirst(const Vector2i pt) const
-{
-    if (epipole1projected and antiEpipole1projected)
-    {
-        double dist = (pt - epipolePx1).squaredNorm();
-        double antiDist = (pt - antiEpipolePx1).squaredNorm();
-        return dist > antiDist;
-    }
-    else if (epipole1projected) return false;
-    else if (antiEpipole1projected) return true;
-    else
-    {
-        throw;
-    }
-    
-}
 

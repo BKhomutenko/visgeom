@@ -96,8 +96,11 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
     case STATE_READY:
         localizer.setDepth(depth);
         localizer.setTargetImage(imageNew);
+        
 //        _xiLocal = localizer.computePose( _xiLocal.compose(Transf(0.01, 0.01, 0.01, 0.01, 0.01, 0.01)) );
         _xiLocal = localizer.computePose( _xiLocal );
+         cout << "MOTION ESTIMATION :" << endl;
+    cout << "    " << _xiLocal << endl;
 //        array<double, 6>  eigen1 = localizer.covarianceEigenValues(1, _xiLocal, false);
 //            for (int i = 0; i < 6; i++)
 //            {
@@ -119,9 +122,7 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         
         break;
     }
-    cout << "MOTION ESTIMATION :" << endl;
-    cout << "    " << _xiLocal << endl;
-    cout << "    " << _xiGlobal << endl;
+   
     cout << "composed :" << endl;
     cout << "    " << _xiGlobal.compose(_xiLocal) << endl;
 }
@@ -147,9 +148,9 @@ void MonoOdometry::pushKeyFrame(const Mat8u & imageNew)
     if (state == STATE_READY)
     {
         // project the prior depth estimation       
-        depth = depth.wrapDepth(_xiLocal);
-        depth.merge(depthNew);
-//        depth = depthNew;
+//        depth = depth.wrapDepth(_xiLocal);
+//        depth.merge(depthNew);
+        depth = depthNew;
     }
     else
     {

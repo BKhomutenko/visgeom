@@ -18,7 +18,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-enum CameraIdx {CAMERA_1, CAMERA_2};
+enum CameraIdx : int {CAMERA_1 = 0, CAMERA_2 = 1};
 
 const double DEFAULT_DEPTH = 5;
 const double MIN_DEPTH = 0.25;

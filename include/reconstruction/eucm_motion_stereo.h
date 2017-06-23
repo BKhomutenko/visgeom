@@ -143,12 +143,11 @@ private:
     
     int gu, gv;
     int gu2, gv2;
-    vector<int> guTmpVec, gvTmpVec;
     Vector3d gX;
     
     Vector2d gptStart;
-    Vector2i ptStartRound;
-    Vector2i ptFinRound;
+    Vector2i gptStartRound;
+    Vector2i gptFinRound;
     int gdispMax;
     int gstep;
     

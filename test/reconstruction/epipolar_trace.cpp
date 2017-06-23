@@ -25,9 +25,9 @@ void CallBackFunc1(int event, int x, int y, int flags, void* userdata)
         Vector2d pt;
         cam1->reconstructPoint(Vector2d(x, y), X);
         Vector2i pti(x, y);
-        bool useInverted = epipoles->useInvertedEpipoleFirst(pti);
-        CurveRasterizer<int, Polynomial2> raster(pti, epipoles->getFirstPx(useInverted),
-                             epipolar->getFirst(X));
+        auto useInverted = epipoles->chooseEpipole(CAMERA_1, pti);
+        CurveRasterizer<int, Polynomial2> raster(pti, epipoles->getPx(CAMERA_1, useInverted),
+                             epipolar->get(CAMERA_1, X));
         if (useInverted) raster.setStep(-1);
         vector<uint8_t> descriptor;
         const int step = epipolarDescriptor->compute(orig1, raster, descriptor);
@@ -42,9 +42,9 @@ void CallBackFunc1(int event, int x, int y, int flags, void* userdata)
         //get the sample sequence
         cam2->projectPoint(TleftRight.rotMatInv() * X, pt);
         Vector2i pti2 = round(pt);
-        useInverted = epipoles->useInvertedEpipoleSecond(pti2);
-        CurveRasterizer<int, Polynomial2> raster2(pti2, epipoles->getSecondPx(useInverted),
-                             epipolar->getSecond(X));
+        useInverted = epipoles->chooseEpipole(CAMERA_2, pti2);
+        CurveRasterizer<int, Polynomial2> raster2(pti2, epipoles->getPx(CAMERA_2, useInverted),
+                             epipolar->get(CAMERA_2, X));
         if (useInverted) raster2.setStep(-1);                     
         raster2.setStep(step);                     
         vector<uint8_t> samleVec;

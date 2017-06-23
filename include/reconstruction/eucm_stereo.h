@@ -51,6 +51,9 @@ struct StereoParameters : public ScaleParameters
     
     int verbosity = 0;
 
+    //squared value, corresonds to 50 px
+    int epipoleMargin = 2500;
+
     //multi-hypoteses
     //TODO remove?
     int hypMax = 1;
@@ -102,6 +105,7 @@ public:
         
     const StereoEpipoles & epipoles() const { return _epipolarCurves.getEpipoles(); }
     
+ 
 protected:
     
     EnhancedCamera *_camera1, *_camera2;
