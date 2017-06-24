@@ -28,7 +28,25 @@ NOTE:
 #include "std.h"
 #include "eigen.h"
 
-//FIXME remove hypStep
+
+void filter(double & v1, double & s1, const double v2, const double s2)
+{
+    double K = 1. / (s1 + s2);
+    v1 = (v1 * s2 + v2 * s1) * K;
+    s1 = max(s1 * s2 * K, 0.1);
+    
+   /* double sHat1 = s1 / (v1 * (v1 - s1));
+    double sHat2 = s2 / (v2 * (v2 - s2));
+    double vHat1 = 1./ v1;
+    double vHat2 = 1./ v2;
+    
+    double K = 1. / (sHat1 + sHat2);
+    vHat1 = (vHat1 * sHat2 + vHat2 * sHat1) * K;
+    sHat1 = max(sHat1 * sHat2 * K, 0.1);
+    
+    v1 = 1. / vHat1;
+    s1 = sHat1 * v1 / (sHat1  + vHat1); */
+}
 
 void DepthMap::applyMask(const Mat8u & mask)
 {
@@ -157,13 +175,6 @@ bool DepthMap::match(const double v1, const double s1, const double v2, const do
     //     cout << "v1: " << v1 << " v2: " << v2 << " s1: " << s1 << " s2: " << s2 << endl;
     // }
     return output;
-}
-
-void DepthMap::filter(double & v1, double & s1, const double v2, const double s2)
-{
-    double K = 1. / (s1 + s2);
-    v1 = (v1 * s2 + v2 * s1) * K;
-    s1 = max(s1 * s2 * K, 0.1);
 }
 
 bool DepthMap::filterPushHypothesis(const Vector3d & X, const double sigmaVal)

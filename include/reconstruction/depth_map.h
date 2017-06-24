@@ -48,6 +48,9 @@ enum ReconstructionFlags : uint32_t
     INDEX_MAPPING = 128    
 };
 
+// Performs a filtered merge on the input depths and sigmas
+void filter(double & v1, double & s1, const double v2, const double s2);
+
 class DepthMap : public ScaleParameters
 {
 public:
@@ -238,8 +241,6 @@ public:
 
     // Returns true if the two depths and sigmas are within an acceptable tolerance of each other
     static bool match(const double v1, const double s1, const double v2, const double s2);
-    // Performs a filtered merge on the input depths and sigmas
-    static void filter(double & v1, double & s1, const double v2, const double s2);
   
     bool empty() { return valVec.size() == 0; }
 private:

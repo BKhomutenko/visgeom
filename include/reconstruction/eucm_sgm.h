@@ -136,6 +136,8 @@ public:
     CurveRasterizer<int, Polynomial2> getCurveRasteriser(CameraIdx camIdx, int idx,
                                                          uint32_t * flags = NULL) const;
     
+    void skipPixel(int x, int y);
+    
     // reconstruction
     void fillGaps(uint8_t * const data, const int step);
     

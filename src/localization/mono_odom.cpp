@@ -60,6 +60,24 @@ void MonoOdometry::feedWheelOdometry(const Transf xiOdomNew)
     _xiOdom = xiOdomNew;
 }
 
+void MonoOdometry::setDepth(const Mat32f & imageDepth)
+{
+    if (depth.empty())
+    {
+        depth = DepthMap(_camera, _sgmParams);
+    }
+    for (int y = 0; y < depth.yMax; y++)
+    {
+        for (int x = 0; x < depth.xMax; x++)
+        {
+            int u = _sgmParams.uConv(x);
+            int v = _sgmParams.vConv(y);
+            depth.at(x, y) = imageDepth(v, u);
+            depth.sigma(x, y) = 0.1;
+        }
+    }
+}
+
 void MonoOdometry::feedImage(const Mat8u & imageNew)
 {
     switch (state)
@@ -107,10 +125,9 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
 //                cout << setw(16) << eigen1[i];
 //            }
 //            cout << endl;
-        cout << _xiGlobal.compose(_xiLocal) << endl << endl;
+//        cout << _xiGlobal.compose(_xiLocal) << endl << endl;
         
-        depth = motionStereo.compute(getCameraMotion(), imageNew, depth);
-        depth.filterNoise();
+        
         
         
         //TODO check whether a new keyframe is needed
@@ -118,6 +135,11 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         if (isNewKeyframeNeeded())
         {
             pushKeyFrame(imageNew);
+        }
+        else
+        {
+            depth = motionStereo.compute(getCameraMotion(), imageNew, depth);
+            depth.filterNoise();
         }
         
         break;

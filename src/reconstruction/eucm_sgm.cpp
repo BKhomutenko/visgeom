@@ -36,7 +36,7 @@ CurveRasterizer<int, Polynomial2> EnhancedSgm::getCurveRasteriser(CameraIdx camI
     Vector2i pti;
     if (camIdx == CAMERA_1) pti = _pointPxVec1[idx];
     else if (camIdx == CAMERA_2) pti = _pinfPxVec[idx]; 
-    uint32_t useInverted = epipoles().chooseEpipole(camIdx, pti);
+    uint32_t useInverted = epipoles().chooseEpipole(camIdx, pti, _params.epipoleMargin);
     Vector2i goal = epipoles().getPx(camIdx, useInverted);
     CurveRasterizer<int, Polynomial2> raster(pti, goal,
                             _epipolarCurves.get(camIdx, _reconstVec[idx]));
@@ -215,6 +215,13 @@ void EnhancedSgm::reconstructDepth(DepthMap & depth) const
     }
 }
 
+void EnhancedSgm::skipPixel(int x, int y)
+{
+    uint8_t * outPtr = _errorBuffer.row(y).data + x*_params.dispMax;            
+    *outPtr = 0;
+    fill(outPtr + 1, outPtr + _params.dispMax, 255);
+}
+
 void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
 {
     if (_params.verbosity > 0) cout << "EnhancedSgm::computeCurveCost" << endl;
@@ -235,23 +242,24 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
             }
             if (not _maskVec[idx])
             {
-                uint8_t * outPtr = _errorBuffer.row(y).data + x*_params.dispMax;            
-                *outPtr = 0;
-                fill(outPtr + 1, outPtr + _params.dispMax, 255);
+                skipPixel(x, y);
                 continue;
             }
             // compute the local image descriptor,
             // a piece of the epipolar curve on the first image
             vector<uint8_t> descriptor;
-            CurveRasterizer<int, Polynomial2> descRaster = getCurveRasteriser(CAMERA_1, idx);
+            uint32_t flags;
+            CurveRasterizer<int, Polynomial2> descRaster = getCurveRasteriser(CAMERA_1, idx, &flags);
+            if (flags & EPIPOLE_TOO_CLOSE) 
+            {
+                skipPixel(x, y);
+                continue;
+            }
             const int step = _epipolarDescriptor.compute(img1, descRaster, descriptor);
             _stepBuffer(y, x) = step;
             if (step < 1) 
             {
-                //TODO make a function
-                uint8_t * outPtr = _errorBuffer.row(y).data + x*_params.dispMax;            
-                *outPtr = 0;
-                fill(outPtr + 1, outPtr + _params.dispMax, 255);
+                skipPixel(x, y);
                 continue;
             }
             if (_params.imageBasedCost) 
@@ -537,7 +545,7 @@ void EnhancedSgm::reconstructDisparity()
                 if (_params.verbosity > 4) cout << setw(8) << err;
                 if (err > _params.maxError) continue;
                 int cost = dynRow1[base + d] + dynRow2[base + d] 
-                        + dynRow3[base + d] + dynRow4[base + d] - 2*err;
+                        + dynRow3[base + d] + dynRow4[base + d] - 2 * err;
                 
                 if ( bestCost > cost)
                 {

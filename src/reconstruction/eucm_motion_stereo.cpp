@@ -35,13 +35,6 @@ Depth-from-motion class for semidense depth estimation
 #include "reconstruction/depth_map.h"
 #include "reconstruction/epipolar_descriptor.h"
 
-//FIXME the same as DepthMap::filter
-void filter(double & v1, double & s1, const double v2, const double s2)
-{
-    double K = 1. / (s1 + s2);
-    v1 = (v1 * s2 + v2 * s1) * K;
-    s1 = max(s1 * s2 * K, 0.1);
-}
 
 bool MotionStereo::selectPoint(int x, int y)
 {
@@ -183,7 +176,7 @@ void MotionStereo::reconstruct(double & dist, double & sigma, double & cost)
     
     
     
-    if (1/* *bestCostIter < _params.maxError and *bestCostIter < 2*cost FIXME*/)
+    if ( *bestCostIter < _params.maxError and *bestCostIter < 2*cost)
     {
         int dBest = bestCostIter - costVec.begin();
 //        cout << setw(8) << dBest;
@@ -280,7 +273,7 @@ DepthMap MotionStereo::compute(Transf T12, const Mat8u & img2)
     //init necessary data structures
     setTransformation(T12);
     DepthMap depthOut(_camera1, _params);
-    depthOut.setTo(OUT_OF_RANGE, OUT_OF_RANGE, OUT_OF_RANGE);
+    depthOut.setTo(OUT_OF_RANGE, OUT_OF_RANGE, _params.maxError);
 
 //    int count1 = 0, count2 = 0, count3 = 0, count4 = 0;
     //for each point

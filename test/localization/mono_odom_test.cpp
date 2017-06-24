@@ -35,6 +35,7 @@ int main(int argc, char** argv)
     {
         device.setCameraTransform(xi.compose(odom._xiBaseCam));
         Mat8u img1;
+//        if (i > 0) odom.setDepth(device.getDepthBuffer());
         device.render(img1);
         
         

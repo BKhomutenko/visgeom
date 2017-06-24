@@ -67,7 +67,7 @@ uint32_t StereoEpipoles::chooseEpipole(CameraIdx idx, const Vector2i pt, int thr
     {
         double dist = (pt - epipolePx[idx]).squaredNorm();
         double antiDist = (pt - antiEpipolePx[idx]).squaredNorm();
-        if (dist > antiDist)
+        if (antiDist < dist)
         {
             res |= EPIPOLE_INVERTED;
             if (antiDist < threshSquared) res |= EPIPOLE_TOO_CLOSE;
