@@ -103,7 +103,7 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
             //compute accurate motion estimation
             sparseOdom.feedData(imageNew, _xiLocal);
             _xiLocal = sparseOdom.getIncrement();
-            
+            _xiLocalOld = _xiLocal;
             //create a keyframe
             pushKeyFrame(imageNew);
             
@@ -116,9 +116,32 @@ void MonoOdometry::feedImage(const Mat8u & imageNew)
         localizer.setTargetImage(imageNew);
         
 //        _xiLocal = localizer.computePose( _xiLocal.compose(Transf(0.01, 0.01, 0.01, 0.01, 0.01, 0.01)) );
+        
+        //scale factor normalization
+        //TODO include the distance constraint in the optimization loop
+        Transf zetaPrior = _xiLocalOld.inverseCompose(_xiLocal);
         _xiLocal = localizer.computePose( _xiLocal );
-         cout << "MOTION ESTIMATION :" << endl;
-    cout << "    " << _xiLocal << endl;
+        Transf zeta = _xiLocalOld.inverseCompose(_xiLocal);
+        double lengthPrior = zetaPrior.trans().norm();
+        double length = zeta.trans().norm();
+        double K = lengthPrior / length;
+        if (length > 1e-2) //TODO put a meaningful threshold
+        {
+            
+            if (K > 1.2) //too much divergence between WO and VO
+            {
+                cout << "WARNING : discard VO result, scale error" << endl;
+                _xiLocal = _xiLocalOld.compose(zetaPrior);
+                break;
+            }
+            zeta.trans() *= K;
+            _xiLocal = _xiLocalOld.compose(zeta);
+        }
+        
+        cout << "MOTION ESTIMATION :" << endl;
+        cout << "    " << _xiLocal << endl;
+        cout << "    K : " << K << endl;
+        _xiLocalOld = _xiLocal;
 //        array<double, 6>  eigen1 = localizer.covarianceEigenValues(1, _xiLocal, false);
 //            for (int i = 0; i < 6; i++)
 //            {
@@ -170,9 +193,9 @@ void MonoOdometry::pushKeyFrame(const Mat8u & imageNew)
     if (state == STATE_READY)
     {
         // project the prior depth estimation       
-//        depth = depth.wrapDepth(_xiLocal);
-//        depth.merge(depthNew);
-        depth = depthNew;
+        depth = depth.wrapDepth(_xiLocal);
+        depth.merge(depthNew);
+//        depth = depthNew;
     }
     else
     {

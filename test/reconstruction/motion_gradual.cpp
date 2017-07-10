@@ -25,6 +25,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "reconstruction/eucm_sgm.h"
 #include "reconstruction/depth_map.h"
 #include "reconstruction/eucm_motion_stereo.h"
+#include "render/render.h"
 //FIXME make an argument
 ofstream results;
 string histDataName;
@@ -61,8 +62,8 @@ void analyzeError(const Mat32f & depthGT, Mat32f & depth,
             if (depthGT(vgt, ugt) != depthGT(vgt, ugt) or depth(v, u) != depth(v, u)) continue;
             Nmax++;
             dist += depthGT(vgt, ugt);
-            ofs << (depthGT(vgt, ugt) - depth(v, u)) / sigma(v, u) << endl;
-            if (sigma(v, u) > 1 or abs(depthGT(vgt, ugt) - depth(v, u)) > 2.5 * sigma(v, u))
+            ofs << (depthGT(vgt, ugt) - depth(v, u)) << "    " << depthGT(vgt, ugt) << "   " << sigma(v, u) << endl;
+            if (sigma(v, u) > 10 or abs(depthGT(vgt, ugt) - depth(v, u)) >  sigma(v, u))
             {
                 continue;
             }
@@ -84,119 +85,155 @@ void analyzeError(const Mat32f & depthGT, Mat32f & depth,
 
 int main(int argc, char** argv) 
 {
+//    ptree root;
+//    read_json(argv[1], root);
+//    const vector<double> intrinsic = readVector<double>(root.get_child("camera_intrinsics"));
+//    const int width = root.get<int>("image.width");
+//    const int height = root.get<int>("image.height");
+//    Transf xiCam0 = readTransform(root.get_child("camera_transform"));
+//    
+//    Mat8u foreImg = imread(root.get<string>("foreground"), 0);
+//    
+//    EnhancedCamera camera(width, height, intrinsic.data());
+//    
+//    //init stereoParameters
+//    SgmParameters stereoParams;
+//    
+//    stereoParams.verbosity = root.get<int>("stereo.verbosity");
+//    stereoParams.salientPoints = false;
+//    stereoParams.u0 = root.get<int>("stereo.u0");
+//    stereoParams.v0 = root.get<int>("stereo.v0");
+//    stereoParams.dispMax = root.get<int>("stereo.disparity_max");
+//    stereoParams.scale = root.get<int>("stereo.scale");
+//    stereoParams.flawCost = root.get<int>("stereo.flaw_cost");
+//    stereoParams.scaleVec = readVector<int>(root.get_child("stereo.scale_vector"));
+//    stereoParams.uMax = width;
+//    stereoParams.vMax = height;
+//    stereoParams.setEqualMargin();
+//    
+//    ImageGenerator generator(&camera, foreImg, 250);
+//    generator.setBackground(backImg);
+//    const int iterMax = root.get<int>("steps");
+
+
     ptree root;
     read_json(argv[1], root);
-    const vector<double> intrinsic = readVector<double>(root.get_child("camera_intrinsics"));
-    const int width = root.get<int>("image.width");
-    const int height = root.get<int>("image.height");
-    Transf xiCam0 = readTransform(root.get_child("camera_transform"));
     
-    Mat8u foreImg = imread(root.get<string>("foreground"), 0);
+    Transf xiCam0 = readTransform(root.get_child("trajectory.initial"));
+    Transf zeta = readTransform(root.get_child("trajectory.increment"));
+    int incrementCount = root.get<int>("trajectory.step_count");
     
-    EnhancedCamera camera(width, height, intrinsic.data());
+    EnhancedCamera camera( readVector<double>(root.get_child("camera_params")).data() );
+    
+    
     
     //init stereoParameters
-    SgmParameters stereoParams;
+    SgmParameters stereoParams(root.get_child("stereo_parameters"));
     
-    stereoParams.verbosity = root.get<int>("stereo.verbosity");
-    stereoParams.salientPoints = false;
-    stereoParams.u0 = root.get<int>("stereo.u0");
-    stereoParams.v0 = root.get<int>("stereo.v0");
-    stereoParams.dispMax = root.get<int>("stereo.disparity_max");
-    stereoParams.scale = root.get<int>("stereo.scale");
-    stereoParams.flawCost = root.get<int>("stereo.flaw_cost");
-    stereoParams.scaleVec = readVector<int>(root.get_child("stereo.scale_vector"));
-    stereoParams.uMax = width;
-    stereoParams.vMax = height;
-    stereoParams.setEqualMargin();
+    //the stereo is computed backwards
+    EnhancedSgm sgm(zeta.inverse(), &camera, &camera, stereoParams);
     
-    ImageGenerator generator(&camera, foreImg, 250);
-//    generator.setBackground(backImg);
-    const int iterMax = root.get<int>("steps");
-    int boardPoseCount = 0;
-    const string imageBaseName = root.get<string>("output_name");
+    string wordlFile = root.get<string>("render");
+    ptree world;     
+    read_json(wordlFile, world);
+    RenderDevice device(world);
+    device.setCamera(&camera);
     
-    results.open(root.get<string>("analysis_output_name"));
+    const string imageBaseName = "output_";
     
-    for (auto & boardPoseItem : root.get_child("plane_transform"))
-    {   
-        int cameraIncCount = 0;
-        generator.setPlaneTransform(readTransform(boardPoseItem.second));
-        //depth GT
-        Mat32f depthGT, depth, sigmaMat;
-        generator.generateDepth(depthGT, xiCam0);
+    results.open("analysis_outoput.txt");
+    
+    int cameraIncCount = 0;
+    //depth GT
+    Mat32f depthGT, depth, sigmaMat;
+    
+    Mat8u img1;
+    device.setCameraTransform(xiCam0);
+    device.render(img1);
+    depthGT = device.getDepthBuffer().clone();
+    imshow("depthGT", depthGT / 10);
+    //base frame
+    const int noiseLevel = root.get<int>("noise");
+    if (noiseLevel != 0)
+    {
+        Mat8u noise(img1.size());
+        randu(noise, 0, noiseLevel);
+        img1 -= noise;
+    }
+    //different increment diretion
+    Transf xiCam = xiCam0.compose(zeta);
+    cout << cameraIncCount << endl;
+    
+    MotionStereoParameters motionStereoParams(stereoParams);
+    motionStereoParams.verbosity = 0;
+    motionStereoParams.descLength = 7;
+    
+    MotionStereo motionStereo(&camera, &camera, motionStereoParams);
+    motionStereo.setBaseImage(img1);
+    //increment count
+    DepthMap depthStereo;
+    for (int i = 0; i < incrementCount; i++, xiCam = xiCam.compose(zeta))
+    {
+        histDataName = "hist_" + to_string(cameraIncCount) + "_" + to_string(i+1) + ".txt";
+        std::ofstream ofs;
+        ofs.open (histDataName, std::ofstream::out);
+        ofs.close();
         
-        imshow("depthGT", depthGT / 10);
-        //base frame
-        const string imgName = imageBaseName + "_" + to_string(boardPoseCount) + "_base.png";
-        Mat8u img1 = imread(imgName, 0);
-         
-        const int noiseLevel = root.get<int>("noise");
+        device.setCameraTransform(xiCam);
+        Mat8u img2;
+        device.render(img2);
         if (noiseLevel != 0)
         {
-            Mat8u noise(img1.size());
+            Mat8u noise(img2.size());
             randu(noise, 0, noiseLevel);
-            img1 -= noise;
+            img2 -= noise;
         }
-        //different increment diretion
-        for (auto & cameraIncItem : root.get_child("camera_increment"))
+        Transf TleftRight = xiCam0.inverseCompose(xiCam);
+        cout << xiCam << endl;
+        results << TleftRight.trans().norm() << "    ";
+        
+        if (i < 2 or root.get<bool>("sgm"))
         {
-            Transf dxi = readTransform(cameraIncItem.second);
-            Transf xiCam = xiCam0.compose(dxi);
-            cout << boardPoseCount << " " << cameraIncCount << endl;
-            
-            MotionStereoParameters motionStereoParams(stereoParams);
-            motionStereoParams.verbosity = 0;
-            motionStereoParams.descLength = 7;
-            
-            MotionStereo motionStereo(&camera, &camera, motionStereoParams);
-            motionStereo.setBaseImage(img1);
-            //increment count
-            DepthMap depthStereo;
-            for (int i = 0; i < iterMax; i++, xiCam = xiCam.compose(dxi))
-            {
-                histDataName = "hist_" + to_string(boardPoseCount) 
-                    + "_" + to_string(cameraIncCount) + "_" + to_string(i+1) + ".txt";
-                std::ofstream ofs;
-                ofs.open (histDataName, std::ofstream::out);
-                ofs.close();
-                
-                const string imgName = imageBaseName + "_" + to_string(boardPoseCount) 
-                    + "_" + to_string(cameraIncCount) + "_" + to_string(i+1) + ".png";
-                Mat8u img2 = imread(imgName, 0);
-                if (noiseLevel != 0)
-                {
-                    Mat8u noise(img2.size());
-                    randu(noise, 0, noiseLevel);
-                    img2 -= noise;
-                }
-                Transf TleftRight = xiCam0.inverseCompose(xiCam);
-                
-                results << TleftRight.trans().norm() << "    ";
-                
-                if (i < 1 or root.get<bool>("sgm"))
-                {
-                    EnhancedSgm stereo(TleftRight, &camera, &camera, stereoParams);
-                    stereo.computeStereo(img1, img2, depthStereo);
-                }
-                else
-                {
-                    depthStereo = motionStereo.compute(TleftRight, img2, depthStereo);
-                }
-                depthStereo.filterNoise();
-                depthStereo.toMat(depth);
-                depthStereo.sigmaToMat(sigmaMat);
-                analyzeError(depthGT, depth, sigmaMat, stereoParams);
-                results << endl;
-                imshow("depth", depth / 10);
-                imshow("img", img2);
-                imwrite("depth_" + to_string(i) + ".png", depth * 25);
-                imwrite("img_" + to_string(i) + ".png", img2);
-                waitKey();
-            }
-            cameraIncCount++;
+            EnhancedSgm stereo(TleftRight, &camera, &camera, stereoParams);
+            stereo.computeStereo(img1, img2, depthStereo);
         }
-        boardPoseCount++;
+        else
+        {
+            depthStereo = motionStereo.compute(TleftRight, img2, depthStereo);
+        }
+        
+        
+        if (root.get<bool>("filter_noise")) depthStereo.filterNoise();
+        
+        
+        //output the point cloud
+        if (i == 9)
+        {
+            MHPack pointPack;
+            depthStereo.reconstruct(pointPack);
+            ofstream cloudos("cloud.txt");
+            
+            Vector3dVec cloud;
+            
+            for (auto & x : pointPack.cloud)
+            {
+                cloudos << x.transpose() << endl;
+            }
+            cloudos.close();
+        }
+        
+        
+        
+        
+        depthStereo.toMat(depth);
+        depthStereo.sigmaToMat(sigmaMat);
+        analyzeError(depthGT, depth, sigmaMat, stereoParams);
+        results << endl;
+        imshow("depth", depth / 10);
+        imshow("img", img2);
+        imwrite("depth_" + to_string(i) + ".png", depth * 25);
+        imwrite("img_" + to_string(i) + ".png", img2);
+        waitKey();
     }
     results.close();
     return 0;

@@ -126,6 +126,7 @@ void EnhancedSgm::createBuffer()
     _tableauBottom.create(_params.yMax, bufferWidth);
     _smallDisparity.create(_params.yMax, _params.xMax * _params.hypMax);
     _finalErrorMat.create(_params.yMax, _params.xMax * _params.hypMax);
+    _skipBuffer.create(_params.yMax, _params.xMax);
     if (_params.imageBasedCost) _costBuffer.create(_params.yMax, _params.xMax);
     if (_params.salientPoints) _salientBuffer.create(_params.yMax, _params.xMax);
     _uCache.create(_params.yMax, _params.xMax * (_params.dispMax + 2*DISPARITY_MARGIN));
@@ -138,6 +139,7 @@ void EnhancedSgm::createBuffer()
 
 void EnhancedSgm::computeStereo(const Mat8u & img1, const Mat8u & img2, DepthMap & depth)
 {
+    _skipBuffer.setTo(0);
     computeCurveCost(img1, img2);
     
     computeDynamicProgramming();
@@ -162,7 +164,7 @@ void EnhancedSgm::reconstructDepth(DepthMap & depth) const
         {
             for (int x = 0; x < _params.xMax; x++)
             {
-                if (_params.salientPoints and not _salientBuffer(y, x)) 
+                if (_params.salientPoints and not _salientBuffer(y, x) or _skipBuffer(y, x)) 
                 {
                     depth.at(x, y, h) = OUT_OF_RANGE;
                     depth.sigma(x, y, h) = OUT_OF_RANGE;
@@ -219,6 +221,7 @@ void EnhancedSgm::skipPixel(int x, int y)
 {
     uint8_t * outPtr = _errorBuffer.row(y).data + x*_params.dispMax;            
     *outPtr = 0;
+    _skipBuffer(y, x) = 1;
     fill(outPtr + 1, outPtr + _params.dispMax, 255);
 }
 
@@ -287,7 +290,7 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                
             //sample the curve 
             vector<uint8_t> sampleVec(nSteps + MARGIN, 0);
-            
+            bool crossedImageBoundary = false;
             if (_params.useUVCache)
             {
                 const int u_vCacheStep = _params.dispMax + 2 * DISPARITY_MARGIN;
@@ -297,7 +300,11 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 vPtr += DISPARITY_MARGIN - HALF_LENGTH * step;
                 for (int i = 0; i  < nSteps + MARGIN; i++, uPtr += step, vPtr += step)
                 {
-                    if (*uPtr < 0 or *vPtr < 0) sampleVec[i] = 0;
+                    if (*uPtr < 0 or *vPtr < 0) 
+                    {
+                        crossedImageBoundary = true;
+                        break;
+                    }
                     else sampleVec[i] = img2(*vPtr, *uPtr);
                 }
             }
@@ -310,9 +317,18 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 for (int i = 0; i  < nSteps + MARGIN; i++, raster.step())
                 {
                     if (raster.v < 0 or raster.v >= img2.rows 
-                        or raster.u < 0 or raster.u >= img2.cols) sampleVec[i] = 0;
+                        or raster.u < 0 or raster.u >= img2.cols)
+                        {
+                            crossedImageBoundary = true;
+                            break;
+                        }
                     else sampleVec[i] = img2(raster.v, raster.u);
                 }
+            }
+            if (crossedImageBoundary)
+            {
+                skipPixel(x, y);
+                continue;
             }
             vector<int> costVec = compareDescriptor(descriptor, sampleVec, _params.flawCost);
             /*if (y == 15)
@@ -361,8 +377,10 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
     }
 //    cout << "Epipoles : " << endl;
 //    cout << epipoles().useInvertedEpipoleSecond(Vector2i(250, 250)) << endl;
-//    cout << epipoles().getSecond(true).transpose() << "     "  << epipoles().getSecond(false).transpose() << endl;
-//    cout << epipoles().getSecondPx(true).transpose() << "     "  << epipoles().getSecondPx(false).transpose() << endl;
+//    cout << epipoles().getSecond(true).transpose() << "   
+//  "  << epipoles().getSecond(false).transpose() << endl;
+//    cout << epipoles().getSecondPx(true).transpose() << "    
+// "  << epipoles().getSecondPx(false).transpose() << endl;
 //    
 //    
 //    cout << epipoles().epipole1projected<< epipoles().epipole2projected
@@ -526,9 +544,10 @@ void EnhancedSgm::reconstructDisparity()
         int32_t* dynRow3 = (int32_t*)(_tableauTop.row(y).data);
         int32_t* dynRow4 = (int32_t*)(_tableauBottom.row(y).data);
         uint8_t* errRow = _errorBuffer.row(y).data;
+        uint8_t* skipRow = _skipBuffer.row(y).data;
         for (int x = 0; x < _params.xMax; x++)
         {
-            if (_params.salientPoints and _salientBuffer(y, x) == 0)
+            if ((_params.salientPoints and _salientBuffer(y, x) == 0) or *(skipRow + x))
             {
                 _smallDisparity(y, x) = -1;
                 continue;

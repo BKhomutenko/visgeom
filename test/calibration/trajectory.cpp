@@ -40,22 +40,23 @@ public:
         //TODO make parameters
         
         Matrix6d covAbs = Matrix6d::Identity()*1e-2;
-        double alpha = params[0]; //turn angle
-        double dist = params[3];//params[PARAM_NUM*circle + 1];
+        
+        double dist = params[2];
+        double alpha = params[3];
         double ca = cos(alpha*0.5);
         double sa = sin(alpha*0.5);
-        Transf xi0(params[2], 0, 0,
+        Transf xi0(0, params[0], 0,
                      0, 0, params[1]);
         //TODO modelizer proprement l'odometrie            
         covVW <<    1e-4,        0, 
                     0,       1e-4;
                 
         //circular motion model
-        Transf dxi(dist * ca, dist * sa, 0, 0, 0, alpha);
+        Transf dxi(-dist * sa, dist * ca, 0, 0, 0, alpha);
         //motion jacobian
         Matrixd<6, 2> dxidu;
-        dxidu <<    ca,     -dist/2 * sa,
-                    sa,     dist/2 * ca,
+        dxidu <<    -sa,     -dist/2 * ca,
+                    ca,     -dist/2 * sa,
                     0,          0,
                     0,          0,
                     0,          0,
@@ -144,64 +145,56 @@ int main(int argc, char** argv)
     
     return 0;*/
     
+    ptree root;
+    read_json(argv[1], root);
+    
+    
     int circleCount = 2;
     vector<ITrajectory*> trajVec;
     double numberSteps = 30;
     vector<double> paramVec;
-    for (int i = 0; i < circleCount; i++)
-    {
-        paramVec.push_back(-i * 0.03 + 0.015);
-//        paramVec.push_back(0.01);
-//        paramVec.push_back(0);
-//        paramVec.push_back(0);
-        paramVec.push_back(-0.2+ i * 0.4);
-        paramVec.push_back(1.5);
-        paramVec.push_back(0.05);
-        trajVec.push_back(new CircularTrajectory(numberSteps));
-    }
+    
+    paramVec.push_back(root.get<double>("trajectory1.y_0"));
+    paramVec.push_back(root.get<double>("trajectory1.theta_0"));
+    paramVec.push_back(root.get<double>("trajectory1.v"));
+    paramVec.push_back(root.get<double>("trajectory1.w"));
+    trajVec.push_back(new CircularTrajectory(root.get<int>("trajectory1.number_steps")));
+
+    paramVec.push_back(root.get<double>("trajectory2.y_0"));
+    paramVec.push_back(root.get<double>("trajectory2.theta_0"));
+    paramVec.push_back(root.get<double>("trajectory2.v"));
+    paramVec.push_back(root.get<double>("trajectory2.w"));
+    trajVec.push_back(new CircularTrajectory(root.get<int>("trajectory2.number_steps")));
     
     vector<Transf> xiOdomVec;
     vector<Matrix6d> covOdomVec;
     
-    vector<Transf> xiOdomBiasVec;
-    vector<Matrix6d> covOdomBiasVec;
-    
-//    traj->compute(paramVec.data(), xiOdomVec, covOdomVec);
-//    
-//    for (int i = 0; i < xiOdomVec.size(); i++)
-//    {
-//        cout << xiOdomVec[i] << endl;
-//        cout << covOdomVec[i] << endl << endl;
-//    }
+//    vector<Transf> xiOdomBiasVec;
+//    vector<Matrix6d> covOdomBiasVec;
     
     
-    
-    //generate the board
-    Vector3dVec board;
-    const int N = 5, M = 8;
-    double step = 0.15;
-    for (int i = 0; i < N; i++)
-    {
-        for (int j = 0; j < M; j++)
-        {
-            board.emplace_back(0, -step * j, -step * i);
-        }
-    }
-    
-    //ZOE
-    const int WIDTH = 800;
-    const int HEIGHT = 600;
-    Transf xiBoard(7, M * step / 2, N * step + 0.2, 0, 0, 0);
-    Matrix3d R;
-    R <<    0,      0,      1, 
-            -1,     0,      0,
-            0,      -1,     0;
-    Transf xiCam(Vector3d(3.5, 0.35, 0.3), R);
-    cout << xiCam.rot() << endl;
-    vector<double> camParams{0.55, 1.1, 200, 200, WIDTH / 2, HEIGHT / 2};
+    vector<double> camParams = readVector<double>(root.get_child("camera_params"));
+    const int WIDTH = root.get<int>("camera_width");
+    const int HEIGHT = root.get<int>("camera_height");
+
     EnhancedCamera cam(WIDTH, HEIGHT, camParams.data());
-    const double curvatureMax = 1. / (2.588 / tan(M_PI / 6) + 1.);
-    
+
+
+
+    //ZOE
+//    const int WIDTH = 800;
+//    const int HEIGHT = 600;
+//    Transf xiBoard(7, M * step / 2, N * step + 0.2, 0, 0, 0);
+//    Matrix3d R;
+//    R <<    0,      0,      1, 
+//            -1,     0,      0,
+//            0,      -1,     0;
+//    Transf xiCam(Vector3d(3.5, 0.35, 0.3), R);
+//    cout << xiCam.rot() << endl;
+//    vector<double> camParams{0.55, 1.1, 200, 200, WIDTH / 2, HEIGHT / 2};
+//    EnhancedCamera cam(WIDTH, HEIGHT, camParams.data());
+//    const double curvatureMax = 1. / (2.588 / tan(M_PI / 6) + 1.);
+//    
     //PIONEER
 //    Transf xiBoard(3, -0.4, 0.5, 0, 0, 0);
 //    Matrix3d R;
@@ -218,9 +211,7 @@ int main(int argc, char** argv)
     
     
     TrajectoryVisualQuality * quality = new TrajectoryVisualQuality(
-                                                trajVec, &cam, xiCam, xiBoard, board,
-                                                Matrix6d::Identity(), Matrix2d::Identity(),
-                                                M, N, curvatureMax);
+                                                trajVec, root.get_child("quality_parameters"), &cam);
     
     //////////////////////////////////
     //Test the visual covariance
@@ -231,8 +222,11 @@ int main(int argc, char** argv)
     cout << quality->EvaluateCost(paramVec.data()) << endl;
     
     
+    
+    //////////////////////////////////
+    //Solve the optimization problem
+    //////////////////////////////////
     ceres::GradientProblem problem(quality);
-
     ceres::GradientProblemSolver::Options options;
 //    options.max_num_iterations = 25;
     options.max_num_iterations = 1000;
@@ -266,16 +260,16 @@ int main(int argc, char** argv)
     jsonBiasfile.open("traj3Bias.json");
     
     vector<double> paramBiasVec = paramVec;
-    paramBiasVec[0] *= 1.03;
+//    paramBiasVec[0] *= 1.03;
 //    paramBiasVec[4] += 0.0015;
-    paramBiasVec[3] *= 1.03;
+//    paramBiasVec[3] *= 1.03;
 //    paramBiasVec[7] += 0.0015;
     for (int trajIdx = 0; trajIdx < trajVec.size(); trajIdx++)
     {
         auto traj = trajVec[trajIdx];
         
         traj->compute(paramVec.data() + trajIdx * traj->paramSize(), xiOdomVec, covOdomVec);
-        traj->compute(paramBiasVec.data() + trajIdx * traj->paramSize(), xiOdomBiasVec, covOdomBiasVec);
+//        traj->compute(paramBiasVec.data() + trajIdx * traj->paramSize(), xiOdomBiasVec, covOdomBiasVec);
         
         for (int i = 0; i < xiOdomVec.size(); i++)
         {
@@ -285,10 +279,10 @@ int main(int argc, char** argv)
                         << xiOdomVec[i].trans()[0] << ", " 
                         << xiOdomVec[i].trans()[1] << ", " 
                         << xiOdomVec[i].rot()[2] << "],"<< std::endl;
-            jsonBiasfile << "            [" 
-                        << xiOdomBiasVec[i].trans()[0] << ", " 
-                        << xiOdomBiasVec[i].trans()[1] << ", " 
-                        << xiOdomBiasVec[i].rot()[2] << "],"<< std::endl;
+//            jsonBiasfile << "            [" 
+//                        << xiOdomBiasVec[i].trans()[0] << ", " 
+//                        << xiOdomBiasVec[i].trans()[1] << ", " 
+//                        << xiOdomBiasVec[i].rot()[2] << "],"<< std::endl;
             //to plot
             myfile << xiOdomVec[i].trans()[0] << "   " << xiOdomVec[i].trans()[1]  << endl;
             

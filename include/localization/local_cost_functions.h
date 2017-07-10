@@ -67,7 +67,8 @@ struct PhotometricCostFunction : ceres::CostFunction
     const Transf _xiBaseCam;
     const PhotometricPack & _dataPack;
     const Grid2D<float> _imageGrid;
-    const double _scale;
+//    const double _scale;
+    const double _invScale;
     const double LOSS_FACTOR = 3;     // defines how quickly the impact of data points is reduced with error
 };
 
@@ -84,7 +85,7 @@ struct PhotometricError
             _projectionParams(projectionParams),
             _dataPack(dataPack),
             _imageGrid(img2.cols, img2.rows, (float*)(img2.data)),
-            _scale(scale) {}
+            _invScale(1. / scale) {}
             
     template <typename T>
     bool operator()(const T * const* params,
@@ -112,7 +113,7 @@ struct PhotometricError
             if (projector(projectionParamsT.data(), transformedPoints[i].data(), pt.data())) 
             {
                 T res;
-                imageInterpolator.Evaluate(pt[1] / T(_scale), pt[0] / T(_scale), &res);
+                imageInterpolator.Evaluate(pt[1] * T(_invScale), pt[0] * T(_invScale), &res);
                 residual[i] = res - T(_dataPack.valVec[i]);
             }
             else
@@ -126,7 +127,8 @@ struct PhotometricError
     const vector<double> & _projectionParams;
     const PhotometricPack & _dataPack;
     const Grid2D<float> _imageGrid;
-    const double _scale; 
+//    const double _scale; 
+    const double _invScale;
 };
 
 /*
@@ -142,10 +144,10 @@ struct MutualInformation : public FirstOrderFunction
             _dataPack(dataPack),
             _xiBaseCam(xiBaseCam),
             _imageGrid(img2.cols, img2.rows, (float*)img2.data),
-            _scale(scale),
+            _invScale(1. / scale),
             _numBins(numBins),
             _histStep(valMax / (numBins - 1)),
-            _increment(1./dataPack.cloud.size()),
+            _increment(1. / dataPack.cloud.size()),
             _hist1(computeHist(dataPack.valVec))
     { }
     
@@ -174,7 +176,8 @@ struct MutualInformation : public FirstOrderFunction
     ICamera * _camera;
     const PhotometricPack & _dataPack;
     const Grid2D<float> _imageGrid;
-    const double _scale;
+//    const double _scale;
+    const double _invScale;
     
     //histogram params
     const int _numBins;

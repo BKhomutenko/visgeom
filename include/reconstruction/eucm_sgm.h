@@ -165,6 +165,7 @@ private:
     Mat8u _costBuffer; //TODO maybe merge with salientBuffer
     Mat8u _salientBuffer; 
     Mat8u _stepBuffer;
+    Mat8u _skipBuffer;
     Mat32s _tableauLeft, _tableauRight; //FIXME check the type through the code
     Mat32s _tableauTop, _tableauBottom;
     Mat32s _smallDisparity;

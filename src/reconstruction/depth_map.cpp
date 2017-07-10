@@ -572,7 +572,7 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
             const int queryIdx = queryIdxVec[i];
             double depth = valVec[queryIdx + h*hStep];
             double sigma = sigmaVec[queryIdx + h*hStep]; //TODO discard points with sigma > sigmaMax
-            if (depth < MIN_DEPTH)
+            if (depth < MIN_DEPTH or depth == OUT_OF_RANGE)
             {
                 if (reconstFlags & DEFAULT_VALUES and h == 0)
                 {
@@ -893,7 +893,7 @@ void DepthMap::filterNoise()
 //                double neighSigmaVal = myCopy.sigma(x + dxArr[i], y + dyArr[i]);
                 if (neighDepthVal == OUT_OF_RANGE) continue;
                 countFilled++;
-                if (abs(depthVal - neighDepthVal) > 2*sigmaVal) continue;
+                if (abs(depthVal - neighDepthVal) > sigmaVal) continue;
                 countMatches++;
                 acc += neighDepthVal;
             }

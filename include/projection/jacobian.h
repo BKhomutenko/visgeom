@@ -22,9 +22,6 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "projection/generic_camera.h"
 #include "geometry/geometry.h"
 
-// A class for projection jacobian computation
-// dp/dt = J dxi/dt
-
 //TODO rewrite the explanation 
 /*
 Jacobian matrix of wrapped image brightness with respect

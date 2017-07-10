@@ -86,7 +86,7 @@ double TrajectoryQuality::EvaluateCost(const double * params) const
 TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ICamera * camera,
             Transf xiCam, Transf xiBoard, const Vector3dVec & board,
             const Matrix6d & CovPrior, const Matrix2d & CovPt, 
-            const int Nx, const int Ny, double kapaMax) : 
+            const int Nx, const int Ny, double kappaMax) : 
     _trajVec(trajVec),
     _camera(camera->clone()),
     _xiCam(xiCam),
@@ -94,7 +94,7 @@ TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & tr
     _hessPrior(CovPrior.inverse()),
     _board(board),
     _paramSize(0),
-    _kapaMax(kapaMax),
+    _kappaMax(kappaMax),
     _Nx(Nx),
     _Ny(Ny)
 {
@@ -105,7 +105,44 @@ TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & tr
         _paramSize += t->paramSize();
     }
 }
-    
+
+TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, 
+        const ptree & params, const ICamera * camera) : 
+    _trajVec(trajVec),
+    _camera(camera->clone()),
+    _xiCam(readTransform(params.get_child("xiBaseCam")),
+    _xiBoard(readTransform(params.get_child("xiOrigBoard")),
+    _hessPrior(Matrix6d::Zero()),
+    _paramSize(0),
+    _kappaMax( 1. / readTransform(params.get_child("turn_radius")),
+    _Nx(params.get<int>("board.cols")),
+    _Ny(params.get<int>("board.rows"))
+{
+    //init _hessPrior
+    vector<double> priorVarianceVec = readVector(params.get_child("prior_variance"));
+    for (int i = 0; i < 6; i++)
+    {
+        _hessPrior(i, i) = 1. / priorVarianceVec[i];
+    }
+    //init _board
+    double step = params.get<double>("board.step");
+    for (int i = 0; i < _Nx; i++)
+    {
+        for (int j = 0; j < _Ny; j++)
+        {
+            board.emplace_back(step * i, step * j, 0);
+        }
+    }
+    Matrix2d covPtInv = Matrix2d::Zero();
+    covPtInv(0, 0) = covPtInv(1, 1) = 1. / params.get<double>("feature_variance");
+    Eigen::LLT<Matrix2d> lltOfCovCornerInv(CovPt.inverse()); // compute the Cholesky decomposition of A
+    _ptStiffness = lltOfCovCornerInv.matrixU();
+    for (auto & t : _trajVec)
+    {
+        _paramSize += t->paramSize();
+    }
+}
+  
 bool TrajectoryVisualQuality::Evaluate(const double * params,
         double * residual, double * jacobian) const
 {
@@ -135,6 +172,7 @@ double TrajectoryVisualQuality::EvaluateCost(const double * params) const
     for (int trajIdx = 0; trajIdx < _trajVec.size(); trajIdx++)
     {
         auto traj = _trajVec[trajIdx];
+        //FIXME a potential bug if traj->paramSize() is different for different traj
         traj->compute(params + trajIdx * traj->paramSize(), xiOdomVec, covOdomVec);
         
         for (int i = 1; i < xiOdomVec.size(); i++)
@@ -229,7 +267,7 @@ double TrajectoryVisualQuality::curvatureCost(const Transf & xi1, const Transf &
     const double v = zeta.trans().norm();
     const double w = zeta.rot().norm();
     const double kapa = w / v;
-    return pow(30 * max(0., kapa - _kapaMax), 2);
+    return pow(30 * max(0., kapa - _kappaMax), 2);
 }
 
 // Transformation kinematic jacobian

@@ -225,15 +225,15 @@ target_link_libraries( depth_reconstruct_test
 #)
 
 # TODO eventually remove
-#add_executable( motion_gradual
-#    test/reconstruction/motion_gradual.cpp
-#)
+add_executable( motion_gradual
+    test/reconstruction/motion_gradual.cpp
+)
 
-#target_link_libraries( motion_gradual 
-#    reconstruction
-#    utils
-#    ${OpenCV_LIBS} 
-#)
+target_link_libraries( motion_gradual 
+    reconstruction
+    render
+    ${OpenCV_LIBS} 
+)
 
 ## LOCALIZATION ###
 add_executable( odometry_test

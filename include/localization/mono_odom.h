@@ -71,6 +71,7 @@ public:
     // state
     // pose wrt current keyframe
     Transf _xiLocal; 
+    Transf _xiLocalOld;
     Transf _xiGlobal;
     // the last WO measuremen to compute odometry increment
     Transf _xiOdom; 

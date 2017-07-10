@@ -39,7 +39,7 @@ PhotometricCostFunction::PhotometricCostFunction(const ICamera * camera, const T
             _dataPack(dataPack),
             _xiBaseCam(xiBaseCam),
             _imageGrid(img2.cols, img2.rows, (float*)(img2.data)),
-            _scale(scale) 
+            _invScale(1. / scale) 
     {
         mutable_parameter_block_sizes()->clear();
         mutable_parameter_block_sizes()->push_back(6);
@@ -88,9 +88,9 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
                 double f;
                 // image interpolation and gradient
                 Covector2d grad;
-                imageInterpolator.Evaluate(pt[1] / _scale, pt[0] / _scale,
+                imageInterpolator.Evaluate(pt[1] * _invScale, pt[0] * _invScale,
                         &f, &grad[1], &grad[0]);
-                grad /= _scale;  // normalize according to the scale
+                grad *= _invScale;  // normalize according to the scale
                 
                 residual[i] = (f - _dataPack.valVec[i]); // / (_dataPack.valVec[i] + 10);
 //                if (abs(residual[i]) > 10)
@@ -133,7 +133,7 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
             if (_camera->projectPoint(transformedPoints[i], pt)) 
             {
                 double f;
-                imageInterpolator.Evaluate(pt[1] / _scale, pt[0] / _scale, &f);
+                imageInterpolator.Evaluate(pt[1] * _invScale, pt[0] * _invScale, &f);
                 residual[i] = (f - _dataPack.valVec[i]);// / (_dataPack.valVec[i] + 10);
                 double k;
                 lossFunction(residual[i], residual[i], k);
@@ -188,14 +188,14 @@ bool MutualInformation::Evaluate(double const * parameters,
                 double & f = valVec2[i];
                 Covector2d & grad = gradVec[i];
                 // image interpolation and gradient
-                imageInterpolator.Evaluate(pt[1] / _scale, pt[0] / _scale,
+                imageInterpolator.Evaluate(pt[1] * _invScale, pt[0] * _invScale,
                         &f, &grad[1], &grad[0]);
-                grad /= _scale;  // normalize according to the scale
+                grad *= _invScale;  // normalize according to the scale
             }
             else 
             {
                 double & f = valVec2[i];
-                imageInterpolator.Evaluate(pt[1] / _scale, pt[0] / _scale, &f);
+                imageInterpolator.Evaluate(pt[1] * _invScale, pt[0] * _invScale, &f);
             }
             
         }
@@ -212,7 +212,7 @@ bool MutualInformation::Evaluate(double const * parameters,
         for (int idx1 = 0; idx1 < _numBins; idx1++)
         {
             const double & p12 = hist12[idx2 * _numBins + idx1];
-            const double log12 = log(p12 / hist2[idx2] / _hist1[idx1]);
+            const double log12 = log(p12 / (hist2[idx2] * _hist1[idx1]));
             if (p12 > 0)
             {
                 logVec12[idx2 * _numBins + idx1] = log12;

@@ -69,8 +69,10 @@ struct TrajectoryVisualQuality : FirstOrderFunction
     TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ICamera * camera,
             Transf xiCam, Transf xiBoard, const Vector3dVec & board,
             const Matrix6d & CovPrior, const Matrix2d & CovPt, 
-            const int Nx, const int Ny, double kapaMax = 0.3);
+            const int Nx, const int Ny, double kappaMax = 0.3);
     
+    TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ptree & params);
+            
     virtual bool Evaluate(const double * params,
             double * residual, double * jacobian) const;
     
@@ -100,9 +102,9 @@ struct TrajectoryVisualQuality : FirstOrderFunction
     Transf _xiCam, _xiBoard;
     Vector3dVec _board;
     int _Nx, _Ny;
-    Matrix2d _ptStiffness;  // A^T * A = C_pt^-1
+    Matrix2d _ptStiffness;  // A^T * A = C_pt^-1    -- point detection precision
     Matrix6d _hessPrior;  // C_prior^-1   --  the regularization term
-    double _kapaMax;
+    double _kappaMax;
 };
 
 //TODO put lesewhere
