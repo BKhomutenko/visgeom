@@ -96,7 +96,8 @@ TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & tr
     _paramSize(0),
     _kappaMax(kappaMax),
     _Nx(Nx),
-    _Ny(Ny)
+    _Ny(Ny),
+    MIN_DIST(1)
 {
     Eigen::LLT<Matrix2d> lltOfCovCornerInv(CovPt.inverse()); // compute the Cholesky decomposition of A
     _ptStiffness = lltOfCovCornerInv.matrixU();
@@ -110,32 +111,36 @@ TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & tr
         const ptree & params, const ICamera * camera) : 
     _trajVec(trajVec),
     _camera(camera->clone()),
-    _xiCam(readTransform(params.get_child("xiBaseCam")),
-    _xiBoard(readTransform(params.get_child("xiOrigBoard")),
+    _xiCam( readTransform(params.get_child("xiBaseCam")) ),
+    _xiBoard( readTransform(params.get_child("xiOrigBoard")) ),
     _hessPrior(Matrix6d::Zero()),
     _paramSize(0),
-    _kappaMax( 1. / readTransform(params.get_child("turn_radius")),
+    _kappaMax( 1. / params.get<double>("turn_radius") ),
     _Nx(params.get<int>("board.cols")),
-    _Ny(params.get<int>("board.rows"))
+    _Ny(params.get<int>("board.rows")),
+    MIN_DIST( params.get<double>("min_camera_dist") ),
+    MARGIN( params.get<double>("min_margin") ),
+    MIN_DIAGONAL( params.get<double>("min_board_size") ),
+    MAX_DIFF( params.get<double>("max_aspect_ratio") )
 {
     //init _hessPrior
-    vector<double> priorVarianceVec = readVector(params.get_child("prior_variance"));
+    vector<double> priorVarianceVec = readVector<double>(params.get_child("prior_variance"));
     for (int i = 0; i < 6; i++)
     {
         _hessPrior(i, i) = 1. / priorVarianceVec[i];
     }
     //init _board
     double step = params.get<double>("board.step");
-    for (int i = 0; i < _Nx; i++)
+    for (int j = 0; j < _Ny; j++)
     {
-        for (int j = 0; j < _Ny; j++)
+        for (int i = 0; i < _Nx; i++)
         {
-            board.emplace_back(step * i, step * j, 0);
+            _board.emplace_back(step * i, step * j, 0);
         }
     }
     Matrix2d covPtInv = Matrix2d::Zero();
     covPtInv(0, 0) = covPtInv(1, 1) = 1. / params.get<double>("feature_variance");
-    Eigen::LLT<Matrix2d> lltOfCovCornerInv(CovPt.inverse()); // compute the Cholesky decomposition of A
+    Eigen::LLT<Matrix2d> lltOfCovCornerInv(covPtInv); // compute the Cholesky decomposition of A
     _ptStiffness = lltOfCovCornerInv.matrixU();
     for (auto & t : _trajVec)
     {
@@ -178,17 +183,17 @@ double TrajectoryVisualQuality::EvaluateCost(const double * params) const
         for (int i = 1; i < xiOdomVec.size(); i++)
         {
             Matrix6d LcamOdom = _xiCam.screwTransfInv();
-            Transf xiBaseCam = xiOdomVec[i].compose(_xiCam);
-            Matrix6d C = visualCov(xiBaseCam) + LcamOdom * covOdomVec[i] * LcamOdom.transpose();
-            Transf xiVis = _xiCam.inverseCompose(xiOdomVec[0].inverseCompose(xiBaseCam));
+            Transf xiOrigCam = xiOdomVec[i].compose(_xiCam);
+            Matrix6d C = visualCov(xiOrigCam) + LcamOdom * covOdomVec[i] * LcamOdom.transpose();
+            Transf xiVis = _xiCam.inverseCompose(xiOdomVec[0].inverseCompose(xiOrigCam));
             Matrix6d J = xiVis.screwTransfInv() - Matrix6d::Identity();
             // hessian is computed up to an orthonormal transformation
             // it does not change the rank but simplifies the calculus
             H += (J.transpose() * C.inverse() * J); 
-            res += imageLimitsCost(xiBaseCam);
+            res += imageLimitsCost(xiOrigCam);
             res += curvatureCost(xiOdomVec[i - 1], xiOdomVec[i]);
             //TODO add the distance to board as a constraint
-    //        res += distanceCost();
+            res += distanceCost(xiOrigCam);
         }
     }
     JacobiSVD<Matrix6d> svd(H);
@@ -198,6 +203,8 @@ double TrajectoryVisualQuality::EvaluateCost(const double * params) const
     }
     return res;
 }
+
+
 
 Matrix6d TrajectoryVisualQuality::visualCov(const Transf & camPose) const
 {
@@ -222,17 +229,20 @@ Matrix6d TrajectoryVisualQuality::visualCov(const Transf & camPose) const
     return JtCJinv.transpose() * JtJ * JtCJinv;
 }
 
+double TrajectoryVisualQuality::distanceCost(const Transf & camPose) const
+{
+    Transf xiCamBoard = camPose.inverseCompose(_xiBoard);
+    return pow(max(MIN_DIST - xiCamBoard.trans().norm(), 0.) * 10, 2);
+}
+
 //image borders and the board size
 double TrajectoryVisualQuality::imageLimitsCost(const Transf & camPose) const
 {
-    const double MARGIN = 100;
-    const double MIN_DIAGONAL = 70;
-    const double MAX_DIFF = 1.5;
     //FIXME temporary for particular data
     Vector2d center(_camera->getCenterU(), _camera->getCenterV());
 //    Vector2d center(280, 215);
 //    double r = min(center[1], _camera->height - center[1])  - MARGIN; // margin
-    double r = (_camera->getCenterU() + _camera->getCenterV()) / 2;
+    double r = (_camera->getCenterU() + _camera->getCenterV()) / 2.;
     double res = 0;
     
     Transf xiCamBoard = camPose.inverseCompose(_xiBoard);

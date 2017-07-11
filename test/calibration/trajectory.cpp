@@ -216,6 +216,8 @@ int main(int argc, char** argv)
     //////////////////////////////////
     //Test the visual covariance
     //////////////////////////////////
+    Transf xiCam = readTransform(root.get_child("quality_parameters.xiBaseCam"));
+    Transf xiBoard = readTransform(root.get_child("quality_parameters.xiOrigBoard"));
     Matrix6d C = quality->visualCov(Transf(0.1, 0.1, 0, 0, 0, .1).compose(xiCam));
     cout << C << endl << endl;
     cout << C.inverse() << endl;
@@ -226,15 +228,19 @@ int main(int argc, char** argv)
     //////////////////////////////////
     //Solve the optimization problem
     //////////////////////////////////
+
     ceres::GradientProblem problem(quality);
     ceres::GradientProblemSolver::Options options;
 //    options.max_num_iterations = 25;
+//    options.max_num_line_search_step_size_iterations = 100;
     options.max_num_iterations = 1000;
     options.minimizer_progress_to_stdout = true;
     ceres::GradientProblemSolver::Summary summary;
-    ceres::Solve(options, problem, paramVec.data(), &summary);
-    
-    std::cout << summary.FullReport() << endl;
+    if (root.get<bool>("optimize"))
+    {
+        ceres::Solve(options, problem, paramVec.data(), &summary);
+        std::cout << summary.FullReport() << endl;
+    }
     
     for (int i = 0; i < circleCount; i++)
     {
@@ -248,11 +254,12 @@ int main(int argc, char** argv)
     
     
     //output the trajectory parameters
-    fourParamsAnalysis(paramVec.data(), xiBoard);
-    fourParamsAnalysis(paramVec.data() + PARAM_NUM, xiBoard);
+    //TODO change back everything
+//    fourParamsAnalysis(paramVec.data(), xiBoard);
+//    fourParamsAnalysis(paramVec.data() + PARAM_NUM, xiBoard);
     
     ofstream myfile;
-    myfile.open("/home/bogdan/projects/python/trajectory/traj3");
+    myfile.open("/home/bodyk/projects/python/trajectory/traj3");
     ofstream jsonfile;
     jsonfile.open("traj3.json");
     
@@ -297,7 +304,7 @@ int main(int argc, char** argv)
             fill(img.data + WIDTH * (HEIGHT - 2), img.data + WIDTH * HEIGHT, 0);
             Transf xiCamBoard = xiOdomVec[i].compose(xiCam).inverseCompose(xiBoard);
             Vector3dVec boardCam;
-            xiCamBoard.transform(board, boardCam);
+            xiCamBoard.transform(quality->_board, boardCam);
             Vector2dVec projectedBoard;
             cam.projectPointCloud(boardCam, projectedBoard);
             

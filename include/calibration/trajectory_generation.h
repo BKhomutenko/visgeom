@@ -71,7 +71,7 @@ struct TrajectoryVisualQuality : FirstOrderFunction
             const Matrix6d & CovPrior, const Matrix2d & CovPt, 
             const int Nx, const int Ny, double kappaMax = 0.3);
     
-    TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ptree & params);
+    TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ptree & params, const ICamera * camera);
             
     virtual bool Evaluate(const double * params,
             double * residual, double * jacobian) const;
@@ -81,6 +81,8 @@ struct TrajectoryVisualQuality : FirstOrderFunction
     //TODO to think how to regularize for different cameras
     //This function is adapted for fisheye cameras
     double imageLimitsCost(const Transf & camPose) const;
+    
+    double distanceCost(const Transf & camPose) const;
     
     double curvatureCost(const Transf & xi1, const Transf & xi2) const;
     
@@ -105,6 +107,11 @@ struct TrajectoryVisualQuality : FirstOrderFunction
     Matrix2d _ptStiffness;  // A^T * A = C_pt^-1    -- point detection precision
     Matrix6d _hessPrior;  // C_prior^-1   --  the regularization term
     double _kappaMax;
+    //TODO make constants constant
+    double MIN_DIST; // distance camera-board
+    double MARGIN;  // distance corners-image border
+    double MIN_DIAGONAL;  // board projection size
+    double MAX_DIFF;  // ratio between two diagonals
 };
 
 //TODO put lesewhere
