@@ -39,6 +39,7 @@ using std::array;
 using std::pair;
 using std::map;
 using Array6d = array<double, 6>;
+using std::make_pair;
 
 // Algorithms
 using std::copy;

@@ -31,6 +31,7 @@ reading out .json files
 
 using boost::property_tree::ptree;
 using boost::property_tree::read_json;
+using boost::property_tree::write_json;
 
 template<typename T>
 Transformation<T> transformFromData(const vector<T> & valVec)

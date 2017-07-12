@@ -85,6 +85,14 @@ target_link_libraries( calib
     ${Boost_LIBRARIES}
 )
 
+add_executable( odom_interpolation
+    test/calibration/odometry_interpolation.cpp
+)
+
+target_link_libraries( odom_interpolation
+    ${Boost_LIBRARIES}
+)
+
 add_executable( optim_trajectory
     test/calibration/trajectory.cpp
 )
