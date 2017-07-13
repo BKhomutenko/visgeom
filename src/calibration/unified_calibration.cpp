@@ -164,6 +164,7 @@ void GenericCameraCalibration::initTransformChainInfo(ImageData & data, const pt
         if (flagName == "check_extraction") data.checkExtraction = true;
         else if (flagName == "improve_detection") data.improveDetection = true;
         else if (flagName == "show_outliers") data.showOutliers = true;
+        else if (flagName == "user_guided") data.userGuided = true;
         else if (flagName == "draw_improved") 
         {
             data.drawImproved = true;
@@ -612,6 +613,7 @@ void onMouse( int event, int x, int y, int, void* )
 
 void GenericCameraCalibration::extractGridProjections(ImageData & data)
 {
+    const int flags = cv::CALIB_CB_ADAPTIVE_THRESH;
     Size patternSize(data.Nx, data.Ny);
     for (auto & fileName : data.imageNameVec)
     {
@@ -624,45 +626,52 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
             continue;
         }
         vector<cv::Point2f> centers;
-        bool patternIsFound = findChessboardCorners(frame, patternSize, centers);
+        bool patternIsFound = findChessboardCorners(frame, patternSize, centers, flags);
         if (not patternIsFound)
         {
             //USER-guided detection
-            
-//            xVec.clear();
-//            yVec.clear();
-//            
-//            cout << "CB detection failed" << endl;
-//            cout << "select UL, then BR corners of the area with CB" << endl;
+            if (data.userGuided)
+            {
+                xVec.clear();
+                yVec.clear();
+                
+                cout << "CB detection failed" << endl;
+                cout << "select UL, then BR corners of the area with CB" << endl;
 
-//            imshow("Select", frame);
-//            setMouseCallback("Select", onMouse);
-//            while ( xVec.size() < 2) waitKey(50);
+                imshow("Select", frame);
+                setMouseCallback("Select", onMouse);
+                while ( xVec.size() < 2) waitKey(50);
 
-//            Mat8u subframe = frame.colRange(xVec[0], xVec[1]).rowRange(yVec[0], yVec[1]);
-//            double ratio = 1;
-//            const double ROWS_MIN = 120;
-//            const double COLS_MIN = 160;
-//            while (subframe.rows * ratio < ROWS_MIN or subframe.cols * ratio < COLS_MIN)
-//            {
-//                ratio += 1;
-//            }
-//            if (ratio != 1) resize(subframe, subframe, Size(0, 0), ratio, ratio);
-//            
-//            patternIsFound = findChessboardCorners(subframe, patternSize,
-//                                    centers);
-////            imshow("Select", subframe);
-////            waitKey();
-//            if (not patternIsFound)
-//            {
+                Mat8u subframe = frame.colRange(xVec[0], xVec[1]).rowRange(yVec[0], yVec[1]);
+                double ratio = 1;
+                const double ROWS_MIN = 120;
+                const double COLS_MIN = 160;
+                while (subframe.rows * ratio < ROWS_MIN or subframe.cols * ratio < COLS_MIN)
+                {
+                    ratio += 1;
+                }
+                if (ratio != 1) resize(subframe, subframe, Size(0, 0), ratio, ratio);
+                
+                patternIsFound = findChessboardCorners(subframe, patternSize,
+                                        centers, flags);
+                imshow("Select", subframe);
+                waitKey();
+                if (not patternIsFound)
+                {
+                    cout << fileName << " : ERROR, pattern not found" << endl;
+                    continue;
+                }
+                for (auto & pt : centers)
+                {
+                    pt.x = pt.x / ratio + xVec[0];
+                    pt.y = pt.y / ratio + yVec[0];
+                }
+            }
+            else
+            {
                 cout << fileName << " : ERROR, pattern not found" << endl;
                 continue;
-//            }
-//            for (auto & pt : centers)
-//            {
-//                pt.x = pt.x / ratio + xVec[0];
-//                pt.y = pt.y / ratio + yVec[0];
-//            }
+            }
         }
         
         if (data.checkExtraction)

@@ -62,6 +62,7 @@ struct ImageData
     bool showOutliers = false;
     bool improveDetection = false;
     bool drawImproved = false;
+    bool userGuided = false;
     double drawScale = 7;
     int getFirstExtractedIdx() const
     {

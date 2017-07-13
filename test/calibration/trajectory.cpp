@@ -23,7 +23,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "calibration/trajectory_generation.h"
 #include "projection/eucm.h"
 
-const int PARAM_NUM = 4;
+const int PARAM_NUM = 5;
 class CircularTrajectory : public ITrajectory
 {
 public:
@@ -41,12 +41,12 @@ public:
         
         Matrix6d covAbs = Matrix6d::Identity()*1e-2;
         
-        double dist = params[2];
-        double alpha = params[3];
+        double dist = params[3];
+        double alpha = params[4];
         double ca = cos(alpha*0.5);
         double sa = sin(alpha*0.5);
-        Transf xi0(0, params[0], 0,
-                     0, 0, params[1]);
+        Transf xi0(params[0], params[1], 0,
+                     0, 0, params[2]);
         //TODO modelizer proprement l'odometrie            
         covVW <<    1e-4,        0, 
                     0,       1e-4;
@@ -154,12 +154,14 @@ int main(int argc, char** argv)
     double numberSteps = 30;
     vector<double> paramVec;
     
+    paramVec.push_back(root.get<double>("trajectory1.x_0"));
     paramVec.push_back(root.get<double>("trajectory1.y_0"));
     paramVec.push_back(root.get<double>("trajectory1.theta_0"));
     paramVec.push_back(root.get<double>("trajectory1.v"));
     paramVec.push_back(root.get<double>("trajectory1.w"));
     trajVec.push_back(new CircularTrajectory(root.get<int>("trajectory1.number_steps")));
 
+    paramVec.push_back(root.get<double>("trajectory2.x_0"));
     paramVec.push_back(root.get<double>("trajectory2.y_0"));
     paramVec.push_back(root.get<double>("trajectory2.theta_0"));
     paramVec.push_back(root.get<double>("trajectory2.v"));
@@ -259,7 +261,7 @@ int main(int argc, char** argv)
 //    fourParamsAnalysis(paramVec.data() + PARAM_NUM, xiBoard);
     
     ofstream myfile;
-    myfile.open("/home/bodyk/projects/python/trajectory/traj3");
+    myfile.open("/home/bogdan/projects/python/trajectory/traj3");
     ofstream jsonfile;
     jsonfile.open("traj3.json");
     
@@ -303,6 +305,10 @@ int main(int argc, char** argv)
             fill(img.data, img.data + WIDTH * 2, 0);
             fill(img.data + WIDTH * (HEIGHT - 2), img.data + WIDTH * HEIGHT, 0);
             Transf xiCamBoard = xiOdomVec[i].compose(xiCam).inverseCompose(xiBoard);
+            if (i == 0)
+            {
+                cout << "xiCamBoard " << trajIdx + 1 << " : " << xiCamBoard << endl;
+            }
             Vector3dVec boardCam;
             xiCamBoard.transform(quality->_board, boardCam);
             Vector2dVec projectedBoard;

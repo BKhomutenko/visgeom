@@ -83,30 +83,6 @@ double TrajectoryQuality::EvaluateCost(const double * params) const
 /// TrajectoryVisualQuality ///
 ///////////////////////////////
 
-TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ICamera * camera,
-            Transf xiCam, Transf xiBoard, const Vector3dVec & board,
-            const Matrix6d & CovPrior, const Matrix2d & CovPt, 
-            const int Nx, const int Ny, double kappaMax) : 
-    _trajVec(trajVec),
-    _camera(camera->clone()),
-    _xiCam(xiCam),
-    _xiBoard(xiBoard),
-    _hessPrior(CovPrior.inverse()),
-    _board(board),
-    _paramSize(0),
-    _kappaMax(kappaMax),
-    _Nx(Nx),
-    _Ny(Ny),
-    MIN_DIST(1)
-{
-    Eigen::LLT<Matrix2d> lltOfCovCornerInv(CovPt.inverse()); // compute the Cholesky decomposition of A
-    _ptStiffness = lltOfCovCornerInv.matrixU();
-    for (auto & t : _trajVec)
-    {
-        _paramSize += t->paramSize();
-    }
-}
-
 TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, 
         const ptree & params, const ICamera * camera) : 
     _trajVec(trajVec),
@@ -120,8 +96,7 @@ TrajectoryVisualQuality::TrajectoryVisualQuality(const vector<ITrajectory*> & tr
     _Ny(params.get<int>("board.rows")),
     MIN_DIST( params.get<double>("min_camera_dist") ),
     MARGIN( params.get<double>("min_margin") ),
-    MIN_DIAGONAL( params.get<double>("min_board_size") ),
-    MAX_DIFF( params.get<double>("max_aspect_ratio") )
+    MIN_CELL( params.get<double>("min_cell_size") )
 {
     //init _hessPrior
     vector<double> priorVarianceVec = readVector<double>(params.get_child("prior_variance"));
@@ -194,6 +169,7 @@ double TrajectoryVisualQuality::EvaluateCost(const double * params) const
             res += curvatureCost(xiOdomVec[i - 1], xiOdomVec[i]);
             //TODO add the distance to board as a constraint
             res += distanceCost(xiOrigCam);
+            res += normalCost(xiOrigCam);
         }
     }
     JacobiSVD<Matrix6d> svd(H);
@@ -232,7 +208,18 @@ Matrix6d TrajectoryVisualQuality::visualCov(const Transf & camPose) const
 double TrajectoryVisualQuality::distanceCost(const Transf & camPose) const
 {
     Transf xiCamBoard = camPose.inverseCompose(_xiBoard);
-    return pow(max(MIN_DIST - xiCamBoard.trans().norm(), 0.) * 10, 2);
+    return pow(max(MIN_DIST - xiCamBoard.trans().norm(), 0.), 2);
+}
+
+double TrajectoryVisualQuality::normalCost(const Transf & camPose) const
+{
+    Transf xiCamBoard = camPose.inverseCompose(_xiBoard);
+    Matrix3d R = xiCamBoard.rotMat();
+    Vector3d ez = R.col(2);
+    Vector3d dir = xiCamBoard.trans();
+    dir.normalize();
+    
+    return pow( max(dir.cross(ez).norm() - M_PI / 6, 0.) * 10, 2);
 }
 
 //image borders and the board size
@@ -258,16 +245,29 @@ double TrajectoryVisualQuality::imageLimitsCost(const Transf & camPose) const
         double distR = max((pt - center).norm() - r, 0.);
         res += pow(max(distX, max(distY, distR))/ 10., 2);
     }
-    auto pt1 = boardProjectionVec[0];
-    auto pt2 = boardProjectionVec.back();
-    auto pt3 = boardProjectionVec[_Nx - 1];
-    auto pt4 = boardProjectionVec[_Nx * (_Ny- 1)];
-    double diag1 = (pt1 - pt2).norm();
-    double diag2 = (pt3 - pt4).norm();
-    double diagSmall = min(diag1, diag2);
-    double diagBig = max(diag1, diag2);
-    res += pow(max(MIN_DIAGONAL - diagSmall, 0.), 2);
-    res += pow(max(diagBig / diagSmall - MAX_DIFF, 0.) * 10, 2);
+    
+    //constraint the horisontal cell size
+    for (int i = 0; i < _Nx - 1; i++)
+    {
+        for (int j = 0; j < _Ny; j++)
+        {
+            auto pt1 = boardProjectionVec[_Nx * j + i];
+            auto pt2 = boardProjectionVec[_Nx * j + i + 1];
+            double dist = (pt1 - pt2).norm();
+            res += pow(max(MIN_CELL - dist, 0.)/10., 2);
+        }
+    }
+    //constraint the vertical cell size
+    for (int i = 0; i < _Nx; i++)
+    {
+        for (int j = 0; j < _Ny - 1; j++)
+        {
+            auto pt1 = boardProjectionVec[_Nx * j + i];
+            auto pt2 = boardProjectionVec[_Nx * (j + 1) + i];
+            double dist = (pt1 - pt2).norm();
+            res += pow(max(MIN_CELL - dist, 0.)/10., 2);
+        }
+    }
     return res;
 }
 
@@ -277,7 +277,7 @@ double TrajectoryVisualQuality::curvatureCost(const Transf & xi1, const Transf &
     const double v = zeta.trans().norm();
     const double w = zeta.rot().norm();
     const double kapa = w / v;
-    return pow(30 * max(0., kapa - _kappaMax), 2);
+    return pow(max(0., kapa - _kappaMax) * 10, 2);
 }
 
 // Transformation kinematic jacobian

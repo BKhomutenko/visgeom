@@ -66,12 +66,8 @@ struct TrajectoryQuality : FirstOrderFunction
 struct TrajectoryVisualQuality : FirstOrderFunction
 {
     // the class takes the ownership of traj
-    TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ICamera * camera,
-            Transf xiCam, Transf xiBoard, const Vector3dVec & board,
-            const Matrix6d & CovPrior, const Matrix2d & CovPt, 
-            const int Nx, const int Ny, double kappaMax = 0.3);
-    
-    TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, const ptree & params, const ICamera * camera);
+    TrajectoryVisualQuality(const vector<ITrajectory*> & trajVec, 
+            const ptree & params, const ICamera * camera);
             
     virtual bool Evaluate(const double * params,
             double * residual, double * jacobian) const;
@@ -83,6 +79,8 @@ struct TrajectoryVisualQuality : FirstOrderFunction
     double imageLimitsCost(const Transf & camPose) const;
     
     double distanceCost(const Transf & camPose) const;
+    
+    double normalCost(const Transf & camPose) const;
     
     double curvatureCost(const Transf & xi1, const Transf & xi2) const;
     
@@ -110,8 +108,7 @@ struct TrajectoryVisualQuality : FirstOrderFunction
     //TODO make constants constant
     double MIN_DIST; // distance camera-board
     double MARGIN;  // distance corners-image border
-    double MIN_DIAGONAL;  // board projection size
-    double MAX_DIFF;  // ratio between two diagonals
+    double MIN_CELL;  // cell projection size
 };
 
 //TODO put lesewhere
