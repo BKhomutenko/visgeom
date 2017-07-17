@@ -56,18 +56,18 @@ int main(int argc, char** argv) {
     ///TEST A RESPONSE FUNCTION
     
     Mat8u src;
-    const double SIGMA = 2.5;
+    const double SIGMA = 2;
     const int FILTER_SIZE = 1 + 2 * round(SIGMA);
     GaussianBlur(frame, src, Size(FILTER_SIZE, FILTER_SIZE), SIGMA, SIGMA);
     
-    Mat32f respXY(src.size()), respUV(src.size()), resp(src.size());
-    respXY.setTo(0);
-    respUV.setTo(0);
+    Mat32f imx(src.size()), imy(src.size()), resp(src.size());
+    imx.setTo(0);
+    imy.setTo(0);
     resp.setTo(0);
     double acc = 0;
     int count = 0;
-    const int SIZE = 3;
-    const int HSIZE = 2;
+    const int SIZE = 2;
+    const int HSIZE = 1;
     for (int v = SIZE; v < src.rows - SIZE; v++)
     {
         for (int u = SIZE; u < src.cols - SIZE; u++)
@@ -85,8 +85,8 @@ int main(int argc, char** argv) {
             double iuv = src(v - HSIZE, u - HSIZE) + src(v + HSIZE, u + HSIZE) 
                             - src(v  + HSIZE, u - HSIZE) - src(v - HSIZE, u + HSIZE);
             iuv /= 4*HSIZE*HSIZE;
-            respXY(v, u) = -iuu * ivv;
-            respUV(v, u) = iuv * iuv ;
+            imx(v, u) = gx;
+            imy(v, u) = gy;
             double respVal = -iuu * ivv + iuv * iuv - 0.01*pow(gx * gx + gy * gy, 2);
             if (respVal > 1) 
             {
@@ -97,8 +97,8 @@ int main(int argc, char** argv) {
         }
     }
     const double avgVal = acc / count;
-    imshow("respXY", -respXY / 25);
-    imshow("respUV", respUV / 25);
+    imshow("respXY", imx / 250 +0.5);
+    imshow("respUV", imy / 250 +0.5);
     imshow("resp", resp / 250);
     
     waitKey();
@@ -107,19 +107,19 @@ int main(int argc, char** argv) {
     
     
     ///TEST HARRIS CORNERS
-    const int IMAGE_MARGIN = 2;
-    Mat32f gradx, grady, respxx, respxy, respyy;
-    
-    Sobel(frame, gradx, CV_32F, 1, 0, 3, 1./255);
-    Sobel(frame, grady, CV_32F, 0, 1, 3, 1./255);
-    respxx = gradx.mul(gradx);
-    respyy = grady.mul(grady);
-    respxy = gradx.mul(grady);
-    
-    const double SIGMA2 = 0.8;
-    GaussianBlur(respxx, respxx, Size(5, 5), SIGMA2, SIGMA2);
-    GaussianBlur(respxy, respxy, Size(5, 5), SIGMA2, SIGMA2);
-    GaussianBlur(respyy, respyy, Size(5, 5), SIGMA2, SIGMA2);
+//    const int IMAGE_MARGIN = 2;
+//    Mat32f gradx, grady, respxx, respxy, respyy;
+//    
+//    Sobel(frame, gradx, CV_32F, 1, 0, 3, 1./255);
+//    Sobel(frame, grady, CV_32F, 0, 1, 3, 1./255);
+//    respxx = gradx.mul(gradx);
+//    respyy = grady.mul(grady);
+//    respxy = gradx.mul(grady);
+//    
+//    const double SIGMA2 = 0.8;
+//    GaussianBlur(respxx, respxx, Size(5, 5), SIGMA2, SIGMA2);
+//    GaussianBlur(respxy, respxy, Size(5, 5), SIGMA2, SIGMA2);
+//    GaussianBlur(respyy, respyy, Size(5, 5), SIGMA2, SIGMA2);
     
 //    Mat32f resp(frame.size());
 //    resp.setTo(0);
@@ -151,8 +151,7 @@ int main(int argc, char** argv) {
     //find maxima
     
     
-    Mat32f detected(frame.size());
-    detected.setTo(0);
+    
     
     const int WINDOW_SIZE = 4;
     vector<pair<double, Vector2i>> hypVec;
@@ -186,7 +185,6 @@ int main(int argc, char** argv) {
             if (isMax)
             { 
                 hypVec.emplace_back(val, Vector2i(u, v));
-//                detected(v, u) = 1;
             }
         }
     }
@@ -197,44 +195,44 @@ int main(int argc, char** argv) {
    
     
     
-    const int INIT_RADIUS = 5;
-    
-    
-                                              
-    
-    int count2 = 0;
-    
-    for (int i = 0; i < 60; i++)
-    {
-        if (hypVec.empty()) break;
-        pop_heap(hypVec.begin(), hypVec.end(), comp);
-        auto pt = hypVec.back().second;
-        hypVec.pop_back();
-        // compute transitions
-        Polynomial2 circle;
-        circle.kuu = 1;
-        circle.kvv = 1;
-        circle.kuv = 0;
-        circle.ku = -2*pt[0];
-        circle.kv = -2*pt[1];
-        circle.k1 = pt[0] * pt[0] + pt[1] * pt[1] - INIT_RADIUS * INIT_RADIUS;
-        
-        Vector2i pt0(pt[0] + INIT_RADIUS, pt[1]);
-        CurveRasterizer<int, Polynomial2> raster(pt[0] + INIT_RADIUS, pt[1],
-                                                 pt[0], pt[1] + INIT_RADIUS, circle);
-        
-        vector<double> sampleVec;
-        Vector2iVec circleVec;
-        for (int i = 0;
-             not (i > 5 and abs(raster.u - pt0[0]) <= 1 and abs(raster.v - pt0[1]) <= 1);
-             i++, raster.step())
-        {
-            sampleVec.push_back(frame(raster.v, raster.u));
-            circleVec.emplace_back(raster.u, raster.v);
-        }
-        
-        double totalVal = 0;
-        double diffVal = 0;
+//    const int INIT_RADIUS = 5;
+//    
+//    
+//                                              
+//    
+//    int count2 = 0;
+//    
+//    for (int i = 0; i < 60; i++)
+//    {
+//        if (hypVec.empty()) break;
+//        pop_heap(hypVec.begin(), hypVec.end(), comp);
+//        auto pt = hypVec.back().second;
+//        hypVec.pop_back();
+//        // compute transitions
+//        Polynomial2 circle;
+//        circle.kuu = 1;
+//        circle.kvv = 1;
+//        circle.kuv = 0;
+//        circle.ku = -2*pt[0];
+//        circle.kv = -2*pt[1];
+//        circle.k1 = pt[0] * pt[0] + pt[1] * pt[1] - INIT_RADIUS * INIT_RADIUS;
+//        
+//        Vector2i pt0(pt[0] + INIT_RADIUS, pt[1]);
+//        CurveRasterizer<int, Polynomial2> raster(pt[0] + INIT_RADIUS, pt[1],
+//                                                 pt[0], pt[1] + INIT_RADIUS, circle);
+//        
+//        vector<double> sampleVec;
+//        Vector2iVec circleVec;
+//        for (int i = 0;
+//             not (i > 5 and abs(raster.u - pt0[0]) <= 1 and abs(raster.v - pt0[1]) <= 1);
+//             i++, raster.step())
+//        {
+//            sampleVec.push_back(frame(raster.v, raster.u));
+//            circleVec.emplace_back(raster.u, raster.v);
+//        }
+//        
+//        double totalVal = 0;
+//        double diffVal = 0;
         
 //        int deltaStep = sampleVec.size() / 2;
 //        for (int i = 0; i < sampleVec.size(); i++)
@@ -292,12 +290,86 @@ int main(int argc, char** argv) {
 //        if (*itMin3 < transMax * -0.3) continue;
 //        setZero(transitionVec.begin(), transitionVec.end(), itMin3);
         
-        detected(pt[1], pt[0]) = 1;
-        count2++;
+//        detected(pt[1], pt[0]) = 1;
+//        count2++;
+//    }
+//    cout << count2 << endl;
+//    imshow("detected", detected);
+//    waitKey();
+
+
+////INIT THE BREADTH-FIRST SEARCH
+
+    Mat16s idxMap(frame.size());
+    idxMap.setTo(-1);
+    
+    queue<pair<int, Vector2i>> fringe;
+    vector<vector<int>> arcVec;
+    int MAX_CANDIDATE_COUNT = int(1.5 * Nx * Ny);
+    
+    //init the fringe
+    for (int i = 0; i < MAX_CANDIDATE_COUNT; i++)
+    {
+        if (hypVec.empty()) break;
+        
+        pop_heap(hypVec.begin(), hypVec.end(), comp);
+        Vector2i pt = hypVec.back().second;
+        hypVec.pop_back();
+        fringe.emplace(i, pt);
+        arcVec.emplace_back();
     }
-    cout << count2 << endl;
-    imshow("detected", detected);
+    
+    const vector<int> duVec = {-1, 0, 1, 0};
+    const vector<int> dvVec = {0, -1, 0, 1};
+    
+    while (not fringe.empty())
+    {
+        auto e = fringe.front();
+        fringe.pop();
+        const int u = e.second[0];
+        const int v = e.second[1];
+        const int idx = e.first;
+        if (idxMap(v, u) != -1)
+        {
+            //TODO process connection
+            continue;            
+        }
+        idxMap(v, u) = idx;
+        for (int i = 0; i < 4; i++)
+        {
+            const int u2 = u + duVec[i];
+            const int v2 = v + dvVec[i];
+            if (u2 < 0 or u2 >= idxMap.cols or v2 < 0 or v2 >= idxMap.rows)
+            {
+                continue;
+            }
+            if (idxMap(v2, u2) == -1)
+            {
+                fringe.emplace(idx, Vector2i(u2, v2));
+            }
+            else if (idxMap(v2, u2) != idx)
+            {
+                const int idx2 = idxMap(v2, u2);
+                if (find(arcVec[idx].begin(), arcVec[idx].end(), idx2) == arcVec[idx].end())
+                {
+                    arcVec[idx].push_back(idx2);
+                    arcVec[idx2].push_back(idx);
+                }
+            }
+        }
+    }
+    
+    for (auto & arcs : arcVec)
+    {
+        for (auto & x : arcs)
+        {
+            cout << setw(5) << x;
+        }
+        cout << endl;
+    }
+    imshow("segments", idxMap * 1000 - 32000);
     waitKey();
+
     return 0;
     
     

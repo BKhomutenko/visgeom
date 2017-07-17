@@ -25,6 +25,7 @@ STL types and methods
 #include <vector>
 #include <array>
 #include <map>
+#include <queue>
 #include <list>
 #include <algorithm>
 #include <random>
@@ -34,6 +35,7 @@ STL types and methods
 
 // Containers
 using std::vector;
+using std::queue;
 using std::list;
 using std::array;
 using std::pair;
