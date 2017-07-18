@@ -83,3 +83,27 @@ T bilinear(const M & src, Q x, Q y)
     return (i11*dx + i10*dx2)*dy + (i01*dx + i00*dx2)*(1-dy);
 }
 
+inline void cross(Mat& img, double x, double y, int size, const Scalar& color,
+            int thickness=1, int lineType=8, int shift=0)
+{
+    line(img, Point(x - size, y - size),
+            Point(x + size, y + size),
+            color, thickness, lineType, shift);
+    line(img, Point(x - size, y + size),
+            Point(x + size, y - size),
+            color, thickness, lineType, shift);
+}
+
+template <typename T>
+void drawPoints(Mat& img, T pointVec)
+{
+    if (pointVec.size() == 0) return;
+    int color = 100;
+    const int colorStep = 155 / pointVec.size();
+    for (auto & pt : pointVec)
+    {
+        cross(img, pt[0], pt[1], 10, color, 3);
+        color += colorStep;
+    }
+}
+

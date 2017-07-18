@@ -158,7 +158,6 @@ public:
 
 };
 
-void cross(Mat& img, Point pt, int size, const Scalar& color, int thickness=1, int lineType=8, int shift=0);
 
 /* TODO add the residual analysis
     void residualAnalysis(const vector<double> & intrinsic,

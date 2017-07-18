@@ -24,9 +24,12 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "utils/curve_rasterizer.h"
 
+
+
 //SubpixelCorner function definition
 
-SubpixelCorner::SubpixelCorner(const Mat32f & gradu, const Mat32f & gradv, const int steps, const double length) :    
+SubpixelCorner::SubpixelCorner(const Mat32f & gradu, const Mat32f & gradv,
+             const int steps, const double length) :    
             _graduGrid(gradu.cols, gradu.rows, (float*)gradu.data),
             _gradvGrid(gradv.cols, gradv.rows, (float*)gradv.data),
             _stepLength(length / steps)
@@ -38,7 +41,8 @@ SubpixelCorner::SubpixelCorner(const Mat32f & gradu, const Mat32f & gradv, const
         stepVec.push_back(i * _stepLength);
     }
 }
-            
+
+
 bool SubpixelCorner::Evaluate(const double* parameters,
                     double* cost,
                     double* gradient) const 
@@ -146,20 +150,17 @@ void detected(Mat& img, const array<double, 5> & data, int size,
     }
 }
 
+
 //CornerDetector function definition
 
 void CornerDetector::improveCorners(Vector2dVec & pointVec) const
 {
-//    Mat8uc3 img(_img.size());
-//    cvtColor(_img, img, CV_GRAY2BGR);
-//    resize(img, img, Size(0, 0), 4.5, 4.5);
     
     for (auto & x : pointVec)
     {
         array<double, 5> dataArr;
         initPoin(x, dataArr.data());
         
-//        detected(img, dataArr, 15, Scalar(255, 200), 4.5);
         ceres::GradientProblem problem(new SubpixelCorner(_gradx, _grady));
         ceres::GradientProblemSolver::Options options;
 //        options.line_search_direction_type = ceres::NONLINEAR_CONJUGATE_GRADIENT;
@@ -173,50 +174,571 @@ void CornerDetector::improveCorners(Vector2dVec & pointVec) const
         
 //        cout << summary.FullReport() << endl;
         
-//        cout << dataArr[0] << "   "
-//            << dataArr[1] << "   "
-//            << dataArr[2] << "   "
-//            << dataArr[3] << endl;
-        /////////////
-//        detected(img, dataArr, 15, Scalar(0, 200, 255), 4.5);
-        
-        
-        
-//        
-//        cout << dataArr[4] << endl;
-//        imshow("transitions", img);
-//    waitKey();
-           
         x[0] = dataArr[0];
         x[1] = dataArr[1];
     }
     
 }
 
-CornerDetector::CornerDetector(const Mat8u & img, const int initRadius) : //: _img(img)
-    _gradx(img.rows, img.cols),
-    _grady(img.rows, img.cols),
-    _img(img.rows, img.cols),
-    INIT_RADIUS(initRadius)
+CornerDetector::CornerDetector(int Nx, int Ny, int initRadius, bool improveDetection, bool debug) :
+    _Nx(Nx),
+    _Ny(Ny),
+    MAX_CANDIDATE_COUNT(2 * Nx * Ny),
+    INIT_RADIUS(initRadius),
+    IMPROVE_DETECTION(improveDetection),
+    DEBUG(debug)
+{ }
+
+void CornerDetector::setImage(const Mat8u & img)
 {
-    //TODO instead of derivating the whole image, pass just a small patch to the optimization
-    Sobel(img, _gradx, CV_32F, 1, 0, 3, 1e-3);
-    Sobel(img, _grady, CV_32F, 0, 1, 3, 1e-3);
+    //FIXME for backward compatibility
+    if (IMPROVE_DETECTION)
+    {
+        Sobel(img, _gradx, CV_32F, 1, 0, 3, 1e-3);
+        Sobel(img, _grady, CV_32F, 0, 1, 3, 1e-3);
+    }
     img.copyTo(_img);
+    
+    _resp.create(_img.size());
+    _imgrad.create(_img.size());
+    _src.create(_img.size());
+    _detected.create(_img.size());
+    _idxMap.create(_img.size());
 }
+
+bool CornerDetector::detectPattern(Vector2dVec & ptVec)
+{
+    
+    computeResponse();
+    
+    selectCandidates();
+    
+    if (_hypHeap.size() < _Nx * _Ny) return false;
+    
+    constructGraph();
+    
+    vector<int> idxVec = selectPattern();
+    
+    if (idxVec.size() != _Nx * _Ny) return false;
+    
+    ptVec.clear();
+    for (auto & idx : idxVec)
+    {
+        auto pt = _ptVec[idx];
+        ptVec.emplace_back(pt[0], pt[1]);
+    }
+    
+    if (IMPROVE_DETECTION)
+    {
+        improveCorners(ptVec);
+    }
+    
+    return true;
+}
+    
+void CornerDetector::computeResponse()
+{
+    const double SIGMA = 1.5; //TODO make a parameter
+    const int FILTER_SIZE = 1 + 2 * round(SIGMA);
+    GaussianBlur(_img, _src, Size(FILTER_SIZE, FILTER_SIZE), SIGMA, SIGMA);
+    
+    _imgrad.setTo(0);
+    _resp.setTo(0);
+    double acc = 0;
+    int count = 0;
+    const int SIZE = 3;
+    const int HSIZE = 2;
+    for (int v = SIZE; v < _img.rows - SIZE; v++)
+    {
+        for (int u = SIZE; u < _img.cols - SIZE; u++)
+        {
+            
+            double gx = (_src(v, u + HSIZE) - _src(v, u - HSIZE) ) / (2 * HSIZE);
+            double gy = (_src(v + HSIZE, u) - _src(v - HSIZE, u) ) / (2 * HSIZE);
+            
+            
+            //We are looking for saddle points, that is negative hessian determinant
+            double iuu = _src(v, u - SIZE) + _src(v, u + SIZE) - 2* _src(v, u);
+            iuu /= SIZE*SIZE;
+            double ivv = _src(v - SIZE, u) + _src(v + SIZE, u) - 2* _src(v, u);
+            ivv /= SIZE*SIZE;
+            double iuv = _src(v - HSIZE, u - HSIZE) + _src(v + HSIZE, u + HSIZE) 
+                            - _src(v  + HSIZE, u - HSIZE) - _src(v - HSIZE, u + HSIZE);
+            iuv /= 4*HSIZE*HSIZE;
+            double gsq = gx * gx + gy * gy;
+            _imgrad(v, u) = gsq;
+            double _respVal = -iuu * ivv + iuv * iuv - 0.002*pow(gsq, 2);
+            if (_respVal > 0.1) 
+            {
+                _resp(v, u) = _respVal;
+                acc += _respVal;
+                count++;
+            }
+        }
+    }
+    _avgVal = acc / count;
+    if (DEBUG)
+    {
+        imshow ("img", _img );
+        imshow ("resp", _resp / 100);
+        waitKey();
+    }
+}
+
+void CornerDetector::selectCandidates()
+{
+    const int WINDOW_SIZE = 3;
+    vector<pair<double, Vector2i>> maximaHeap;
+    for (int v = WINDOW_SIZE; v < _img.rows - WINDOW_SIZE; v++)
+    {
+        for (int u = WINDOW_SIZE; u < _img.cols - WINDOW_SIZE; u++)
+        {
+            
+            bool isMax = true;
+            const double val = _resp(v, u);
+            if (val < _avgVal) continue;
+            for (int j = -WINDOW_SIZE; j <= WINDOW_SIZE; j++)
+            {
+                for (int i = -WINDOW_SIZE; i <= WINDOW_SIZE; i++)
+                {
+                    if (i == 0 and j == 0) continue;
+                    const double valNeigh = _resp(v + j, u + i);
+                    if ( val <= valNeigh)
+                    {
+                        //quite unlikely scenario that 
+                        //the two neighbor pixels are local maxima simultaneously
+                        //in this case only one is to be selected
+                        if (val == valNeigh and (i > 0 or i == 0 and j > 0)) continue;
+                        isMax = false;
+                        break;
+                    }
+                    
+                }
+                if (not isMax) break;
+            }
+            if (isMax)
+            { 
+                maximaHeap.emplace_back(val, Vector2i(u, v));
+            }
+        }
+    }
+    
+    make_heap(maximaHeap.begin(), maximaHeap.end(), comp);
+    
+    ///compute thresh
+    vector<pair<double, Vector2i>> threshHeap = maximaHeap;
+    
+    double acc = 0;
+    const int REF_ITEM_COUNT = _Nx * _Ny;
+    for (int i = 0; i < REF_ITEM_COUNT and not threshHeap.empty(); i++)
+    {
+        pop_heap(threshHeap.begin(), threshHeap.end(), comp);
+        acc += threshHeap.back().first;
+        threshHeap.pop_back();
+    }
+    
+    const double VAL_THRESH = 0.05 * acc / REF_ITEM_COUNT;
+    /// Check coner-ness
+   
+    
+    
+    _detected.setTo(0);
+    
+    _hypHeap.clear();   
+    int i = 0;                                      
+    while (not maximaHeap.empty() and 
+            maximaHeap.front().first > VAL_THRESH and 
+            i < MAX_CANDIDATE_COUNT)
+    {
+        pop_heap(maximaHeap.begin(), maximaHeap.end(), comp);
+        auto pt = maximaHeap.back().second;
+        double val = maximaHeap.back().first;
+        if (val < VAL_THRESH) break;
+        maximaHeap.pop_back();
+        // compute transitions
+        Polynomial2 circle = Polynomial2::Circle(pt[0], pt[1], INIT_RADIUS);
+        
+        Vector2i pt0(pt[0] + INIT_RADIUS, pt[1]);
+        CurveRasterizer<int, Polynomial2> raster(pt[0] + INIT_RADIUS, pt[1],
+                                                 pt[0], pt[1] + INIT_RADIUS, circle);
+        
+        vector<double> sampleVec;
+        Vector2iVec circleVec;
+        for (int i = 0;
+             not (i > 5 and abs(raster.u - pt0[0]) <= 1 and abs(raster.v - pt0[1]) <= 1);
+             i++, raster.step())
+        {
+            sampleVec.push_back(_img(raster.v, raster.u));
+            circleVec.emplace_back(raster.u, raster.v);
+        }
+        
+        vector<double> transitionVec;
+        
+        transitionVec.push_back(sampleVec[1] - sampleVec.back());
+        
+        for (int i = 1; i < sampleVec.size() - 1; i++)
+        {
+            transitionVec.push_back(sampleVec[i + 1] - sampleVec[i - 1]);
+        }
+        int idxLast = sampleVec.size() - 2;
+        transitionVec.push_back(sampleVec.front() - sampleVec[idxLast]);
+                                
+        // find the strongest
+        int distThresh = sampleVec.size() / 2 - 2;
+        
+        auto itMax = max_element(transitionVec.begin(), transitionVec.end());
+        double transMax = *itMax;
+//        cout << endl << setw(10) << *itMax;
+        // remove the maximum and its neighbors
+        setZero(transitionVec.begin(), transitionVec.end(), itMax);
+        // check the other three : must be at least 0.75
+        
+        auto itMax2 = max_element(transitionVec.begin(), transitionVec.end());
+//        cout << setw(10) << *itMax2;
+        
+        if (*itMax2 < transMax * 0.5) continue;
+        setZero(transitionVec.begin(), transitionVec.end(), itMax2);
+        
+        if (abs(distance(itMax, itMax2)) < distThresh) continue;
+            
+        auto itMax3 = max_element(transitionVec.begin(), transitionVec.end());
+        
+        if (*itMax3 > transMax * 0.5) continue;
+        setZero(transitionVec.begin(), transitionVec.end(), itMax3);
+        
+        auto itMin = min_element(transitionVec.begin(), transitionVec.end());
+//        cout << setw(10) << *itMin;
+        
+        if (*itMin > transMax * -0.5) continue;
+        setZero(transitionVec.begin(), transitionVec.end(), itMin);
+        
+        auto itMin2 = min_element(transitionVec.begin(), transitionVec.end());
+//        cout << setw(10) << *itMin2;
+        
+        if (*itMin2 > transMax * -0.5) continue;
+        setZero(transitionVec.begin(), transitionVec.end(), itMin2);
+        
+        if ( abs(distance(itMin, itMin2)) < distThresh) continue;
+        
+        auto itMin3 = min_element(transitionVec.begin(), transitionVec.end());
+        
+        if (*itMin3 < transMax * -0.5) continue;
+        setZero(transitionVec.begin(), transitionVec.end(), itMin3);
+
+        _detected(pt[1], pt[0]) = 255; //FIXME for debug
+        
+        _hypHeap.emplace_back(-pt[0] - pt[1], pt);
+        i++;
+    }
+    if (DEBUG)
+    {
+        imshow ("detected", _detected);
+        waitKey();
+    }
+    make_heap(_hypHeap.begin(), _hypHeap.end(), comp);
+}
+
+void CornerDetector::constructGraph()
+{
+    _idxMap.setTo(-1);
+
+    queue<TimePoint> fringe;
+    //init the fringe
+    //TODO make it after the previous filtering
+    _arcVec.clear();
+    _ptVec.clear();
+    for (int i = 0; not _hypHeap.empty(); i++)
+    {
+        pop_heap(_hypHeap.begin(), _hypHeap.end(), comp);
+        Vector2i pt = _hypHeap.back().second;
+        _hypHeap.pop_back();
+        const int SPREAD = 2;
+        for (int du = -SPREAD; du <= SPREAD; du += SPREAD)
+        {
+            for (int dv = -SPREAD; dv <= SPREAD; dv += SPREAD)
+            {
+                fringe.emplace(0, i, pt[0] + du, pt[1] + dv);
+            }
+        }
+        _arcVec.emplace_back();
+        _ptVec.push_back(pt);
+    }
+    
+    const vector<int> duVec = {-1, 0, 1, 0};
+    const vector<int> dvVec = {0, -1, 0, 1};
+    
+    const int CANDIDATE_COUNT = _arcVec.size();
+    const int SEARCH_REACH = 100;
+    const double SQUARED_GRAD_MAX = 50;
+    while (not fringe.empty() and fringe.front().t < SEARCH_REACH)
+    {
+        auto e = fringe.front();
+        fringe.pop();
+        if (_idxMap(e.v, e.u) != -1)
+        {
+            continue;            
+        }
+        _idxMap(e.v, e.u) = e.idx;
+        for (int i = 0; i < 4; i++)
+        {
+            const int u2 = e.u + duVec[i];
+            const int v2 = e.v + dvVec[i];
+            if (u2 < 0 or u2 >= _idxMap.cols or v2 < 0 or v2 >= _idxMap.rows)
+            {
+                continue;
+            }
+            if (_imgrad(v2, u2) < SQUARED_GRAD_MAX ) continue;
+            if (_idxMap(v2, u2) == -1)
+            {
+                fringe.emplace(e.t + 1, e.idx, u2, v2);
+            }
+            else if (_idxMap(v2, u2) != e.idx)
+            {
+                const int idx2 = _idxMap(v2, u2);
+                if (find(_arcVec[e.idx].begin(), _arcVec[e.idx].end(), idx2) == _arcVec[e.idx].end())
+                {
+                    _arcVec[e.idx].push_back(idx2);
+                    _arcVec[idx2].push_back(e.idx);
+                }
+            }
+        }
+    }
+    if (DEBUG)
+    {
+        imshow ("detected", _idxMap * 1000 - 32000);
+    }
+}
+
+double compareVectors(Vector2i v1, Vector2i v2)
+{
+    double norm1 = v1.norm();
+    double norm2 = v2.norm();
+    double len2 = pow((norm1 - norm2) / norm1, 2);
+    double c = v1.dot(v2) / norm1 / norm2;
+    double th2 = 2. * (1. - c);
+    return th2 * 2 + len2 / 2; //FIXME parameters to tune
+}
+
+vector<int> CornerDetector::extractSequence(int idx0, int idx1)
+{
+    vector<int> chain;
+    
+    ///FIND A GOOD DIRECTIOIN///
+    
+    Vector2i d1 = _ptVec[idx1] - _ptVec[idx0];
+    
+    int idx2 = -1;
+    double bestNormDiff = 0.1; //TODO a parameter to be set
+    for (auto & n2 : _arcVec[idx1])
+    {
+        Vector2i d2 = _ptVec[n2] - _ptVec[idx1];
+        double normDiff = compareVectors(d1, d2);
+        if (normDiff < bestNormDiff)
+        {
+            bestNormDiff = normDiff;
+            idx2 = n2;
+        }
+    }
+    if (idx2 == -1) return chain;
+    
+    chain.push_back(idx0);
+    chain.push_back(idx1);
+    chain.push_back(idx2);
+
+    ///EXTRACT THE CHAIN///
+    while (true)
+    {   
+        auto chainIt = chain.end();
+        int idx2 = *(--chainIt);
+        int idx1 = *(--chainIt);
+        int idx0 = *(--chainIt);
+        Vector2i d0 = _ptVec[idx1] - _ptVec[idx0];
+        Vector2i d1 = _ptVec[idx2] - _ptVec[idx1];
+        Vector2i predicted = 2 * d1 - d0;
+        int idx3 = -1;
+        double bestNormDiff = 0.1;
+//        cout << " predictive search : ";
+        for (auto & n2 : _arcVec[idx2])
+        {
+            Vector2i d2 = _ptVec[n2] - _ptVec[idx2];
+            double normDiff = compareVectors(d1, d2);
+            if (normDiff < bestNormDiff)
+            {
+                bestNormDiff = normDiff;
+                idx3 = n2;
+                break;
+            }
+        } 
+//        cout << endl;
+        if (idx3 != -1)
+        {
+            chain.push_back(idx3);
+        }
+        else break;
+    }
+    
+    return chain;
+}
+
+
+
+//TODO rewrite with a finite automaton
+vector<int> CornerDetector::selectPattern()
+{
+    vector<int> res;
+    for (int idx0 = 0; idx0 < _ptVec.size(); idx0++)
+    {
+        //FIXME for debug
+        Mat8u chainMat;
+        if (DEBUG)
+        {
+            _detected.copyTo(chainMat);
+            cross(chainMat, _ptVec[idx0][0], _ptVec[idx0][1], 6, 255, 5);
+            for (auto & n : _arcVec[idx0]) cout << n << "   ";
+            cout << endl;
+        }
+             
+        if (_arcVec[idx0].size() < 2) continue;
+        //first, look for a potential upper left corner
+        vector<int> chainY;
+        vector<int> chainX;
+        for (auto & n : _arcVec[idx0])
+        {
+            vector<int> chain = extractSequence(idx0, n);
+            if (DEBUG)
+            {
+                cout << "Chain1 detected" << endl;
+                for (auto & pt : chain)
+                {
+                    cross(chainMat, _ptVec[pt][0], _ptVec[pt][1], 5, 255);
+                }
+                imshow("chainMat", chainMat);
+                waitKey();
+                
+            }
+            
+            if (chain.size() >= _Ny) 
+            {
+                while (chain.size() > _Ny) chain.pop_back();
+                
+                
+                //check whether x-chain is extractable
+                for (auto & nx : _arcVec[idx0])
+                {
+                    if (nx == n) continue;
+                    //check the orientation
+                    Vector2i d1 = _ptVec[nx] - _ptVec[idx0];
+                    Vector2i d2 = _ptVec[n] - _ptVec[idx0];
+                    
+                    if (d1[0] * d2[1] - d1[1] * d2[0] < 0.1 * d1.norm() * d2.norm()) continue;
+                    vector<int> chain2 = extractSequence(idx0, nx);
+                    if (chain2.size() >= _Nx)
+                    {
+                        while (chain2.size() > _Nx) chain2.pop_back();
+                        if (DEBUG)
+                        {
+                            cout << "Chain2 detected" << endl;
+                            cout << d1.transpose() << "   " << d2.transpose() << endl;
+                            for (auto & pt : chain2)
+                            {
+                                cross(chainMat, _ptVec[pt][0], _ptVec[pt][1], 5, 255);
+                            }
+                            imshow("chainMat", chainMat);
+                            waitKey();
+                        }
+                
+                
+                
+                        chainX = chain2;
+                        break;
+                    }
+                }
+                if (chainX.size() == _Nx)
+                {
+                    chainY = chain;
+                    break;
+                }
+            }
+        }
+        if (chainY.empty() or chainX.empty()) continue;
+        
+        res = chainX;
+        
+        for (int i = 1; i < chainY.size(); i++)
+        {
+            int idxPrev = chainY[i-1];
+            int idxCur = chainY[i];
+            bool detected = false;
+            for (auto & nx : _arcVec[idxCur])
+            {
+                if (nx == idxPrev) continue;
+                //check the orientation
+                Vector2i d1 = _ptVec[idxPrev] - _ptVec[idxCur];
+                Vector2i d2 = _ptVec[nx] - _ptVec[idxCur];
+                
+                if (DEBUG)
+                {
+                    cross(chainMat, _ptVec[nx][0], _ptVec[nx][1], 3, 255, 3);
+                    cout << d1[0] * d2[1] - d1[1] * d2[0] << endl;
+                    imshow("chainMat", chainMat);
+                    waitKey();
+                }
+                if (d1[0] * d2[1] - d1[1] * d2[0] < 0.1 * d1.norm() * d2.norm()) continue;
+                vector<int> chain2 = extractSequence(idxCur, nx);
+                
+                if (DEBUG)
+                {
+                    for (auto & pt : chain2)
+                    {
+                        cross(chainMat, _ptVec[pt][0], _ptVec[pt][1], 5, 255);
+                    }
+                    imshow("chainMat", chainMat);
+                    waitKey();
+                }
+                    
+                if (chain2.size() >= _Nx)
+                {
+                    detected = true;
+                    res.insert(res.end(), chain2.begin(), chain2.begin() + _Nx);
+                    break;
+                }
+            }
+            if (not detected) break;
+        }
+        if (res.size() == _Nx * _Ny and verifyDetection(res))
+        {
+            return res;
+        }
+        else
+        {
+            res.clear();
+        }
+    }    
+    
+    return res;
+}
+
+bool CornerDetector::verifyDetection(const vector<int> & idxVec)
+{
+    if (idxVec.size() != _Nx * _Ny) return false;
+    for (int i = 1; i < _Nx; i++)
+    {
+        vector<int> chain = extractSequence(idxVec[i], idxVec[_Nx + i]);
+        if (chain.size() < _Ny) return false;
+        for (int j = 2; j < _Ny; j++)
+        {
+            if (chain[j] != idxVec[j*_Nx + i]) return false;
+        }
+    }
+    return true;
+}
+
 
 void CornerDetector::initPoin(const Vector2d & pt, double * data) const
 {
     // for init_radius look for transitions
     
-    Polynomial2 circle;
-    
-    circle.kuu = 1;
-    circle.kvv = 1;
-    circle.kuv = 0;
-    circle.ku = -2*pt[0];
-    circle.kv = -2*pt[1];
-    circle.k1 = pt[0] * pt[0] + pt[1] * pt[1] - INIT_RADIUS * INIT_RADIUS;
+    Polynomial2 circle = Polynomial2::Circle(pt[0], pt[1], INIT_RADIUS);
     
     Vector2i pti = round(pt);
     Vector2i pt0(pti[0] + INIT_RADIUS, pti[1]);

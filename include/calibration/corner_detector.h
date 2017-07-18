@@ -40,22 +40,111 @@ public:
 
 double findMinDistance(const Vector2dVec & cornerVec, const int rows, const int cols);
 
+//TODO make flags instead of bool
 class CornerDetector
 {
 public:
-    CornerDetector(const Mat8u & img, const int initRadius = 5);
+    CornerDetector(int Nx, int Ny, int initRadius = 5, bool improveDetection = true, bool debug = false);
     
     virtual ~CornerDetector() {}
+    
+    //used in heapsort
+    
+    
+    void setImage(const Mat8u & img);
+    
+    bool detectPattern(Vector2dVec & ptVec);
+    
+    //out : _src, _imgrad, _resp, _avgVal
+    void computeResponse();
+    
+    //out : _hypHeap, _detected
+    void selectCandidates();
+    
+    //out : _arcVec, _ptVec
+    void constructGraph();
+    
+    vector<int> selectPattern();
+    
+    vector<int> extractSequence(int idx0, int idx1);
+    
+    bool verifyDetection(const vector<int> & idxVec);
     
     void improveCorners(Vector2dVec & pointVec) const;   
     
     void initPoin(const Vector2d & pt, double * data) const;
     
+    
+    
 private:
+
+    const bool DEBUG;
+    //DETECTION
+    Mat32f _resp, _imgrad;
+    Mat8u _src;
+    double _avgVal;
+    
+    //FIXME for debug
+    Mat8u _detected;
+    
+    //for the graph construction
+    Mat16s _idxMap;
+    
+    vector<vector<int>> _arcVec;
+    vector<Vector2i> _ptVec;
+    
+    //detected strongest maxima sorted by (u + v)
+    vector<pair<double, Vector2i>> _hypHeap;
+    
+    int _Nx, _Ny;
+    int MAX_CANDIDATE_COUNT;
+    
+    //REFINEMENT
     Mat32f _gradx, _grady;
-//    Mat32f _img;
     Mat8u _img;
     
+    const bool IMPROVE_DETECTION;
     const int INIT_RADIUS;
     
+    //STRUCTURES AND FUNCTIONS
+    
+    struct TimePoint
+    {
+        int t;
+        int idx;
+        int u, v;
+        
+        TimePoint(int time, int idx, int u, int v): 
+            t(time), idx(idx), u(u), v(v) {}
+        
+        bool friend operator < (const TimePoint & a, const TimePoint & b) 
+        {
+            return a.t > b.t;
+        }
+    };
+    
+    static bool comp(const pair<double, Vector2i> & a, const pair<double, Vector2i> & b)
+    {
+        return a.first < b.first;
+    }
+    
+    template<typename T>
+    static void setZero(T begin, T end, T it)
+    {
+        auto ref = *it;
+        
+        T itDir = it;
+        do {
+            *itDir = 0;
+            itDir++;
+            if (itDir == end) itDir = begin;
+        } while (*itDir * ref > 0);
+        
+        T itInv = it;
+        do {
+            *itInv = 0;
+            if (itInv == begin) itInv = end;
+            itInv--;
+        } while (*itInv * ref > 0);
+    }
 };

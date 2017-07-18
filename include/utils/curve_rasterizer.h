@@ -30,6 +30,18 @@ A template-base coordinate transformation implementation
 // Axx + Bxy + Cyy + Dx + Ey + F
 struct Polynomial2
 {
+    static Polynomial2 Circle(int u0, int v0, int r)
+    {
+        Polynomial2 circle;
+        circle.kuu = 1;
+        circle.kvv = 1;
+        circle.kuv = 0;
+        circle.ku = -2*u0;
+        circle.kv = -2*v0;
+        circle.k1 = u0 * u0 + v0 * v0 - r * r;
+        return circle;
+    }
+    
     Polynomial2() {}
 //    Polynomial2(const std::array<double, 6> & coeffs) : coeffArr(coeffs) {}
 //    std::array<double, 6> coeffArr;

@@ -611,6 +611,7 @@ void onMouse( int event, int x, int y, int, void* )
     yVec.push_back(y);
 }
 
+/* OLD VECSION FOR OPENCV COMPARISON
 void GenericCameraCalibration::extractGridProjections(ImageData & data)
 {
     const int flags = cv::CALIB_CB_ADAPTIVE_THRESH;
@@ -678,8 +679,8 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
         {
             //FIXME 
 //            F0310 19:01:41.823675  1227 cubic_interpolation.h:72] Check failed: x >= 0.0 (-nan vs. 0) 
-//*** Check failure stack trace: ***
-//Aborted (core dumped)
+// *** Check failure stack trace: ***
+// Aborted (core dumped)
             Mat8uc3 cornerImg;
             cvtColor(frame, cornerImg, CV_GRAY2BGR);
             drawChessboardCorners(cornerImg, patternSize, Mat(centers), patternIsFound);
@@ -731,26 +732,101 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
     }
     cout << endl;
 }
+*/
+
+void GenericCameraCalibration::extractGridProjections(ImageData & data)
+{
+    CornerDetector detector(data.Nx, data.Ny, 3, data.improveDetection);
+    for (auto & fileName : data.imageNameVec)
+    {
+        cout << "." << flush;
+        data.detectedCornersVec.emplace_back();
+        Mat8u frame = imread(fileName, 0);
+        if (frame.empty())
+        {
+            cout << fileName << " : ERROR, file not found" << endl;
+            continue;
+        }
+        detector.setImage(frame);
+        Vector2dVec patternVec;
+        bool patternIsFound = detector.detectPattern(patternVec);
+        if (not patternIsFound)
+        {
+            cout << fileName << " : ERROR, pattern not found" << endl;
+            continue;
+        }
+        
+        if (data.checkExtraction)
+        {
+            Mat8u cornerImg;
+            frame.copyTo(cornerImg);
+            
+            drawPoints(cornerImg, patternVec);
+            imshow("corners", cornerImg);
+            char key = waitKey();
+            if (key == 'n' or key == 'N')
+            {
+                cout << fileName << " : ERROR, pattern not accepted" << endl;
+                continue;
+            }
+        }
+        
+        data.detectedCornersVec.back() = patternVec;
+    }
+    cout << endl;
+}
 
 Transf GenericCameraCalibration::estimateInitialGrid(const ImageData & data, const int gridIdx)
 {
     auto & cornerVec = data.detectedCornersVec[gridIdx];
     
-    Problem problem;
-    GenericProjectionJac * costFunction = new GenericProjectionJac(cornerVec, data.board,
-            cameraMap[data.cameraName], {TRANSFORM_DIRECT});
+    ICamera * cam = cameraMap[data.cameraName];
+    
+    
     array<double, 6> xiArr{0, 0, 1, 0, 0, 0};
     
-    Vector2d v = cornerVec[1] - cornerVec[0];
-    xiArr[5] = atan2(v[1], v[0]);
+    Vector2d pt1 = cornerVec[0];
+    Vector2d pt2 = cornerVec[data.Nx - 1];
+    Vector3d X1, X2;
     
+    cam->reconstructPoint(pt1, X1);
+    cam->reconstructPoint(pt2, X2);
+    
+    X1.normalize();
+    X2.normalize();
+    
+    Vector3d dir(X2 - X1);
+    Vector3d dirModel = data.board[data.Nx - 1] - data.board[0];
+    double scale = dirModel.norm() / dir.norm();
+    
+    Vector3d pos = X1 * scale;
+    //initial position
+    copy(pos.data(), pos.data() + 3, xiArr.data());
+    
+    //initial orientation
+    Vector3d ex(1, 0, 0);
+    
+    double c = ex.dot(dir);
+    Vector3d rotAxis = ex.cross(dir);
+    double s = rotAxis.norm();
+    double th = atan2(s, c);
+    rotAxis.normalize();
+    rotAxis *= th;
+    copy(rotAxis.data(), rotAxis.data() + 3, xiArr.data() + 3);
+    
+    Problem problem;
+    GenericProjectionJac * costFunction = new GenericProjectionJac(cornerVec, data.board,
+            cam, {TRANSFORM_DIRECT});
+            
     problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
             xiArr.data(), intrinsicMap[data.cameraName].data());
     problem.SetParameterBlockConstant(intrinsicMap[data.cameraName].data());
     Solver::Options options;
     options.max_num_iterations = 500;
     Solver::Summary summary;
+    
     Solve(options, &problem, &summary);
+//    cout << summary.FullReport() << endl;
     return Transf(xiArr.data());
 }
 
@@ -776,16 +852,6 @@ void GenericCameraCalibration::computeTransforms(const ImageData & data, vector<
     }
 }
 
-//TODO put to ocv?
-void cross(Mat& img, Point pt, int size, const Scalar& color, int thickness, int lineType, int shift)
-{
-    line(img, Point(pt.x - size, pt.y - size),
-            Point(pt.x + size, pt.y + size),
-            color, thickness, lineType, shift);
-    line(img, Point(pt.x - size, pt.y + size),
-            Point(pt.x + size, pt.y - size),
-            color, thickness, lineType, shift);
-}
 
 void GenericCameraCalibration::writeImageResidual(const ImageData & data, const string & fileName) const
 {
@@ -854,7 +920,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
             //detected
             for (auto & pt : data.detectedCornersVec[transfIdx])
             {
-                cross(img, Point(pt[0], pt[1]), 5, Scalar(255, 127, 0));
+                cross(img, pt[0], pt[1], 5, Scalar(255, 127, 0));
             }
             
             imshow("outliers", img);
