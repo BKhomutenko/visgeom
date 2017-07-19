@@ -93,6 +93,14 @@ target_link_libraries( odom_interpolation
     ${Boost_LIBRARIES}
 )
 
+add_executable( stereo_sync
+    test/calibration/stereo_sync.cpp
+)
+
+target_link_libraries( stereo_sync
+    ${Boost_LIBRARIES}
+)
+
 add_executable( optim_trajectory
     test/calibration/trajectory.cpp
 )

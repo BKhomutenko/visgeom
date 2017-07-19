@@ -349,7 +349,8 @@ void GenericCameraCalibration::initGlobalTransform(const ImageData & data, const
 
 void GenericCameraCalibration::initTransforms(const ImageData & data, const string & initName)
 {
-    if (transformInfoMap.find(initName) == transformInfoMap.end())
+    if (initName == "none") return;
+    else if (transformInfoMap.find(initName) == transformInfoMap.end())
     {
         throw runtime_error(initName + " does not exist, impossible to initialize");
     }
@@ -437,27 +438,27 @@ void GenericCameraCalibration::addGridResidualBlocks(const ImageData & data)
         switch (ptrVec.size())
         {
         case 0:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1), intrinsicPtr);
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2), intrinsicPtr);
             break;
         case 1:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
                     ptrVec[0], intrinsicPtr);
             break;
         case 2:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
                     ptrVec[0], ptrVec[1], intrinsicPtr);
             break;
         case 3:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
                     ptrVec[0], ptrVec[1], ptrVec[2], intrinsicPtr);
             break;
         case 4:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
                     ptrVec[0], ptrVec[1], ptrVec[2],
                     ptrVec[3], intrinsicPtr);
             break;
         case 5:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
                     ptrVec[0], ptrVec[1], ptrVec[2],
                     ptrVec[3], ptrVec[4], intrinsicPtr);
             break;
@@ -736,7 +737,7 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
 
 void GenericCameraCalibration::extractGridProjections(ImageData & data)
 {
-    CornerDetector detector(data.Nx, data.Ny, 3, data.improveDetection);
+    CornerDetector detector(data.Nx, data.Ny, 5, data.improveDetection);
     for (auto & fileName : data.imageNameVec)
     {
         cout << "." << flush;
@@ -818,7 +819,7 @@ Transf GenericCameraCalibration::estimateInitialGrid(const ImageData & data, con
     GenericProjectionJac * costFunction = new GenericProjectionJac(cornerVec, data.board,
             cam, {TRANSFORM_DIRECT});
             
-    problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+    problem.AddResidualBlock(costFunction, new SoftLOneLoss(25),
             xiArr.data(), intrinsicMap[data.cameraName].data());
     problem.SetParameterBlockConstant(intrinsicMap[data.cameraName].data());
     Solver::Options options;
@@ -873,7 +874,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
         //TODO projectPointCloud to project
         cam->projectPointCloud(boardCam, projectedVec);
         
-        double stdAcc;
+        double stdAcc = 0;
         Vector2dVec inlierVec, outlierVec;
         vector<double> errVec;
         for (int i = 0; i < projectedVec.size(); i++)
@@ -888,7 +889,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
         {
             Vector2d err = data.detectedCornersVec[transfIdx][i] - projectedVec[i];
             double errNorm = err.norm();
-            if (errNorm < 3 * sigma and errNorm < 1) // 1px is fo the case when all the points are off
+            if (errNorm < 3 * sigma and sigma < 1) // px is for the case when all the points are off
             {                                        // we are looking for the sub-pixel precision
                 inlierVec.push_back(projectedVec[i]);
             }

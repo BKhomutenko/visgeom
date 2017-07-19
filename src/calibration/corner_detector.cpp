@@ -183,7 +183,7 @@ void CornerDetector::improveCorners(Vector2dVec & pointVec) const
 CornerDetector::CornerDetector(int Nx, int Ny, int initRadius, bool improveDetection, bool debug) :
     _Nx(Nx),
     _Ny(Ny),
-    MAX_CANDIDATE_COUNT(2 * Nx * Ny),
+    MAX_CANDIDATE_COUNT(5 * Nx * Ny),
     INIT_RADIUS(initRadius),
     IMPROVE_DETECTION(improveDetection),
     DEBUG(debug)
@@ -238,7 +238,7 @@ bool CornerDetector::detectPattern(Vector2dVec & ptVec)
     
 void CornerDetector::computeResponse()
 {
-    const double SIGMA = 1.5; //TODO make a parameter
+    const double SIGMA = 2; //TODO make a parameter
     const int FILTER_SIZE = 1 + 2 * round(SIGMA);
     GaussianBlur(_img, _src, Size(FILTER_SIZE, FILTER_SIZE), SIGMA, SIGMA);
     
@@ -285,9 +285,84 @@ void CornerDetector::computeResponse()
     }
 }
 
+bool CornerDetector::checkCorner(const Vector2i & pt)
+{
+    Polynomial2 circle = Polynomial2::Circle(pt[0], pt[1], INIT_RADIUS);
+    
+    Vector2i pt0(pt[0] + INIT_RADIUS, pt[1]);
+    CurveRasterizer<int, Polynomial2> raster(pt[0] + INIT_RADIUS, pt[1],
+                                             pt[0], pt[1] + INIT_RADIUS, circle);
+    
+    vector<double> sampleVec;
+    Vector2iVec circleVec;
+    for (int i = 0;
+         not (i > 5 and abs(raster.u - pt0[0]) <= 1 and abs(raster.v - pt0[1]) <= 1);
+         i++, raster.step())
+    {
+        sampleVec.push_back(_img(raster.v, raster.u));
+        circleVec.emplace_back(raster.u, raster.v);
+    }
+    
+    vector<double> transitionVec;
+    
+    transitionVec.push_back(sampleVec[1] - sampleVec.back());
+    
+    for (int i = 1; i < sampleVec.size() - 1; i++)
+    {
+        transitionVec.push_back(sampleVec[i + 1] - sampleVec[i - 1]);
+    }
+    int idxLast = sampleVec.size() - 2;
+    transitionVec.push_back(sampleVec.front() - sampleVec[idxLast]);
+                            
+    // find the strongest
+    int distThresh = sampleVec.size() / 2 - 2;
+    
+    auto itMax = max_element(transitionVec.begin(), transitionVec.end());
+    double transMax = *itMax;
+//        cout << endl << setw(10) << *itMax;
+    // remove the maximum and its neighbors
+    setZero(transitionVec.begin(), transitionVec.end(), itMax);
+    // check the other three : must be at least 0.75
+    
+    auto itMax2 = max_element(transitionVec.begin(), transitionVec.end());
+//        cout << setw(10) << *itMax2;
+    
+    if (*itMax2 < transMax * 0.5) return false;
+    setZero(transitionVec.begin(), transitionVec.end(), itMax2);
+    
+    if (abs(distance(itMax, itMax2)) < distThresh) return false;
+        
+    auto itMax3 = max_element(transitionVec.begin(), transitionVec.end());
+    
+    if (*itMax3 > transMax * 0.5) return false;
+    setZero(transitionVec.begin(), transitionVec.end(), itMax3);
+    
+    auto itMin = min_element(transitionVec.begin(), transitionVec.end());
+//        cout << setw(10) << *itMin;
+    
+    if (*itMin > transMax * -0.5) return false;
+    setZero(transitionVec.begin(), transitionVec.end(), itMin);
+    
+    auto itMin2 = min_element(transitionVec.begin(), transitionVec.end());
+//        cout << setw(10) << *itMin2;
+    
+    if (*itMin2 > transMax * -0.5) return false;
+    setZero(transitionVec.begin(), transitionVec.end(), itMin2);
+    
+    if ( abs(distance(itMin, itMin2)) < distThresh) return false;
+    
+    auto itMin3 = min_element(transitionVec.begin(), transitionVec.end());
+    
+    if (*itMin3 < transMax * -0.5) return false;
+    setZero(transitionVec.begin(), transitionVec.end(), itMin3);
+    
+    return true;
+}
+
 void CornerDetector::selectCandidates()
 {
-    const int WINDOW_SIZE = 3;
+    //find local maxima
+    const int WINDOW_SIZE = 5;
     vector<pair<double, Vector2i>> maximaHeap;
     for (int v = WINDOW_SIZE; v < _img.rows - WINDOW_SIZE; v++)
     {
@@ -337,12 +412,11 @@ void CornerDetector::selectCandidates()
         threshHeap.pop_back();
     }
     
-    const double VAL_THRESH = 0.05 * acc / REF_ITEM_COUNT;
-    /// Check coner-ness
-   
+    const double VAL_THRESH = 0.00 * acc / REF_ITEM_COUNT;
     
     
-    _detected.setTo(0);
+    /// Check coner-ness   
+    if (DEBUG) _detected.setTo(0);
     
     _hypHeap.clear();   
     int i = 0;                                      
@@ -352,80 +426,12 @@ void CornerDetector::selectCandidates()
     {
         pop_heap(maximaHeap.begin(), maximaHeap.end(), comp);
         auto pt = maximaHeap.back().second;
-        double val = maximaHeap.back().first;
-        if (val < VAL_THRESH) break;
         maximaHeap.pop_back();
         // compute transitions
-        Polynomial2 circle = Polynomial2::Circle(pt[0], pt[1], INIT_RADIUS);
         
-        Vector2i pt0(pt[0] + INIT_RADIUS, pt[1]);
-        CurveRasterizer<int, Polynomial2> raster(pt[0] + INIT_RADIUS, pt[1],
-                                                 pt[0], pt[1] + INIT_RADIUS, circle);
+        if (not checkCorner(pt)) continue;
         
-        vector<double> sampleVec;
-        Vector2iVec circleVec;
-        for (int i = 0;
-             not (i > 5 and abs(raster.u - pt0[0]) <= 1 and abs(raster.v - pt0[1]) <= 1);
-             i++, raster.step())
-        {
-            sampleVec.push_back(_img(raster.v, raster.u));
-            circleVec.emplace_back(raster.u, raster.v);
-        }
-        
-        vector<double> transitionVec;
-        
-        transitionVec.push_back(sampleVec[1] - sampleVec.back());
-        
-        for (int i = 1; i < sampleVec.size() - 1; i++)
-        {
-            transitionVec.push_back(sampleVec[i + 1] - sampleVec[i - 1]);
-        }
-        int idxLast = sampleVec.size() - 2;
-        transitionVec.push_back(sampleVec.front() - sampleVec[idxLast]);
-                                
-        // find the strongest
-        int distThresh = sampleVec.size() / 2 - 2;
-        
-        auto itMax = max_element(transitionVec.begin(), transitionVec.end());
-        double transMax = *itMax;
-//        cout << endl << setw(10) << *itMax;
-        // remove the maximum and its neighbors
-        setZero(transitionVec.begin(), transitionVec.end(), itMax);
-        // check the other three : must be at least 0.75
-        
-        auto itMax2 = max_element(transitionVec.begin(), transitionVec.end());
-//        cout << setw(10) << *itMax2;
-        
-        if (*itMax2 < transMax * 0.5) continue;
-        setZero(transitionVec.begin(), transitionVec.end(), itMax2);
-        
-        if (abs(distance(itMax, itMax2)) < distThresh) continue;
-            
-        auto itMax3 = max_element(transitionVec.begin(), transitionVec.end());
-        
-        if (*itMax3 > transMax * 0.5) continue;
-        setZero(transitionVec.begin(), transitionVec.end(), itMax3);
-        
-        auto itMin = min_element(transitionVec.begin(), transitionVec.end());
-//        cout << setw(10) << *itMin;
-        
-        if (*itMin > transMax * -0.5) continue;
-        setZero(transitionVec.begin(), transitionVec.end(), itMin);
-        
-        auto itMin2 = min_element(transitionVec.begin(), transitionVec.end());
-//        cout << setw(10) << *itMin2;
-        
-        if (*itMin2 > transMax * -0.5) continue;
-        setZero(transitionVec.begin(), transitionVec.end(), itMin2);
-        
-        if ( abs(distance(itMin, itMin2)) < distThresh) continue;
-        
-        auto itMin3 = min_element(transitionVec.begin(), transitionVec.end());
-        
-        if (*itMin3 < transMax * -0.5) continue;
-        setZero(transitionVec.begin(), transitionVec.end(), itMin3);
-
-        _detected(pt[1], pt[0]) = 255; //FIXME for debug
+        if (DEBUG) _detected(pt[1], pt[0]) = 255;
         
         _hypHeap.emplace_back(-pt[0] - pt[1], pt);
         i++;
@@ -452,7 +458,7 @@ void CornerDetector::constructGraph()
         pop_heap(_hypHeap.begin(), _hypHeap.end(), comp);
         Vector2i pt = _hypHeap.back().second;
         _hypHeap.pop_back();
-        const int SPREAD = 2;
+        const int SPREAD = 3;
         for (int du = -SPREAD; du <= SPREAD; du += SPREAD)
         {
             for (int dv = -SPREAD; dv <= SPREAD; dv += SPREAD)
@@ -505,7 +511,7 @@ void CornerDetector::constructGraph()
     }
     if (DEBUG)
     {
-        imshow ("detected", _idxMap * 1000 - 32000);
+        imshow ("detected", _idxMap * 250 - 32000);
     }
 }
 

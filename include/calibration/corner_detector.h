@@ -61,6 +61,11 @@ public:
     //out : _hypHeap, _detected
     void selectCandidates();
     
+    //TODO rewrite
+    // /home/bogdan/projects/data/mapping/fluence_calibration/right/000411.png 
+    // /home/bogdan/projects/data/mapping/fluence_calibration/right/000402.png
+    bool checkCorner(const Vector2i & pt);
+    
     //out : _arcVec, _ptVec
     void constructGraph();
     
@@ -84,7 +89,7 @@ private:
     Mat8u _src;
     double _avgVal;
     
-    //FIXME for debug
+    //for debug
     Mat8u _detected;
     
     //for the graph construction
@@ -96,8 +101,8 @@ private:
     //detected strongest maxima sorted by (u + v)
     vector<pair<double, Vector2i>> _hypHeap;
     
-    int _Nx, _Ny;
-    int MAX_CANDIDATE_COUNT;
+    const int _Nx, _Ny;
+    const int MAX_CANDIDATE_COUNT;
     
     //REFINEMENT
     Mat32f _gradx, _grady;
