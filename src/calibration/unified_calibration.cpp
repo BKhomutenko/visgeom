@@ -165,6 +165,8 @@ void GenericCameraCalibration::initTransformChainInfo(ImageData & data, const pt
         else if (flagName == "improve_detection") data.improveDetection = true;
         else if (flagName == "show_outliers") data.showOutliers = true;
         else if (flagName == "user_guided") data.userGuided = true;
+        else if (flagName == "do_not_solve") data.doNotSolve = true;
+        else if (flagName == "do_not_solve_global") data.doNotSolveGlobal = true;
         else if (flagName == "draw_improved") 
         {
             data.drawImproved = true;
@@ -207,14 +209,14 @@ void GenericCameraCalibration::initGrid(ImageData & data, const ptree & node)
 {   
     data.Nx = node.get<int>("object.cols");
     data.Ny = node.get<int>("object.rows");
-    double sqSize = node.get<double>("object.size");
+    data.sqSize = node.get<double>("object.size");
     data.board.clear();
     data.board.reserve(data.Nx * data.Ny);
     for (int i = 0; i < data.Ny; i++)
     {
         for (int j = 0; j < data.Nx; j++)
         {
-           data.board.emplace_back(sqSize * j, sqSize * i, 0); 
+           data.board.emplace_back(data.sqSize * j, data.sqSize * i, 0); 
         }
     }
     //fill up detectedCornersVec which stores all the extracted grids
@@ -410,14 +412,19 @@ void GenericCameraCalibration::initTransforms(const ImageData & data, const stri
     {
         int transfIdx = data.getFirstExtractedIdx();
         auto xi = estimateInitialGrid(data, transfIdx);
+        cout << "INITI VALUE IN CAMERA FRAME " << endl;
+        cout << xi << endl;
         xi = getInitTransform(xi, initName, data, transfIdx);
+        cout << "INITI TRANSFORM " << endl;
+        cout << xi << endl;
         xi.toArray(globalTransformMap[initName].data());
-        if (data.detectedCornersVec.size() > 1) initGlobalTransform(data, initName);
+        if (data.detectedCornersVec.size() > 1 and not data.doNotSolve) initGlobalTransform(data, initName);
     }
 }
 
 void GenericCameraCalibration::addGridResidualBlocks(const ImageData & data)
 {
+    if (data.doNotSolveGlobal) return;
     for (int transfIdx = 0; transfIdx < data.detectedCornersVec.size(); transfIdx++)
     {
         if (data.detectedCornersVec[transfIdx].empty()) continue;
@@ -788,51 +795,87 @@ Transf GenericCameraCalibration::estimateInitialGrid(const ImageData & data, con
     
     Vector2d pt1 = cornerVec[0];
     Vector2d pt2 = cornerVec[data.Nx - 1];
-    Vector3d X1, X2;
+    Vector2d pt3 = cornerVec[(data.Ny - 1) * data.Nx];
+    Vector2d pt4 = cornerVec[data.Ny * data.Nx - 1];
+    Vector3d X1, X2, X3, X4;
     
     cam->reconstructPoint(pt1, X1);
     cam->reconstructPoint(pt2, X2);
+    cam->reconstructPoint(pt3, X3);
+    cam->reconstructPoint(pt4, X4);
     
     X1.normalize();
     X2.normalize();
+    X3.normalize();
+    X4.normalize();
     
-    Vector3d dir(X2 - X1);
-    Vector3d dirModel = data.board[data.Nx - 1] - data.board[0];
-    double scale = dirModel.norm() / dir.norm();
-    
-    Vector3d pos = X1 * scale;
     //initial position
+    Vector3d ex1(X2 - X1);
+    Vector3d ex2(X4 - X3);
+    Vector3d ey1(X3 - X1);
+    Vector3d ey2(X4 - X2);
+    double exModel = data.sqSize * data.Nx;
+    double eyModel = data.sqSize * data.Ny;
+    
+    double scaleX1 = exModel / ex1.norm();
+    double scaleX2 = exModel / ex2.norm();
+    double scaleY1 = eyModel / ey1.norm();
+    double scaleY2 = eyModel / ey2.norm();
+    
+    Vector3d pos = X1 * (scaleX1 + scaleY1) * 0.5;
     copy(pos.data(), pos.data() + 3, xiArr.data());
     
     //initial orientation
-    Vector3d ex(1, 0, 0);
+    //compute the board basis and make a rotation matrix
+    /*
+    Vector3d ez = (X1 + X2) * 0.5; // ex.dot(ez) = 0
+    ex1.normalize();
+    ez.normalize();
+    Vector3d ey = ez.cross(ex);
+    Matrix3d R;
+    R << ex1, ey, ez;
+    */
+    Vector3d posx = X2 * (scaleX1 + scaleY2) * 0.5;
+    Vector3d posy = X3 * (scaleX2 + scaleY1) * 0.5;
+    Vector3d ex = posx - pos;
+    Vector3d ey = posy - pos;
+    ex.normalize();
+    //make ey perpendicular
+    ey = (Matrix3d::Identity() - ex * ex.transpose()) * ey;
+    ey.normalize();
     
-    double c = ex.dot(dir);
-    Vector3d rotAxis = ex.cross(dir);
-    double s = rotAxis.norm();
-    double th = atan2(s, c);
-    rotAxis.normalize();
-    rotAxis *= th;
-    copy(rotAxis.data(), rotAxis.data() + 3, xiArr.data() + 3);
+    Vector3d ez = ex.cross(ey);
+    Matrix3d R;
+    R << ex, ey, ez;
     
-    Problem problem;
-    GenericProjectionJac * costFunction = new GenericProjectionJac(cornerVec, data.board,
-            cam, {TRANSFORM_DIRECT});
-            
-    problem.AddResidualBlock(costFunction, new SoftLOneLoss(25),
-            xiArr.data(), intrinsicMap[data.cameraName].data());
-    problem.SetParameterBlockConstant(intrinsicMap[data.cameraName].data());
-    Solver::Options options;
-    options.max_num_iterations = 500;
-    Solver::Summary summary;
+    Vector3d rot = rotationVector(R);
     
-    Solve(options, &problem, &summary);
-//    cout << summary.FullReport() << endl;
+    copy(rot.data(), rot.data() + 3, xiArr.data() + 3);
+    
+    if (not data.doNotSolve)
+    {
+        Problem problem;
+        GenericProjectionJac * costFunction = new GenericProjectionJac(cornerVec, data.board,
+                cam, {TRANSFORM_DIRECT});
+                
+        problem.AddResidualBlock(costFunction, new SoftLOneLoss(25),
+                xiArr.data(), intrinsicMap[data.cameraName].data());
+        problem.SetParameterBlockConstant(intrinsicMap[data.cameraName].data());
+        Solver::Options options;
+        options.max_num_iterations = 500;
+        Solver::Summary summary;
+        
+        Solve(options, &problem, &summary);
+//        cout << "IMAGE NAME : " << data.imageNameVec[gridIdx] << endl;
+//        cout << summary.FullReport() << endl;
+    }
+    
     return Transf(xiArr.data());
 }
 
 void GenericCameraCalibration::computeTransforms(const ImageData & data, vector<Transf> & transfVec) const
 {
+    transfVec.clear();
     transfVec.reserve(data.detectedCornersVec.size());
     for (int transfIdx = 0; transfIdx < data.detectedCornersVec.size(); transfIdx++)
     {
@@ -844,10 +887,12 @@ void GenericCameraCalibration::computeTransforms(const ImageData & data, vector<
             if (data.transStatusVec[i] == TRANSFORM_DIRECT)
             {
                 xi = xi.compose(getTransform(name, transfIdx));
+//                cout << getTransform(name, transfIdx) << endl;
             }
             else if (data.transStatusVec[i] == TRANSFORM_INVERSE)
             {
                 xi = xi.composeInverse(getTransform(name, transfIdx));
+//                cout << "inv " <<  getTransform(name, transfIdx) << endl;
             }
         }
     }
@@ -902,6 +947,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
         
         if (data.showOutliers and not outlierVec.empty())
         {
+            cout << transfVec[transfIdx] << endl;
             cout << data.imageNameVec[transfIdx] << endl;
             cout << "standard deviation : " << sigma << endl;
             cout << "3 sigma : " << 3 * sigma << endl;
@@ -915,7 +961,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
             for (int i = 0; i < outlierVec.size(); i++)
             {
                 circle(img, Point(outlierVec[i][0], outlierVec[i][1]), 8, Scalar(0, 127, 255), 3);
-                cout << outlierVec[i] << "   err : " << errVec[i] << endl;
+//                cout << outlierVec[i] << "   err : " << errVec[i] << endl;
             }
             
             //detected

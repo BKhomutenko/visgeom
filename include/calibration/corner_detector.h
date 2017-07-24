@@ -25,7 +25,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 class SubpixelCorner : public ceres::FirstOrderFunction 
 {
 public:
-    SubpixelCorner(const Mat32f & gradu, const Mat32f & gradv, const int steps = 7, const double length = 7);
+    SubpixelCorner(const Mat32f & gradu, const Mat32f & gradv, const Vector2d pt0,
+                 const int steps = 7, const double length = 7);
             
     bool Evaluate(const double* parameters,
                         double* cost,
@@ -36,6 +37,7 @@ public:
     const Grid2D<float> _graduGrid, _gradvGrid;
     vector<double> stepVec;
     const double _stepLength;
+    const Vector2d _prior;
 };
 
 double findMinDistance(const Vector2dVec & cornerVec, const int rows, const int cols);
@@ -86,7 +88,8 @@ private:
     const bool DEBUG;
     //DETECTION
     Mat32f _resp, _imgrad;
-    Mat8u _src;
+    Mat32f _gradx, _grady;
+    Mat8u _src1, _src2;
     double _avgVal;
     
     //for debug
@@ -104,8 +107,6 @@ private:
     const int _Nx, _Ny;
     const int MAX_CANDIDATE_COUNT;
     
-    //REFINEMENT
-    Mat32f _gradx, _grady;
     Mat8u _img;
     
     const bool IMPROVE_DETECTION;

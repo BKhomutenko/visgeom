@@ -54,7 +54,7 @@ struct ImageData
     
     int Nx, Ny; //calibration board size
     Vector3dVec board; //calibraiton board model
-    
+    double sqSize;
     string cameraName;
     
     
@@ -63,7 +63,10 @@ struct ImageData
     bool improveDetection = false;
     bool drawImproved = false;
     bool userGuided = false;
+    bool doNotSolve = false;
+    bool doNotSolveGlobal = false;
     double drawScale = 7;
+    
     int getFirstExtractedIdx() const
     {
         int i = 0;

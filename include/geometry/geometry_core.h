@@ -76,6 +76,48 @@ Matrix3<T> rotationMatrix(const Vector3<T> & v)
 }
 
 template<typename T>
+Matrix3<T> rotMatX(const T th)
+{
+    Matrix3<T> R;
+    T sinth = sin(th);
+    T costh = cos(th);
+        
+    R <<        T(1.),      T(0),       T(0),
+                T(0),       costh,     -sinth,
+                T(0),       sinth,      costh;
+         
+    return R;
+}
+
+template<typename T>
+Matrix3<T> rotMatY(const T th)
+{
+    Matrix3<T> R;
+    T sinth = sin(th);
+    T costh = cos(th);
+        
+    R <<        costh,      T(0),       sinth,
+                T(0),       T(1.),      T(0),
+                -sinth,     T(0),       costh;
+         
+    return R;
+}
+
+template<typename T>
+Matrix3<T> rotMatZ(const T th)
+{
+    Matrix3<T> R;
+    T sinth = sin(th);
+    T costh = cos(th);
+        
+    R <<        costh,     -sinth,      T(0),
+                sinth,      costh,      T(0),
+                T(0),       T(0),       T(1.);
+         
+    return R;
+}
+
+template<typename T>
 Vector3<T> rotationVector(const Matrix3<T> & R)
 {
     return Quaternion<T>(R).toRotationVector();

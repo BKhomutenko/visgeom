@@ -44,7 +44,7 @@ int main(int argc, char** argv)
     map<double, Transf> transfMap;
     for (auto & x : odomRoot)
     {
-        double t = x.second.get<int>("time_s") + x.second.get<int>("time_ns");
+        double t = x.second.get<int>("time_s") + x.second.get<int>("time_ns") * 1e-9;
         Transf xi = readTransform(x.second.get_child("pose"));
         transfMap[t] = xi;
     }
@@ -52,7 +52,7 @@ int main(int argc, char** argv)
     map<double, string> nameMap;
     for (auto & x : imgRoot)
     {
-        double t = x.second.get<int>("time_s") + x.second.get<int>("time_ns");
+        double t = x.second.get<int>("time_s") + x.second.get<int>("time_ns") * 1e-9;
         string name = x.second.get<string>("fname");
         nameMap[t] = name;
     }

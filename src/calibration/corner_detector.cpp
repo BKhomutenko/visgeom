@@ -28,11 +28,12 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 
 //SubpixelCorner function definition
 
-SubpixelCorner::SubpixelCorner(const Mat32f & gradu, const Mat32f & gradv,
+SubpixelCorner::SubpixelCorner(const Mat32f & gradu, const Mat32f & gradv, const Vector2d pt0,
              const int steps, const double length) :    
             _graduGrid(gradu.cols, gradu.rows, (float*)gradu.data),
             _gradvGrid(gradv.cols, gradv.rows, (float*)gradv.data),
-            _stepLength(length / steps)
+            _stepLength(length / steps),
+            _prior(pt0)
 {
     stepVec.reserve(2*steps);
     for (int i = 1; i <= steps; i++)
@@ -50,9 +51,14 @@ bool SubpixelCorner::Evaluate(const double* parameters,
     const double & u = parameters[0];
     const double & v = parameters[1];
     
-    //TODO possibly merge
-    *cost = 0;
-    if (gradient != NULL) fill(gradient, gradient + 5, 0.);
+    //prior position
+    *cost = 0.1 * ( pow(_prior[0] - u, 2) + pow(_prior[1] - v, 2));
+    if (gradient != NULL)
+    {
+        gradient[0] = 0.2 * (u - _prior[0]);
+        gradient[1] = 0.2 * (v - _prior[1]);
+        fill(gradient + 2, gradient + 5, 0.);
+    }
     
     ceres::BiCubicInterpolator<Grid2D<float>> graduInter(_graduGrid);
     ceres::BiCubicInterpolator<Grid2D<float>> gradvInter(_gradvGrid);
@@ -161,7 +167,7 @@ void CornerDetector::improveCorners(Vector2dVec & pointVec) const
         array<double, 5> dataArr;
         initPoin(x, dataArr.data());
         
-        ceres::GradientProblem problem(new SubpixelCorner(_gradx, _grady));
+        ceres::GradientProblem problem(new SubpixelCorner(_gradx, _grady, x));
         ceres::GradientProblemSolver::Options options;
 //        options.line_search_direction_type = ceres::NONLINEAR_CONJUGATE_GRADIENT;
 //        options.line_search_type = ceres::ARMIJO;
@@ -191,17 +197,14 @@ CornerDetector::CornerDetector(int Nx, int Ny, int initRadius, bool improveDetec
 
 void CornerDetector::setImage(const Mat8u & img)
 {
-    //FIXME for backward compatibility
-    if (IMPROVE_DETECTION)
-    {
-        Sobel(img, _gradx, CV_32F, 1, 0, 3, 1e-3);
-        Sobel(img, _grady, CV_32F, 0, 1, 3, 1e-3);
-    }
     img.copyTo(_img);
     
     _resp.create(_img.size());
     _imgrad.create(_img.size());
-    _src.create(_img.size());
+    _gradx.create(_img.size());
+    _grady.create(_img.size());
+    _src1.create(_img.size());
+    _src2.create(_img.size());
     _detected.create(_img.size());
     _idxMap.create(_img.size());
 }
@@ -238,10 +241,13 @@ bool CornerDetector::detectPattern(Vector2dVec & ptVec)
     
 void CornerDetector::computeResponse()
 {
-    const double SIGMA = 2; //TODO make a parameter
-    const int FILTER_SIZE = 1 + 2 * round(SIGMA);
-    GaussianBlur(_img, _src, Size(FILTER_SIZE, FILTER_SIZE), SIGMA, SIGMA);
+    const double SIGMA_1 = 0.7; //TODO make a parameter
+    const int FILTER_SIZE_1 = 3;
+    GaussianBlur(_img, _src1, Size(FILTER_SIZE_1, FILTER_SIZE_1), SIGMA_1, SIGMA_1);
     
+    const double SIGMA_2 = 3.5; //TODO make a parameter
+    const int FILTER_SIZE_2 = 1 + 2 * round(SIGMA_2);
+    GaussianBlur(_img, _src2, Size(FILTER_SIZE_2, FILTER_SIZE_2), SIGMA_2, SIGMA_2);
     _imgrad.setTo(0);
     _resp.setTo(0);
     double acc = 0;
@@ -252,23 +258,32 @@ void CornerDetector::computeResponse()
     {
         for (int u = SIZE; u < _img.cols - SIZE; u++)
         {
+            //compute sharp gradient
+//            double gxSharp = ( _src1(v, u + 1) - _src1(v, u - 1)  - 0.3*(_src2(v, u + 1) - _src2(v, u - 1)) ) / 2.;
+//            double gySharp = ( _src1(v + 1, u) - _src1(v - 1, u) - 0.3*(_src2(v + 1, u) - _src2(v - 1, u)) ) / 2.;
+            double gxSharp = ( _src1(v, u + 1) - _src1(v, u - 1) ) / 2.;
+            double gySharp = ( _src1(v + 1, u) - _src1(v - 1, u) ) / 2.;
+            _gradx(v, u) = gxSharp * 0.01;
+            _grady(v, u) = gySharp * 0.01;
+            _imgrad(v, u) = gxSharp*gxSharp + gySharp*gySharp;
             
-            double gx = (_src(v, u + HSIZE) - _src(v, u - HSIZE) ) / (2 * HSIZE);
-            double gy = (_src(v + HSIZE, u) - _src(v - HSIZE, u) ) / (2 * HSIZE);
+            
             
             
             //We are looking for saddle points, that is negative hessian determinant
-            double iuu = _src(v, u - SIZE) + _src(v, u + SIZE) - 2* _src(v, u);
+            double iuu = _src2(v, u - SIZE) + _src2(v, u + SIZE) - 2* _src2(v, u);
             iuu /= SIZE*SIZE;
-            double ivv = _src(v - SIZE, u) + _src(v + SIZE, u) - 2* _src(v, u);
+            double ivv = _src2(v - SIZE, u) + _src2(v + SIZE, u) - 2* _src2(v, u);
             ivv /= SIZE*SIZE;
-            double iuv = _src(v - HSIZE, u - HSIZE) + _src(v + HSIZE, u + HSIZE) 
-                            - _src(v  + HSIZE, u - HSIZE) - _src(v - HSIZE, u + HSIZE);
+            double iuv = _src2(v - HSIZE, u - HSIZE) + _src2(v + HSIZE, u + HSIZE) 
+                            - _src2(v  + HSIZE, u - HSIZE) - _src2(v - HSIZE, u + HSIZE);
             iuv /= 4*HSIZE*HSIZE;
+            
+            double gx = (_src2(v, u + HSIZE) - _src2(v, u - HSIZE) ) / (2 * HSIZE);
+            double gy = (_src2(v + HSIZE, u) - _src2(v - HSIZE, u) ) / (2 * HSIZE);
             double gsq = gx * gx + gy * gy;
-            _imgrad(v, u) = gsq;
-            double _respVal = -iuu * ivv + iuv * iuv - 0.002*pow(gsq, 2);
-            if (_respVal > 0.1) 
+            double _respVal = -iuu * ivv + iuv * iuv - 0.001*pow(gsq, 2);
+            if (_respVal > 0.03) 
             {
                 _resp(v, u) = _respVal;
                 acc += _respVal;
@@ -280,13 +295,15 @@ void CornerDetector::computeResponse()
     if (DEBUG)
     {
         imshow ("img", _img );
+        imshow ("imgrad", _imgrad / 500);
         imshow ("resp", _resp / 100);
         waitKey();
     }
 }
 
 bool CornerDetector::checkCorner(const Vector2i & pt)
-{
+{   
+//    return true;
     Polynomial2 circle = Polynomial2::Circle(pt[0], pt[1], INIT_RADIUS);
     
     Vector2i pt0(pt[0] + INIT_RADIUS, pt[1]);
@@ -317,14 +334,14 @@ bool CornerDetector::checkCorner(const Vector2i & pt)
     // find the strongest
     int distThresh = sampleVec.size() / 2 - 2;
     
-    auto itMax = max_element(transitionVec.begin(), transitionVec.end());
+    const auto itMax = max_element(transitionVec.begin(), transitionVec.end());
     double transMax = *itMax;
 //        cout << endl << setw(10) << *itMax;
     // remove the maximum and its neighbors
     setZero(transitionVec.begin(), transitionVec.end(), itMax);
     // check the other three : must be at least 0.75
     
-    auto itMax2 = max_element(transitionVec.begin(), transitionVec.end());
+    const auto itMax2 = max_element(transitionVec.begin(), transitionVec.end());
 //        cout << setw(10) << *itMax2;
     
     if (*itMax2 < transMax * 0.5) return false;
@@ -337,13 +354,13 @@ bool CornerDetector::checkCorner(const Vector2i & pt)
     if (*itMax3 > transMax * 0.5) return false;
     setZero(transitionVec.begin(), transitionVec.end(), itMax3);
     
-    auto itMin = min_element(transitionVec.begin(), transitionVec.end());
+    const auto itMin = min_element(transitionVec.begin(), transitionVec.end());
 //        cout << setw(10) << *itMin;
     
     if (*itMin > transMax * -0.5) return false;
     setZero(transitionVec.begin(), transitionVec.end(), itMin);
     
-    auto itMin2 = min_element(transitionVec.begin(), transitionVec.end());
+    const auto itMin2 = min_element(transitionVec.begin(), transitionVec.end());
 //        cout << setw(10) << *itMin2;
     
     if (*itMin2 > transMax * -0.5) return false;
@@ -355,6 +372,23 @@ bool CornerDetector::checkCorner(const Vector2i & pt)
     
     if (*itMin3 < transMax * -0.5) return false;
     setZero(transitionVec.begin(), transitionVec.end(), itMin3);
+    
+//    if ( abs( abs(distance(itMin, itMin2)) - abs(distance(itMax, itMax2)) ) > 2 )
+//    {
+//        if (DEBUG)
+//        {
+//            for (auto & it : {itMin, itMin2, itMax, itMax2})
+//            {
+//                int d = distance(transitionVec.begin(), it);
+//                _detected(circleVec[d][1], circleVec[d][0]) = 128;
+//            }
+////            cout << "REJECTED : " << pt.transpose() << endl;
+////            cout << abs(distance(itMax, itMax2)) << "   " << abs(distance(itMin, itMin2)) << endl;
+//        }
+//        return false;
+//     
+//    }
+    
     
     return true;
 }
@@ -412,7 +446,7 @@ void CornerDetector::selectCandidates()
         threshHeap.pop_back();
     }
     
-    const double VAL_THRESH = 0.00 * acc / REF_ITEM_COUNT;
+    const double VAL_THRESH = 0.1 * acc / REF_ITEM_COUNT;
     
     
     /// Check coner-ness   
@@ -444,6 +478,7 @@ void CornerDetector::selectCandidates()
     make_heap(_hypHeap.begin(), _hypHeap.end(), comp);
 }
 
+
 void CornerDetector::constructGraph()
 {
     _idxMap.setTo(-1);
@@ -458,7 +493,7 @@ void CornerDetector::constructGraph()
         pop_heap(_hypHeap.begin(), _hypHeap.end(), comp);
         Vector2i pt = _hypHeap.back().second;
         _hypHeap.pop_back();
-        const int SPREAD = 3;
+        const int SPREAD = 2;
         for (int du = -SPREAD; du <= SPREAD; du += SPREAD)
         {
             for (int dv = -SPREAD; dv <= SPREAD; dv += SPREAD)
@@ -466,16 +501,17 @@ void CornerDetector::constructGraph()
                 fringe.emplace(0, i, pt[0] + du, pt[1] + dv);
             }
         }
+        fringe.emplace(0, i, pt[0], pt[1]);
         _arcVec.emplace_back();
         _ptVec.push_back(pt);
     }
     
-    const vector<int> duVec = {-1, 0, 1, 0};
-    const vector<int> dvVec = {0, -1, 0, 1};
+    const vector<int> duVec = {-1, 0, 1, 1, 1, 0, -1, -1};
+    const vector<int> dvVec = {-1, -1, -1, 0, 1, 1, 1, 0};
     
     const int CANDIDATE_COUNT = _arcVec.size();
-    const int SEARCH_REACH = 100;
-    const double SQUARED_GRAD_MAX = 50;
+    const int SEARCH_REACH = 140;
+    const double SQUARED_GRAD_MAX = 15;
     while (not fringe.empty() and fringe.front().t < SEARCH_REACH)
     {
         auto e = fringe.front();
@@ -485,7 +521,7 @@ void CornerDetector::constructGraph()
             continue;            
         }
         _idxMap(e.v, e.u) = e.idx;
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 8; i++)
         {
             const int u2 = e.u + duVec[i];
             const int v2 = e.v + dvVec[i];
@@ -493,7 +529,25 @@ void CornerDetector::constructGraph()
             {
                 continue;
             }
-            if (_imgrad(v2, u2) < SQUARED_GRAD_MAX ) continue;
+            
+            
+            double x1 = u2 - _ptVec[e.idx][0];
+            double y1 = v2 - _ptVec[e.idx][1];
+            double t2 = x1 * x1 + y1 * y1;
+            if (t2 > 25)
+            {
+                if (_imgrad(v2, u2) < SQUARED_GRAD_MAX ) continue;
+                //check the gradient orientation
+                double xg = _gradx(v2, u2);
+                double yg = _grady(v2, u2);
+                double c = x1 * xg + y1 * yg;
+                double s = x1 * yg - y1 * xg;
+                double angle = abs(atan2(s, c));
+                double t = sqrt(t2);
+                double thresh = min(M_PI / 8, t / 150.) + 0.75 / t;
+                if (angle < M_PI / 2 - thresh or 
+                    angle > M_PI / 2 + thresh) continue;
+            }
             if (_idxMap(v2, u2) == -1)
             {
                 fringe.emplace(e.t + 1, e.idx, u2, v2);
@@ -511,7 +565,11 @@ void CornerDetector::constructGraph()
     }
     if (DEBUG)
     {
-        imshow ("detected", _idxMap * 250 - 32000);
+        for (auto & x : _idxMap)
+        {
+            x = (x * 2000) % 32000;
+        }    
+        imshow ("detected", _idxMap  - 32000);
     }
 }
 
@@ -522,7 +580,7 @@ double compareVectors(Vector2i v1, Vector2i v2)
     double len2 = pow((norm1 - norm2) / norm1, 2);
     double c = v1.dot(v2) / norm1 / norm2;
     double th2 = 2. * (1. - c);
-    return th2 * 2 + len2 / 2; //FIXME parameters to tune
+    return th2 + len2/10; //FIXME parameters to tune
 }
 
 vector<int> CornerDetector::extractSequence(int idx0, int idx1)
@@ -587,7 +645,6 @@ vector<int> CornerDetector::extractSequence(int idx0, int idx1)
 }
 
 
-
 //TODO rewrite with a finite automaton
 vector<int> CornerDetector::selectPattern()
 {
@@ -627,7 +684,6 @@ vector<int> CornerDetector::selectPattern()
             {
                 while (chain.size() > _Ny) chain.pop_back();
                 
-                
                 //check whether x-chain is extractable
                 for (auto & nx : _arcVec[idx0])
                 {
@@ -641,6 +697,8 @@ vector<int> CornerDetector::selectPattern()
                     if (chain2.size() >= _Nx)
                     {
                         while (chain2.size() > _Nx) chain2.pop_back();
+                        
+                        
                         if (DEBUG)
                         {
                             cout << "Chain2 detected" << endl;
@@ -704,6 +762,7 @@ vector<int> CornerDetector::selectPattern()
                     
                 if (chain2.size() >= _Nx)
                 {
+                    
                     detected = true;
                     res.insert(res.end(), chain2.begin(), chain2.begin() + _Nx);
                     break;
