@@ -189,7 +189,7 @@ void CornerDetector::improveCorners(Vector2dVec & pointVec) const
 CornerDetector::CornerDetector(int Nx, int Ny, int initRadius, bool improveDetection, bool debug) :
     _Nx(Nx),
     _Ny(Ny),
-    MAX_CANDIDATE_COUNT(5 * Nx * Ny),
+    MAX_CANDIDATE_COUNT(10 * Nx * Ny),
     INIT_RADIUS(initRadius),
     IMPROVE_DETECTION(improveDetection),
     DEBUG(debug)
@@ -283,7 +283,7 @@ void CornerDetector::computeResponse()
             double gy = (_src2(v + HSIZE, u) - _src2(v - HSIZE, u) ) / (2 * HSIZE);
             double gsq = gx * gx + gy * gy;
             double _respVal = -iuu * ivv + iuv * iuv - 0.001*pow(gsq, 2);
-            if (_respVal > 0.03) 
+            if (_respVal > 0.01) 
             {
                 _resp(v, u) = _respVal;
                 acc += _respVal;
@@ -332,7 +332,7 @@ bool CornerDetector::checkCorner(const Vector2i & pt)
     transitionVec.push_back(sampleVec.front() - sampleVec[idxLast]);
                             
     // find the strongest
-    int distThresh = sampleVec.size() / 2 - 2;
+    int distThresh = sampleVec.size() / 2 - 3;
     
     const auto itMax = max_element(transitionVec.begin(), transitionVec.end());
     double transMax = *itMax;
@@ -390,7 +390,43 @@ bool CornerDetector::checkCorner(const Vector2i & pt)
 //    }
     
     
-    return true;
+    return scaleInvarient(pt);
+}
+
+bool CornerDetector::scaleInvarient(const Vector2i & pt)
+{
+    const double MIN_GRAD_THRESH = 15e-4;
+    const double CRITERION_THRESH = 0.25;
+    const int WINDOW_SIZE = 6;
+    double acc = 0;
+    int count = 0;
+    double normAcc = 0;
+    for (int dv = -WINDOW_SIZE; dv <= WINDOW_SIZE; dv++)
+    {
+        for (int du = -WINDOW_SIZE; du <= WINDOW_SIZE; du++)
+        {
+            double sqNorm = du*du + dv*dv;
+            if (sqNorm > WINDOW_SIZE*WINDOW_SIZE + 1 or sqNorm < 5) continue;
+            int u = pt[0] + du;
+            int v = pt[1] + dv;
+            if (u < 0 or u >= _img.cols or v < 0 or v >= _img.rows) continue;
+            double gx = _gradx(v, u);
+            double gy = _grady(v, u);
+            double gradSqNorm = gx * gx + gy * gy;
+            if (gradSqNorm < MIN_GRAD_THRESH) continue;
+//            acc += pow(gx * du + gy * dv, 2) / (sqNorm * gradSqNorm);
+//            count++;
+            acc += pow(gx * du + gy * dv, 2) / sqNorm;
+            normAcc += gradSqNorm;
+
+        }
+        
+    }
+    if (DEBUG)
+    {
+        cout << "invariance criterion : "  << acc / normAcc << endl;
+    }
+    return (acc / normAcc < CRITERION_THRESH);
 }
 
 void CornerDetector::selectCandidates()
@@ -446,7 +482,7 @@ void CornerDetector::selectCandidates()
         threshHeap.pop_back();
     }
     
-    const double VAL_THRESH = 0.1 * acc / REF_ITEM_COUNT;
+    const double VAL_THRESH = 0.01 * acc / REF_ITEM_COUNT;
     
     
     /// Check coner-ness   
@@ -534,7 +570,7 @@ void CornerDetector::constructGraph()
             double x1 = u2 - _ptVec[e.idx][0];
             double y1 = v2 - _ptVec[e.idx][1];
             double t2 = x1 * x1 + y1 * y1;
-            if (t2 > 25)
+            if (t2 > 50)
             {
                 if (_imgrad(v2, u2) < SQUARED_GRAD_MAX ) continue;
                 //check the gradient orientation
@@ -544,7 +580,7 @@ void CornerDetector::constructGraph()
                 double s = x1 * yg - y1 * xg;
                 double angle = abs(atan2(s, c));
                 double t = sqrt(t2);
-                double thresh = min(M_PI / 8, t / 150.) + 0.75 / t;
+                double thresh = min(M_PI / 8, t / 150.) + 1. / t;
                 if (angle < M_PI / 2 - thresh or 
                     angle > M_PI / 2 + thresh) continue;
             }

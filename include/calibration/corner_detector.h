@@ -68,6 +68,8 @@ public:
     // /home/bogdan/projects/data/mapping/fluence_calibration/right/000402.png
     bool checkCorner(const Vector2i & pt);
     
+    bool scaleInvarient(const Vector2i & pt);
+    
     //out : _arcVec, _ptVec
     void constructGraph();
     
