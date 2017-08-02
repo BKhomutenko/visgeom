@@ -28,19 +28,26 @@ SLAM system
 #include "reconstruction/depth_map.h"
 #include "geometry/geometry.h"
 #include "projection/generic_camera.h"
+#include "projection/eucm.h"
+#include "reconstruction/depth_map.h"
+#include "reconstruction/eucm_motion_stereo.h"
+#include "reconstruction/eucm_sgm.h"
 #include "localization/sparse_odom.h"
+#include "localization/photometric.h"
 
 struct MappingParameters
 {
+    MappingParameters(const ptree & params) {}
+    MappingParameters() {}
     double distThreshSq = 0.25;
     double angularThreshSq = 0.25;
+    double minInitDist = 0.2;
 };
 
 
 struct Frame
 {
     Mat8u img;
-    int parent;  //so far map is a tree structure
     Transf xi; //the position is defined in the global frame
 };
 
@@ -51,38 +58,57 @@ struct Frame
 class PhotometricMapping
 {
 public:
-    PhotometricMapping(const MappingParameters & params);
+    PhotometricMapping(const ptree & params);
     
     void feedOdometry(const Transf & xi);
     
     void feedImage(const Mat8u & img);
     
+    void pushInterFrame(const Mat8u & img);
+    
     void reInit(const Transf & xi);
     
-    int select(); //-1 means that there is no matching frame
+    int selectMapFrame(const Transf & xi); //-1 means that there is no matching frame
     
-    void newFrame(const Mat8u & img);
-    Transf localizeMI(const Mat8u & img) const;
-    Transf localizePhoto(const Mat8u & img) const;
+    Transf localizeMI(); //localizes the inter frame wrt _frameVec[_mapIdx]
+    Transf localizePhoto(const Mat8u & img); //localizes the image wrt interFrame
     
-    Transf getCameraMotion() const;
+    Transf getCameraMotion(const Transf & xi) const;
     
-private:
-    enum State {ST_INIT, ST_SELECT, ST_TMP_FRAME, ST_MAP_FRAME};
-    MappingParameters _params;
-    State _state;
-    
-    int _activeFrameIdx;
-    Frame _tmpFrame;
-    vector<Frame> _frameVec;
+    bool checkDistance(const Transf & xi) const;
+    bool checkDistance(const Transf & xi1, const Transf & xi2) const;
+//private:
 
-    Transf _xi; //current estimation
+    enum State {MAP_BEGIN, MAP_INIT, MAP_LOCALIZE, MAP_SLAM};
+    
+    MappingParameters _params;
+    
+    EnhancedCamera * _camera;
+    //state variables
+    State _state;
+    int _mapIdx; //currently active map frame
+    bool _odomInit;
+    Frame _interFrame;
+    vector<Frame> _frameVec;
+    DepthMap _depth;
+    Transf _xiLocal; //current base pose estimation in the local frame
+    Transf _xiLocalOld; //for VO scale rectification
     Transf _xiOdom; //the last odometry measure
     Transf _xiOdomImage; //the last odometry before the last image
     
-    Transf _xiBaseCamera;
+    Transf _xiBaseCam;
     
-    DepthMap depth;
+    //utils
+    //are used to create an Sgm object to init the keyframe
+    SgmParameters _sgmParams; 
+    
+    //used to initialize the first transformation
+    SparseOdometry _sparseOdom;
+    
+    //gradually improves the depth map
+    MotionStereo _motionStereo;
+    
+    ScalePhotometric _localizer;
 };
 
 

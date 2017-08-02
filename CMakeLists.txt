@@ -65,6 +65,7 @@ add_library( localization STATIC
     src/localization/local_cost_functions.cpp
     src/localization/mono_odom.cpp
     src/localization/sparse_odom.cpp
+    src/localization/mapping.cpp
 )
 
 TARGET_LINK_LIBRARIES( localization
@@ -252,6 +253,19 @@ target_link_libraries( motion_gradual
 )
 
 ## LOCALIZATION ###
+add_executable( mapping
+    test/localization/map_test.cpp
+)
+
+target_link_libraries( mapping  
+    reconstruction
+    localization
+    render
+    ${OpenCV_LIBS}
+    ${CERES_LIBRARIES}
+    ${Boost_LIBRARIES}
+)
+
 add_executable( odometry_test
     test/localization/mono_odom_test.cpp
 )
