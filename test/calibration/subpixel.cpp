@@ -125,7 +125,7 @@ int main(int argc, char** argv)
     
     Mat8u frame = imread(argv[1], 0);
     
-    CornerDetector detector(Nx, Ny, 5, false, true);
+    CornerDetector detector(Nx, Ny, 3, false, true);
     detector.setImage(frame);
     
     Vector2dVec cornerVec;

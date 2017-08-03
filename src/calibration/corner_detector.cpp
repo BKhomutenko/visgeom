@@ -245,15 +245,15 @@ void CornerDetector::computeResponse()
     const int FILTER_SIZE_1 = 3;
     GaussianBlur(_img, _src1, Size(FILTER_SIZE_1, FILTER_SIZE_1), SIGMA_1, SIGMA_1);
     
-    const double SIGMA_2 = 3.5; //TODO make a parameter
+    const double SIGMA_2 = 1; //TODO make a parameter
     const int FILTER_SIZE_2 = 1 + 2 * round(SIGMA_2);
     GaussianBlur(_img, _src2, Size(FILTER_SIZE_2, FILTER_SIZE_2), SIGMA_2, SIGMA_2);
     _imgrad.setTo(0);
     _resp.setTo(0);
     double acc = 0;
     int count = 0;
-    const int SIZE = 3;
-    const int HSIZE = 2;
+    const int SIZE = 1;
+    const int HSIZE = 1;
     for (int v = SIZE; v < _img.rows - SIZE; v++)
     {
         for (int u = SIZE; u < _img.cols - SIZE; u++)
@@ -296,7 +296,7 @@ void CornerDetector::computeResponse()
     {
         imshow ("img", _img );
         imshow ("imgrad", _imgrad / 500);
-        imshow ("resp", _resp / 100);
+        imshow ("resp", _resp / 1000);
         waitKey();
     }
 }
@@ -393,14 +393,16 @@ bool CornerDetector::checkCorner(const Vector2i & pt)
     return scaleInvarient(pt);
 }
 
+//TODO make the window size adaptive
+//and more generally try to detect the board on different scales with different filter size etc
 bool CornerDetector::scaleInvarient(const Vector2i & pt)
 {
     const double MIN_GRAD_THRESH = 15e-4;
     const double CRITERION_THRESH = 0.25;
-    const int WINDOW_SIZE = 6;
+    const int WINDOW_SIZE = INIT_RADIUS;
     double acc = 0;
     int count = 0;
-    double normAcc = 0;
+    double normAcc = 1e-10;
     for (int dv = -WINDOW_SIZE; dv <= WINDOW_SIZE; dv++)
     {
         for (int du = -WINDOW_SIZE; du <= WINDOW_SIZE; du++)
@@ -424,7 +426,16 @@ bool CornerDetector::scaleInvarient(const Vector2i & pt)
     }
     if (DEBUG)
     {
+        cout << pt.transpose() << endl;
         cout << "invariance criterion : "  << acc / normAcc << endl;
+        if (acc / normAcc < CRITERION_THRESH)
+        {
+            _detected(pt[1], pt[0]) = 128;
+        }
+        else
+        {
+            _detected(pt[1], pt[0]) = 25;
+        }
     }
     return (acc / normAcc < CRITERION_THRESH);
 }
@@ -432,7 +443,7 @@ bool CornerDetector::scaleInvarient(const Vector2i & pt)
 void CornerDetector::selectCandidates()
 {
     //find local maxima
-    const int WINDOW_SIZE = 5;
+    const int WINDOW_SIZE = INIT_RADIUS;
     vector<pair<double, Vector2i>> maximaHeap;
     for (int v = WINDOW_SIZE; v < _img.rows - WINDOW_SIZE; v++)
     {
@@ -446,7 +457,10 @@ void CornerDetector::selectCandidates()
             {
                 for (int i = -WINDOW_SIZE; i <= WINDOW_SIZE; i++)
                 {
+                    
                     if (i == 0 and j == 0) continue;
+                    double sqNorm = i*i + j*j;
+                    if (sqNorm > WINDOW_SIZE*WINDOW_SIZE + 1) continue;
                     const double valNeigh = _resp(v + j, u + i);
                     if ( val <= valNeigh)
                     {
@@ -499,8 +513,8 @@ void CornerDetector::selectCandidates()
         maximaHeap.pop_back();
         // compute transitions
         
-        if (not checkCorner(pt)) continue;
-        
+//        if (not checkCorner(pt)) continue;
+        if (not scaleInvarient(pt)) continue;
         if (DEBUG) _detected(pt[1], pt[0]) = 255;
         
         _hypHeap.emplace_back(-pt[0] - pt[1], pt);
@@ -548,6 +562,7 @@ void CornerDetector::constructGraph()
     const int CANDIDATE_COUNT = _arcVec.size();
     const int SEARCH_REACH = 140;
     const double SQUARED_GRAD_MAX = 15;
+    const int RADIUS_THRESH = INIT_RADIUS * INIT_RADIUS; // how far the search can go with no constraints
     while (not fringe.empty() and fringe.front().t < SEARCH_REACH)
     {
         auto e = fringe.front();
@@ -570,7 +585,7 @@ void CornerDetector::constructGraph()
             double x1 = u2 - _ptVec[e.idx][0];
             double y1 = v2 - _ptVec[e.idx][1];
             double t2 = x1 * x1 + y1 * y1;
-            if (t2 > 50)
+            if (t2 > RADIUS_THRESH)
             {
                 if (_imgrad(v2, u2) < SQUARED_GRAD_MAX ) continue;
                 //check the gradient orientation
