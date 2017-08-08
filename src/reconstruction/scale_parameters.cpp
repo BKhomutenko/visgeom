@@ -38,7 +38,12 @@ ScaleParameters::ScaleParameters(const ptree & params)
         else if (pname == "vMax")   vMax = item.second.get_value<int>();
         else if (pname == "xMax")   xMax = item.second.get_value<int>();
         else if (pname == "yMax")   yMax = item.second.get_value<int>();
+        else if (pname == "equal_margins" and item.second.get_value<bool>()) setEqualMargin();
     }
+//    cout << "u0  " << u0;
+//    cout << "v0  " << v0;
+//    cout << "xMax  " << xMax;
+//    cout << "yMax  " << yMax;
 }
 
 void ScaleParameters::setEqualMargin()

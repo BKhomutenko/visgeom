@@ -95,7 +95,7 @@ Transf ScalePhotometric::computePose(const Transf & T12)
     //TODO set the optimization depth with the parameters   v
     Transf xi = T12;
     _xiPrior = T12;
-    for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 2; scaleIdx--)
+    for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 1; scaleIdx--)
     {
         computePose(scaleIdx, xi);
     }

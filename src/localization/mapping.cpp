@@ -119,8 +119,7 @@ void PhotometricMapping::feedImage(const Mat8u & img)
         }
         else
         {
-            _depth = _motionStereo.compute(getCameraMotion(_xiLocal), img, _depth);
-            _depth.filterNoise();
+            improveStereo(img);
         }
         break;
     case MAP_SLAM:
@@ -142,13 +141,21 @@ void PhotometricMapping::feedImage(const Mat8u & img)
         }
         else
         {
-            _depth = _motionStereo.compute(getCameraMotion(_xiLocal), img, _depth);
-            _depth.filterNoise();
+            improveStereo(img);
         }
         //if the inter frame is too far, push it into the map and 
         //init another intermediate frame
         break;
     }
+}
+
+void PhotometricMapping::improveStereo(const Mat8u & img)
+{
+    Transf base = getCameraMotion(_xiLocal);
+    if (base.trans().norm() < _params.minStereoBase) return;
+    
+    _depth = _motionStereo.compute(base, img, _depth);
+    _depth.filterNoise();
 }
 
 void PhotometricMapping::pushInterFrame(const Mat8u & img)
@@ -159,20 +166,46 @@ void PhotometricMapping::pushInterFrame(const Mat8u & img)
         _interFrame.img.copyTo(_frameVec.back().img);
         _frameVec.back().xi = _interFrame.xi;
     }
-    DepthMap newDepth;
-    EnhancedSgm sgm(getCameraMotion(_xiLocal).inverse(), _camera, _camera, _sgmParams);
-    sgm.computeStereo(img, _interFrame.img, newDepth);
-    newDepth.filterNoise();
-    if (_state == MAP_INIT)
+    
+    Transf base = getCameraMotion(_xiLocal);
+    
+    if (base.trans().norm() > _params.minStereoBase)
     {
-        _depth = newDepth;
+        //use the SGM to compute the depth estimate
+        DepthMap newDepth;
+        EnhancedSgm sgm(base.inverse(), _camera, _camera, _sgmParams);
+        sgm.computeStereo(img, _interFrame.img, newDepth);
+        imshow("img1", img);
+        imshow("img2", _interFrame.img);
+        cout << base.inverse() << endl;
+        newDepth.filterNoise();
+        if (_state == MAP_INIT)
+        {
+            _depth = newDepth;
+        }
+        else
+        {
+            //project forward the prior depth
+            _depth = _depth.wrapDepth(base);
+            _depth.merge(newDepth);
+        }
+    }
+    else if (_state != MAP_INIT)
+    {
+//        //DEBUG
+//        DepthMap wrapped = _depth.wrapDepth(base);
+//        Mat32f depthMat;
+//        odom._depth.toMat(depthMat);
+//        imshow("depth", depthMat / 10);
+    
+        _depth = _depth.wrapDepth(base);
     }
     else
     {
-        //project forward the prior depth
-        _depth = _depth.wrapDepth(_xiLocal);
-        _depth.merge(newDepth);
+        //SHOULD NEVER HAPPEN
+        throw;
     }
+    
     img.copyTo(_interFrame.img);
     _interFrame.xi = _interFrame.xi.compose(_xiLocal);
     _xiLocal = Transf(0, 0, 0, 0, 0, 0);
@@ -262,25 +295,27 @@ Transf PhotometricMapping::localizePhoto(const Mat8u & img)
     Transf zetaPrior = _xiLocalOld.inverseCompose(_xiLocal);
     
     _xiLocal = _localizer.computePose( _xiLocal );
-    Transf zeta = _xiLocalOld.inverseCompose(_xiLocal);
-    double lengthPrior = zetaPrior.trans().norm();
-    double length = zeta.trans().norm();
-    double K = lengthPrior / length;
-    if (length > 1e-2) //TODO put a meaningful threshold
-    {
-        
-        if (K > 1.2) //too much divergence between WO and VO
-        {
-            cout << "WARNING : discard VO result, scale error" << endl;
-            _xiLocal = _xiLocalOld.compose(zetaPrior);
-        }
-        else
-        {
-            zeta.trans() *= K;
-            _xiLocal = _xiLocalOld.compose(zeta);
-        }
-    }
-    _xiLocalOld = _xiLocal;
+    
+    //SCALE FACTOR NORMALIZATION
+//    Transf zeta = _xiLocalOld.inverseCompose(_xiLocal);
+//    double lengthPrior = zetaPrior.trans().norm();
+//    double length = zeta.trans().norm();
+//    double K = lengthPrior / length;
+//    if (length > 1e-2) //TODO put a meaningful threshold
+//    {
+//        
+//        if (K > 1.2) //too much divergence between WO and VO
+//        {
+//            cout << "WARNING : discard VO result, scale error" << endl;
+//            _xiLocal = _xiLocalOld.compose(zetaPrior);
+//        }
+//        else
+//        {
+//            zeta.trans() *= K;
+//            _xiLocal = _xiLocalOld.compose(zeta);
+//        }
+//    }
+//    _xiLocalOld = _xiLocal;
 }
 
 

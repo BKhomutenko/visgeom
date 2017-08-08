@@ -39,9 +39,10 @@ struct MappingParameters
 {
     MappingParameters(const ptree & params) {}
     MappingParameters() {}
-    double distThreshSq = 0.25;
+    double distThreshSq = 0.03;
     double angularThreshSq = 0.25;
-    double minInitDist = 0.2;
+    double minInitDist = 0.1;
+    double minStereoBase = 0.03;
 };
 
 
@@ -77,6 +78,8 @@ public:
     
     bool checkDistance(const Transf & xi) const;
     bool checkDistance(const Transf & xi1, const Transf & xi2) const;
+    
+    void improveStereo(const Mat8u & img);
 //private:
 
     enum State {MAP_BEGIN, MAP_INIT, MAP_LOCALIZE, MAP_SLAM};

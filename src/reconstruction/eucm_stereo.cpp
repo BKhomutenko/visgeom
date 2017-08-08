@@ -32,6 +32,7 @@ StereoParameters::StereoParameters(const ptree & params) :
         else if (pname == "descriptor_size")    descLength = item.second.get_value<int>();
         else if (pname == "scales")    scaleVec = readVector<int>(item.second);
         else if (pname == "descriptor_response_thresh") descRespThresh = item.second.get_value<int>();
+        else if (pname == "num_epipolar_planes") numEpipolarPlanes = item.second.get_value<int>();
     }
 }
 
@@ -40,7 +41,7 @@ EnhancedStereo::EnhancedStereo(const EnhancedCamera * cam1, const EnhancedCamera
     _params(params),
     _camera1(cam1->clone()),
     _camera2(cam2->clone()),
-    _epipolarCurves(cam1, cam2, 2000, params.verbosity),
+    _epipolarCurves(cam1, cam2, _params.numEpipolarPlanes, params.verbosity),
     _epipolarDescriptor(params.descLength, params.descRespThresh, params.scaleVec),
     HALF_LENGTH(params.descLength / 2),
     MARGIN(params.descLength - 1),

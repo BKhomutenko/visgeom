@@ -38,7 +38,7 @@ double LookupFilter::computeOrigin(int length) const
 {
     return 3 * SIGMA * (-1 + 1. / length);
 }
-    
+
 double LookupFilter::computeStep(int length) const
 {
     return 6 * SIGMA / length;
