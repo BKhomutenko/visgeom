@@ -135,16 +135,25 @@ Polynomial2 EnhancedEpipolar::computePolynomial(Vector3d plane) const
     const double & A = plane[0];
     const double & B = plane[1];
     const double & C = plane[2];
-    double AA = A * A;
-    double BB = B * B;
-    double CC = C * C;
-    double CCfufv = CC * fufv;
-    if (CCfufv/(AA + BB) < 1e-1) // the curve passes through the projection center
+    const double AA = A * A;
+    const double BB = B * B;
+    const double CC = C * C;
+    const double CCfufv = CC * fufv;
+    const double dd = CCfufv / (AA + BB); //squared distance to the projection center in pixels
+    if ((AA + BB) > 0 and dd < 1.) // the curve passes through the projection center
     {
+        
         surf.kuu = surf.kuv = surf.kvv = 0;
-        surf.ku = A/fu;
-        surf.kv = B/fv;
-        surf.k1 = -u0*A/fu - v0*B/fv;
+        surf.ku = A / fu;
+        surf.kv = B / fv;
+        
+        const double normABinv = 1./sqrt(AA + BB);
+        const double Cnorm = C / sqrt(AA + BB + CC);
+        const double du = -A * Cnorm * normABinv * fu;
+        const double dv = -B * Cnorm * normABinv * fv;
+        surf.k1 = -(u0  + du)* A/ fu - (v0 + dv) * B / fv;
+        
+//        surf.k1 = -u0 * A/ fu - v0 * B / fv;
     }
     else
     {

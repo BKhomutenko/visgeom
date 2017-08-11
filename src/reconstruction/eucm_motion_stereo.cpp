@@ -25,7 +25,7 @@ Depth-from-motion class for semidense depth estimation
 #include "std.h"
 #include "ocv.h"
 #include "eigen.h"
-#include "utils/filter.h"
+//#include "utils/filter.h"
 #include "geometry/geometry.h"
 #include "projection/eucm.h"
 
@@ -109,8 +109,8 @@ bool MotionStereo::computeUncertainty(double d, double s)
     else // there is a prior
     {
         gX.normalize();
-        Vector3d Xmax = gX * (d + 2.5 * s);
-        Vector3d Xmin = gX * max(d - 2.5 * s, MIN_DEPTH);
+        Vector3d Xmax = gX * (d + 3 * s);
+        Vector3d Xmin = gX * max(d - 3 * s, MIN_DEPTH);
         Xmax = R21() * (Xmax - t12());
         Xmin = R21() * (Xmin - t12());
         Vector2d ptFin;

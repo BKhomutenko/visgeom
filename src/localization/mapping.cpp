@@ -99,6 +99,7 @@ void PhotometricMapping::feedImage(const Mat8u & img)
         xiMapFr = _frameVec[_mapIdx].xi.inverseCompose(_interFrame.xi);
         mapDistanceOk = checkDistance(xiMapFr.compose(_xiLocal));
         
+        //TODO MI localization before recomputing the depth
         if (not mapDistanceOk) //need to change the map frame
         {
             pushInterFrame(img);
@@ -175,8 +176,8 @@ void PhotometricMapping::pushInterFrame(const Mat8u & img)
         DepthMap newDepth;
         EnhancedSgm sgm(base.inverse(), _camera, _camera, _sgmParams);
         sgm.computeStereo(img, _interFrame.img, newDepth);
-        imshow("img1", img);
-        imshow("img2", _interFrame.img);
+//        imshow("img1", img);
+//        imshow("img2", _interFrame.img);
         cout << base.inverse() << endl;
         newDepth.filterNoise();
         if (_state == MAP_INIT)
@@ -189,6 +190,15 @@ void PhotometricMapping::pushInterFrame(const Mat8u & img)
             _depth = _depth.wrapDepth(base);
             _depth.merge(newDepth);
         }
+        
+        /*
+        if (_state != MAP_INIT)
+        {
+            newDepth.merge(_depth.wrapDepth(base));
+        }
+        _depth = newDepth;
+        */
+        
     }
     else if (_state != MAP_INIT)
     {
@@ -295,6 +305,55 @@ Transf PhotometricMapping::localizePhoto(const Mat8u & img)
     Transf zetaPrior = _xiLocalOld.inverseCompose(_xiLocal);
     
     _xiLocal = _localizer.computePose( _xiLocal );
+    
+    //Error correction
+    PhotometricPack dataPack;
+    vector<int> idxVec;
+    _depth.reconstruct(idxVec, dataPack.cloud);
+    
+    const int POINT_NUMBER = dataPack.cloud.size();
+    
+    for (auto & idx : idxVec)
+    {
+        int u = _depth.uConv(idx % _depth.xMax);
+        int v = _depth.vConv(idx / _depth.xMax);
+        dataPack.valVec.push_back(_interFrame.img(v, u));
+    }
+    
+    Mat32f img1, img2;
+    _interFrame.img.convertTo(img1, CV_32F);
+    img.convertTo(img2, CV_32F);
+    
+    PhotometricCostFunction  costFunction1(_camera, _xiBaseCam, dataPack, img1, 1);
+    PhotometricCostFunction  costFunction2(_camera, _xiBaseCam, dataPack, img2, 1);
+    
+    Transf xi = getCameraMotion(_xiLocal);
+    
+    array<double, 6> arg;
+    MatrixXdrm J1(POINT_NUMBER, 6), J2(POINT_NUMBER, 6);
+    double * argPtr = arg.data();
+    double * J1ptr = J1.data();
+    double * J2ptr = J2.data();
+    
+    VectorXd Err(POINT_NUMBER);
+    
+    
+    arg.fill(0);
+    costFunction1.Evaluate(&argPtr, Err.data(), &J1ptr);
+    arg = xi.toArray();
+    costFunction2.Evaluate(&argPtr, Err.data(), &J2ptr);
+    
+    JacobiSVD<MatrixXdrm> svd(J1, ComputeThinU | ComputeThinV);
+    MatrixXdrm J1pinv;
+    pinv(svd, J1pinv);
+    MatrixXdrm projector = J2 - J1*(J1pinv * J2);
+    Vector6d a = (projector).jacobiSvd(ComputeThinU | ComputeThinV).solve(Err);
+    cout << "    #### CORRECTION : " << endl << a.transpose() << endl;
+    
+    Transf dxi(a.data());
+    
+//    _xiLocal = _xiLocal.composeInverse(dxi);
+    
     
     //SCALE FACTOR NORMALIZATION
 //    Transf zeta = _xiLocalOld.inverseCompose(_xiLocal);

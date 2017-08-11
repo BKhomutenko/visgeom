@@ -39,7 +39,8 @@ PhotometricCostFunction::PhotometricCostFunction(const ICamera * camera, const T
             _dataPack(dataPack),
             _xiBaseCam(xiBaseCam),
             _imageGrid(img2.cols, img2.rows, (float*)(img2.data)),
-            _invScale(1. / scale) 
+            _invScale(1. / scale),
+            MARGIN_SIZE(50. / scale)
     {
         mutable_parameter_block_sizes()->clear();
         mutable_parameter_block_sizes()->push_back(6);
@@ -49,7 +50,8 @@ PhotometricCostFunction::PhotometricCostFunction(const ICamera * camera, const T
 void PhotometricCostFunction::lossFunction(const double x, double & rho, double & drhodx) const
 {
     double s = sign(x);
-    const double e = exp(-abs(x) / LOSS_FACTOR);
+    const double arg = -abs(x) / LOSS_FACTOR;
+    const double e = arg > -5 ? exp(-abs(x) / LOSS_FACTOR) : 0;
     rho = s * LOSS_FACTOR * (1. - e);
     drhodx = e;
 
@@ -60,12 +62,40 @@ void PhotometricCostFunction::lossFunction(const double x, double & rho, double 
 A cost function with analytic jacobian
 works faster than autodiff version and works with any ICamera
 */
-    
+
+double PhotometricCostFunction::getUMapgin(const double & u) const
+{
+    double uScale = u * _invScale;
+    if (uScale < MARGIN_SIZE) 
+    {
+        return uScale - MARGIN_SIZE;
+    }
+    else if (uScale > _imageGrid.uMax - MARGIN_SIZE - 1)
+    {
+        return uScale - _imageGrid.uMax + MARGIN_SIZE + 1;
+    } 
+    else return 0;
+}
+
+double PhotometricCostFunction::getVMapgin(const double & v) const
+{
+    double vScale = v * _invScale;
+    if (vScale < MARGIN_SIZE) 
+    {
+        return vScale - MARGIN_SIZE;
+    }
+    else if (vScale > _imageGrid.vMax - MARGIN_SIZE - 1)
+    {
+        return vScale - _imageGrid.vMax + MARGIN_SIZE + 1;
+    } 
+    else return 0;
+}
+
 bool PhotometricCostFunction::Evaluate(double const * const * parameters,
         double * residual, double ** jacobian) const
 {
     const int POINT_NUMBER = _dataPack.cloud.size();
-    const double NORMALIZER = 1.;
+    
     Transf xiBase(parameters[0]);
     Transf xiCam = xiBase.compose(_xiBaseCam);
     // point cloud in frame 2
@@ -76,6 +106,7 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
     ceres::BiCubicInterpolator<Grid2D<float>> imageInterpolator(_imageGrid);
     
     bool computeJac = (jacobian != NULL and jacobian[0] != NULL);
+    const double FADE = 0.01 * MARGIN_SIZE * MARGIN_SIZE;
     if (computeJac)
     {
         // L_uTheta
@@ -83,45 +114,69 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
         for (int i = 0; i < POINT_NUMBER; i++)
         {
             Vector2d pt;
-            if (_camera->projectPoint(transformedPoints[i], pt)) 
+//            bool projRes = 
+            if (not _camera->projectPoint(transformedPoints[i], pt)) 
             {
-                double f;
-                // image interpolation and gradient
-                Covector2d grad;
-                imageInterpolator.Evaluate(pt[1] * _invScale, pt[0] * _invScale,
-                        &f, &grad[1], &grad[0]);
-                grad *= _invScale;  // normalize according to the scale
-                
-                residual[i] = (f - _dataPack.valVec[i]); // / (_dataPack.valVec[i] + 10);
-//                if (abs(residual[i]) > 10)
+                residual[i] = 0;
+                fill(jacobian[0] + i*6, jacobian[0] + i*6 + 6, 0.);
+                continue;
+            }
+            
+            const double uMarg = getUMapgin(pt[0]);
+            const double vMarg = getVMapgin(pt[1]);
+            
+//            double uMarg = 0;
+//            double vMarg = 0;
+                              
+            double f;
+            // image interpolation and gradient
+            Covector2d grad;
+            imageInterpolator.Evaluate(pt[1] * _invScale, pt[0] * _invScale,
+                    &f, &grad[1], &grad[0]);
+            
+            
+            grad *= _invScale;  // normalize according to the scale
+            
+            residual[i] = (f - _dataPack.valVec[i]);
+            double drhoderr;
+            lossFunction(residual[i], residual[i], drhoderr);
+            
+            
+            
+            if (uMarg == 0 and vMarg == 0)
+            {
+                Covector6d dfdxi;
+                jacobianCalculator.dfdxi(transformedPoints[i], grad, dfdxi.data());
+                dfdxi *= drhoderr;
+                copy(dfdxi.data(), dfdxi.data() + 6, jacobian[0] + i*6);
+//                for (int k = 0; k < 6; k++)
 //                {
-//                    residual[i] = 0.;
-//                    fill(jacobian[0] + i*6, jacobian[0] + i*6 + 6, 0.);
+//                    if (abs(jacobian[0][i*6  + k]) > 1e5)
+//                    {
+//                        cout << "Jac is BIG : " << jacobian[0][i*6  + k] << endl;
+//                        cout << "Transformed point " << transformedPoints[i].transpose() << endl;
+//                        cout << "projection " << pt.transpose() << " //// " 
+//                                << _imageGrid.uMax << " " << _imageGrid.vMax << endl;
+//                        cout << "gradient " << grad << endl;
+//                        break;
+//                    }
 //                }
-//                else
-//                {                
-                jacobianCalculator.dfdxi(transformedPoints[i], grad, jacobian[0] + i*6);
-                double k;
-                lossFunction(residual[i], residual[i], k);
-                residual[i] *= NORMALIZER;
-                k *= NORMALIZER;
-                for (int j = 0; j < 6; j++)
-                {
-                    jacobian[0][i*6 + j] *= k;
-                }
-//                }
-                
-//                for (int j = 0; j < 6; j++) *(jacobian[0] + i*6 + j) /= (_dataPack.valVec[i] + 10); 
-                
-                
             }
             else
             {
-                residual[i] = 0.;
-                for (int j = 0; j < 6; j++)
-                {
-                    jacobian[0][i*6 + j] = 0.;
-                }
+                Covector6d dudxi, dvdxi;
+                jacobianCalculator.dpdxi(transformedPoints[i], dudxi.data(), dvdxi.data());
+                Covector6d drhodxi = (drhoderr * grad[0]) * dudxi + (drhoderr * grad[1]) * dvdxi; 
+            
+                //fade-away margins
+                const double phi = FADE / (FADE + uMarg * uMarg + vMarg * vMarg);
+                const double K = -2 * phi * phi / FADE * _invScale;
+                const double dphidu = K * uMarg;
+                const double dphidv = K * vMarg;
+                
+                Map<Covector6d>(jacobian[0] + i*6) = (drhodxi * phi + 
+                                                    residual[i] * (dphidu * dudxi + dphidv * dvdxi))*0;
+                residual[i] *= phi * 0;
             }
         }
     }
@@ -130,20 +185,26 @@ bool PhotometricCostFunction::Evaluate(double const * const * parameters,
         for (int i = 0; i < POINT_NUMBER; i++)
         {
             Vector2d pt;
-            if (_camera->projectPoint(transformedPoints[i], pt)) 
-            {
-                double f;
-                imageInterpolator.Evaluate(pt[1] * _invScale, pt[0] * _invScale, &f);
-                residual[i] = (f - _dataPack.valVec[i]);// / (_dataPack.valVec[i] + 10);
-                double k;
-                lossFunction(residual[i], residual[i], k);
-                residual[i] *= NORMALIZER;
-//                if (abs(residual[i]) > 10) residual[i] = 0.;
-            }
-            else
+            if (not _camera->projectPoint(transformedPoints[i], pt)) 
             {
                 residual[i] = 0.;
+                continue;
             }
+            
+            double f;
+            imageInterpolator.Evaluate(pt[1] * _invScale, pt[0] * _invScale, &f);
+            residual[i] = (f - _dataPack.valVec[i]);
+            double k;
+            lossFunction(residual[i], residual[i], k);
+            const double uMarg = getUMapgin(pt[0]);
+            const double vMarg = getVMapgin(pt[1]);
+            if (uMarg != 0 or vMarg != 0)
+            {
+                
+                const double phi = FADE / (FADE + uMarg * uMarg + vMarg * vMarg);
+                residual[i] *= phi * 0;
+            }
+            
         }
     }
     return true;

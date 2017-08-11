@@ -98,12 +98,29 @@ template <typename T>
 void drawPoints(Mat& img, T pointVec)
 {
     if (pointVec.size() == 0) return;
-    int color = 100;
-    const int colorStep = 155 / pointVec.size();
-    for (auto & pt : pointVec)
+    if (img.channels() == 1)
     {
-        cross(img, pt[0], pt[1], 10, color, 3);
-        color += colorStep;
+        int color = 0;
+        const int colorStep = 155 / pointVec.size();
+        
+        for (auto & pt : pointVec)
+        {
+            cross(img, pt[0], pt[1], 10, color, 3);
+            cross(img, pt[0], pt[1], 9, color + 100, 1);
+            color += colorStep;
+        }
+    }
+    else if (img.channels() == 3)
+    {
+        int color = 255;
+        const int colorStep = 255 / pointVec.size();
+        
+        for (auto & pt : pointVec)
+        {
+            int color2 = sqrt(255 * 255 - color * color);
+            cross(img, pt[0], pt[1], 10, Scalar(color, 0, color2) , 3);
+            color -= colorStep;
+        }
     }
 }
 

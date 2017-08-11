@@ -314,6 +314,19 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 raster.setStep(step); 
                 raster.steps(-HALF_LENGTH);           
                 
+                if (_params.verbosity > 6)
+                {
+                    cout << "CURVE RASTERIZER" << endl;
+                    cout << "delta : " << raster.delta << endl;
+                    cout << "fu fv : " << raster.fu << " " << raster.fv << endl;
+                    cout << " u  v : " << raster.u << " " << raster.v << endl;
+                    
+                    const auto & surf = raster.surf;
+                    cout << " SURF : " << endl;
+                    cout << surf.kuu << " " << surf.kuv << " " << surf.kvv << " " << surf.ku
+                         << " " << surf.kv << " " << surf.k1 << endl;
+                }
+                
                 for (int i = 0; i  < nSteps + MARGIN; i++, raster.step())
                 {
                     if (raster.v < 0 or raster.v >= img2.rows 
@@ -322,7 +335,11 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                             crossedImageBoundary = true;
                             break;
                         }
-                    else sampleVec[i] = img2(raster.v, raster.u);
+                    if (_params.verbosity > 5)
+                    {
+                        cout << raster.u << "  " << raster.v << endl;
+                    }
+                    sampleVec[i] = img2(raster.v, raster.u);
                 }
             }
             if (crossedImageBoundary)
@@ -331,7 +348,8 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                 continue;
             }
             vector<int> costVec = compareDescriptor(descriptor, sampleVec, _params.flawCost);
-            /*if (y == 15)
+            
+            if (_params.verbosity > 4)
             {
                 cout << "Point : " << x << " " << y << endl;
                 cout << "Step : " << step << endl;
@@ -353,8 +371,7 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
                     cout << setw(6) << int(x);
                 }
                 cout << endl;
-            }*/
-            
+            }
 //            //compute the bias;
 //            int sum1 = filter(kernelVec.begin(), kernelVec.end(), descriptor.begin(), 0);
             

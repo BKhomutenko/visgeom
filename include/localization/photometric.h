@@ -76,7 +76,7 @@ public:
             const Transf T12, bool baseValues);
 
     //FIXME temporary function
-    void wrapImage(const Mat32f & src, Mat32f & dst, const Transf T12) const;
+    void wrapImage(const Mat8u & src, Mat8u & dst, const Transf T12) const;
 private:
     // scaleSpace2 must be initialized
     void computePose(int scaleIdx, Transf & T12);

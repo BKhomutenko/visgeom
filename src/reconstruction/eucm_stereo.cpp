@@ -33,6 +33,7 @@ StereoParameters::StereoParameters(const ptree & params) :
         else if (pname == "scales")    scaleVec = readVector<int>(item.second);
         else if (pname == "descriptor_response_thresh") descRespThresh = item.second.get_value<int>();
         else if (pname == "num_epipolar_planes") numEpipolarPlanes = item.second.get_value<int>();
+        else if (pname == "epipole_margin") epipoleMargin = pow(item.second.get_value<int>(), 2);
     }
 }
 

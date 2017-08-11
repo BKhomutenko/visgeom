@@ -25,9 +25,7 @@ Scale space for multiscale optimization
 #include "ocv.h"
 #include "io.h"
 
-#include "reconstruction/scale_parameters.h"
-
-class BinaryScalSpace : private ScaleParameters
+class BinaryScalSpace
 {
 public:
     BinaryScalSpace(int numScales = 1, bool withGradient = false) : 
@@ -40,8 +38,8 @@ public:
         if (gradientOn) resizeGradient();
     }
     
-    using ScaleParameters::uConv;
-    using ScaleParameters::vConv;
+    int uConv(int x) const { return x * scale; }
+    int vConv(int y) const { return y * scale; }
     
     void setGradient(bool val)
     {
@@ -102,11 +100,36 @@ private:
     
     void propagate()
     {
+        if (gradientOn)
+        {
+            Sobel(imgVec[0], gradUVec[0], CV_32F, 1, 0, 3, 1./8);
+            Sobel(imgVec[0], gradVVec[0], CV_32F, 0, 1, 3, 1./8);
+        }
         for (int i = 1; i < imgVec.size(); i++)
         {
-            Mat32f blured;
+            /*Mat32f blured;
             GaussianBlur(imgVec[i - 1], blured, Size(3, 3), 0, 0);
-            resize(blured, imgVec[i], Size(blured.cols/2, blured.rows/2));
+            imgVec[i].create(Size(blured.cols/2, blured.rows/2));
+            for (int v = 0; v < imgVec[i].rows; v++)
+            {
+                for (int u = 0; u < imgVec[i].cols; u++)
+                {
+                    imgVec[i](v, u) = blured(2*v, 2*u);
+                }
+            }*/
+            
+            imgVec[i].create(Size(imgVec[i - 1].cols/2, imgVec[i - 1].rows/2));
+            imgVec[i].setTo(0);
+            for (int v = 0; v < imgVec[i - 1].rows; v++)
+            {
+                int vs = min((int)round(v / 2.), imgVec[i].rows - 1);
+                for (int u = 0; u < imgVec[i - 1].cols; u++)
+                {
+                    int us = min((int)round(u / 2), imgVec[i].cols - 1);
+                    imgVec[i](vs, us) += imgVec[i - 1](v, u);
+                }
+            }
+            imgVec[i] *= 0.25;
             if (gradientOn)
             {
                 Sobel(imgVec[i], gradUVec[i], CV_32F, 1, 0, 3, 1./8);
@@ -118,6 +141,7 @@ private:
     std::vector<Mat32f> imgVec;
     std::vector<Mat32f> gradUVec;
     std::vector<Mat32f> gradVVec;
+    int scale;
     int activeScaleIdx;
     bool gradientOn;
 };

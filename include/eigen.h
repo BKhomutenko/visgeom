@@ -30,31 +30,35 @@ Type definitions
 #include <Eigen/Eigenvalues>
 #include <Eigen/Cholesky>
 // Eigen data structures
-template<typename T>
-using Vector2 = Eigen::Matrix<T, 2, 1>;
+using Eigen::Matrix;
 
 template<typename T>
-using Vector3 = Eigen::Matrix<T, 3, 1>;
+using Vector2 = Matrix<T, 2, 1>;
 
 template<typename T>
-using Matrix3 = Eigen::Matrix<T, 3, 3>;
+using Vector3 = Matrix<T, 3, 1>;
+
+template<typename T>
+using Matrix3 = Matrix<T, 3, 3>;
 
 template<int R, int C>
-using Matrixd = Eigen::Matrix<double, R, C>;
+using Matrixd = Matrix<double, R, C>;
 
-
-using Covector2d = Eigen::Matrix<double, 1, 2>;
-using Covector3d = Eigen::Matrix<double, 1, 3>;
-using Covector6d = Eigen::Matrix<double, 1, 6>;
-using Matrix23drm = Eigen::Matrix<double, 2, 3, Eigen::RowMajor>;
-using Matrix6d = Eigen::Matrix<double, 6, 6>;
-using Matrix6drm = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>;
-using Matrix5d = Eigen::Matrix<double, 5, 5>;
-using Eigen::Matrix;
+using Eigen::Dynamic;
+using Eigen::RowMajor;
+using Covector2d = Matrix<double, 1, 2>;
+using Covector3d = Matrix<double, 1, 3>;
+using Covector6d = Matrix<double, 1, 6>;
+using Matrix23drm = Matrix<double, 2, 3, RowMajor>;
+using Matrix6d = Matrix<double, 6, 6>;
+using Matrix6drm = Matrix<double, 6, 6, RowMajor>;
+using Matrix5d = Matrix<double, 5, 5>;
+using MatrixXdrm = Matrix<double, Dynamic, Dynamic, RowMajor>;
 using Eigen::Vector2d;
 using Eigen::Vector3d;
-using Vector6d = Eigen::Matrix<double, 6, 1>;
-using Vector5d = Eigen::Matrix<double, 5, 1>;
+using Eigen::VectorXd;
+using Vector6d = Matrix<double, 6, 1>;
+using Vector5d = Matrix<double, 5, 1>;
 using Eigen::Matrix2d;
 using Eigen::Matrix3d;
 using Eigen::MatrixXd;
@@ -63,6 +67,10 @@ using Eigen::Vector3i;
 using Eigen::Map;
 
 using Eigen::JacobiSVD;
+using Eigen::ComputeThinU;
+using Eigen::ComputeThinV;
+using Eigen::ComputeFullU;
+using Eigen::ComputeFullV;
 
 template<typename T>
 using Vector3Vec = std::vector<Vector3<T>>;
@@ -80,5 +88,18 @@ inline Vector2i round(const Vector2d & x)
     return Vector2i(round(x[0]), round(x[1]));
 }
 
-
+template<typename JacobiSvdType, typename MatrixType>
+void pinv(JacobiSvdType & svd, MatrixType & pinvmat)
+{
+    const double PINV_TOLERANCE = 1.e-6; // choose your tolerance wisely!
+    auto singularValues = svd.singularValues();
+    for (int i = 0; i < singularValues.rows(); i++) {
+        if ( singularValues(i) > PINV_TOLERANCE)
+        {
+            singularValues(i) = 1.0 / singularValues(i);
+        }
+        else singularValues(i) = 0;
+    }
+    pinvmat= (svd.matrixV()*singularValues.asDiagonal()*svd.matrixU().transpose());
+}
 

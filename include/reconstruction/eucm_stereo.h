@@ -66,6 +66,8 @@ struct StereoParameters : public ScaleParameters
     int descLength = 5;
     vector<int> scaleVec = {1, 2, 3, 5};
     int descRespThresh = 3;
+    
+    int numEpipolarPlanes = 2000;
 };
 
 /*
@@ -107,9 +109,8 @@ public:
     
  
 protected:
-    
-    EnhancedCamera *_camera1, *_camera2;
     StereoParameters _params;
+    EnhancedCamera *_camera1, *_camera2;
     EnhancedEpipolar _epipolarCurves;
     EpipolarDescriptor _epipolarDescriptor;
     

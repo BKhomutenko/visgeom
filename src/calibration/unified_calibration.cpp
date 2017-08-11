@@ -167,6 +167,7 @@ void GenericCameraCalibration::initTransformChainInfo(ImageData & data, const pt
         else if (flagName == "user_guided") data.userGuided = true;
         else if (flagName == "do_not_solve") data.doNotSolve = true;
         else if (flagName == "do_not_solve_global") data.doNotSolveGlobal = true;
+        else if (flagName == "save_outlire_images") data.saveOutlierImages = true;
         else if (flagName == "draw_improved") 
         {
             data.drawImproved = true;
@@ -744,7 +745,7 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
 
 void GenericCameraCalibration::extractGridProjections(ImageData & data)
 {
-    CornerDetector detector(data.Nx, data.Ny, 5, data.improveDetection);
+    CornerDetector detector(data.Nx, data.Ny, 3, data.improveDetection);
     for (auto & fileName : data.imageNameVec)
     {
         cout << "." << flush;
@@ -814,15 +815,15 @@ Transf GenericCameraCalibration::estimateInitialGrid(const ImageData & data, con
     Vector3d ex2(X4 - X3);
     Vector3d ey1(X3 - X1);
     Vector3d ey2(X4 - X2);
-    double exModel = data.sqSize * data.Nx;
-    double eyModel = data.sqSize * data.Ny;
+    double exModel = data.sqSize * (data.Nx - 1);
+    double eyModel = data.sqSize * (data.Ny - 1); 
     
     double scaleX1 = exModel / ex1.norm();
     double scaleX2 = exModel / ex2.norm();
     double scaleY1 = eyModel / ey1.norm();
     double scaleY2 = eyModel / ey2.norm();
     
-    Vector3d pos = X1 * (scaleX1 + scaleY1) * 0.5;
+    Vector3d pos = X1 * min(scaleX1, scaleY1);
     copy(pos.data(), pos.data() + 3, xiArr.data());
     
     //initial orientation
@@ -835,8 +836,8 @@ Transf GenericCameraCalibration::estimateInitialGrid(const ImageData & data, con
     Matrix3d R;
     R << ex1, ey, ez;
     */
-    Vector3d posx = X2 * (scaleX1 + scaleY2) * 0.5;
-    Vector3d posy = X3 * (scaleX2 + scaleY1) * 0.5;
+    Vector3d posx = X2 * min(scaleX1, scaleY2);
+    Vector3d posy = X3 * min(scaleX2, scaleY1);
     Vector3d ex = posx - pos;
     Vector3d ey = posy - pos;
     ex.normalize();
@@ -934,7 +935,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
         {
             Vector2d err = data.detectedCornersVec[transfIdx][i] - projectedVec[i];
             double errNorm = err.norm();
-            if (errNorm < 3 * sigma and sigma < 1) // px is for the case when all the points are off
+            if (errNorm < 3 * sigma and sigma < 0.5) // px is for the case when all the points are off
             {                                        // we are looking for the sub-pixel precision
                 inlierVec.push_back(projectedVec[i]);
             }
@@ -945,33 +946,44 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
             }
         }
         
-        if (data.showOutliers and not outlierVec.empty())
+        if ((data.showOutliers or data.saveOutlierImages) and not outlierVec.empty())
         {
+            cout << "Sample #" << transfIdx << endl;
             cout << transfVec[transfIdx] << endl;
             cout << data.imageNameVec[transfIdx] << endl;
             cout << "standard deviation : " << sigma << endl;
             cout << "3 sigma : " << 3 * sigma << endl;
             Mat img = imread(data.imageNameVec[transfIdx], CV_LOAD_IMAGE_COLOR);
             
+            drawPoints(img, data.detectedCornersVec[transfIdx]);
+            
             //projected
             for (int i = 0; i < inlierVec.size(); i++)
             {
-                circle(img, Point(inlierVec[i][0], inlierVec[i][1]), 8, Scalar(0, 255, 0), 3);
+                circle(img, Point(inlierVec[i][0], inlierVec[i][1]), 9, Scalar(0, 255, 0), 5);
             }
             for (int i = 0; i < outlierVec.size(); i++)
             {
-                circle(img, Point(outlierVec[i][0], outlierVec[i][1]), 8, Scalar(0, 127, 255), 3);
+                circle(img, Point(outlierVec[i][0], outlierVec[i][1]), 9, Scalar(0, 127, 255), 5);
 //                cout << outlierVec[i] << "   err : " << errVec[i] << endl;
             }
             
             //detected
-            for (auto & pt : data.detectedCornersVec[transfIdx])
-            {
-                cross(img, pt[0], pt[1], 5, Scalar(255, 127, 0));
-            }
             
-            imshow("outliers", img);
-            waitKey();
+//            for (auto & pt : data.detectedCornersVec[transfIdx])
+//            {
+//                cross(img, pt[0], pt[1], 5, Scalar(255, 127, 0));
+//            }
+            
+            if (data.saveOutlierImages) 
+            {
+                imwrite( "outliers_" + to_string(transfIdx) + ".png", img(Rect(800, 370, 400, 360)) );
+            }
+            else
+            {
+                imshow("outliers", img);
+                waitKey();
+            }
         }
     }
     

@@ -33,8 +33,8 @@ void filter(double & v1, double & s1, const double v2, const double s2)
 {
     double K = 1. / (s1 + s2);
     v1 = (v1 * s2 + v2 * s1) * K;
-    s1 = max(s1 * s2 * K, 0.1);
-    
+    s1 = max(s1 * s2 * K, 0.05 * v1);
+//    s1 = max(0.05 * v1, min(s1, s2));
    /* double sHat1 = s1 / (v1 * (v1 - s1));
     double sHat2 = s2 / (v2 * (v2 - s2));
     double vHat1 = 1./ v1;
@@ -566,7 +566,6 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
     for (int i = 0; i < queryIdxVec.size(); i++)
     {
         if (queryIdxVec[i] < 0 or queryIdxVec[i] > hStep) continue;
-
         for (int h = 0; h < numHyps; h++)
         {
             const int queryIdx = queryIdxVec[i];
@@ -603,7 +602,6 @@ void DepthMap::reconstruct(MHPack & result, const uint32_t reconstFlags) const
     vector<bool> maskVec;
     Vector3dVec cloud;
     cameraPtr->reconstructPointCloud( result.imagePointVec, cloud, maskVec );
-    
     result.cloud.reserve((reconstFlags & MINMAX) ? 2 * cloud.size() : cloud.size());
     for (int i = 0; i < cloud.size(); i++)
     {
@@ -750,8 +748,9 @@ DepthMap DepthMap::wrapDepth(const Transformation<double> T12) const
             double & depthOld = dMap2.at(idx2);
             if (depthOld == OUT_OF_RANGE or depthNew < depthOld)
             {
-                dMap2.at(idx2) = cloud12[i].norm();
-                dMap2.sigma(idx2) = sigma(idx1);
+                const double dist = cloud12[i].norm();
+                dMap2.at(idx2) = dist;
+                dMap2.sigma(idx2) = sigma(idx1) + 0.01*dist;
                 dMap2.cost(idx2) = cost(idx1);
             }
         }
@@ -935,14 +934,14 @@ void DepthMap::merge(const DepthMap & depth2)
             else
             {
                 const double delta = abs(d - d2);
-                if (delta > 2.5*s and delta > 2.5*s2 and d2 < d)
-                {
-                    d = d2;
-                    sigma(x, y) = s2;
-                }
-                else
+                if (delta < 2*(s + s2))
                 {
                     filter(d, s, d2, s2);
+                }
+                else if (d2 < d)
+                {
+                    d = d2;
+                    s = s2;
                 }
             }
             

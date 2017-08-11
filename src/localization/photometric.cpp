@@ -95,7 +95,7 @@ Transf ScalePhotometric::computePose(const Transf & T12)
     //TODO set the optimization depth with the parameters   v
     Transf xi = T12;
     _xiPrior = T12;
-    for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 1; scaleIdx--)
+    for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 0; scaleIdx--)
     {
         computePose(scaleIdx, xi);
     }
@@ -291,7 +291,7 @@ void ScalePhotometric::computePoseMI(int scaleIdx, Transf & T12)
 //    saveSurface("surf01.txt", costFunction, 2, 3, 0.0005, 50, pose.data());
 }
 
-void ScalePhotometric::wrapImage(const Mat32f & src, Mat32f & dst, const Transf T12) const
+void ScalePhotometric::wrapImage(const Mat8u & src, Mat8u & dst, const Transf T12) const
 {   
     MHPack pack;
     dst.create(src.size());
@@ -312,9 +312,9 @@ void ScalePhotometric::wrapImage(const Mat32f & src, Mat32f & dst, const Transf 
     for (int i = 0; i < pack.cloud.size(); i++)
     {
         int u = round(ptVec[i][0]);
-        int v = (ptVec[i][1]);
-        if (u < 0 or u > src.cols) continue;
-        if (v < 0 or v > src.rows) continue;
+        int v = round(ptVec[i][1]);
+        if (u < 0 or u >= src.cols) continue;
+        if (v < 0 or v >= src.rows) continue;
         int v1 = pack.idxMapVec[i] / src.cols;
         int u1 = pack.idxMapVec[i] % src.cols; // FIXME must be the other way around
         dst(v1, u1) = src(v, u);

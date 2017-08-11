@@ -245,22 +245,24 @@ void CornerDetector::computeResponse()
     const int FILTER_SIZE_1 = 3;
     GaussianBlur(_img, _src1, Size(FILTER_SIZE_1, FILTER_SIZE_1), SIGMA_1, SIGMA_1);
     
-    const double SIGMA_2 = 1; //TODO make a parameter
-    const int FILTER_SIZE_2 = 1 + 2 * round(SIGMA_2);
+    const double SIGMA_2 = 1.3; //TODO make a parameter
+    const int FILTER_SIZE_2 = 1 + 2 * ceil(SIGMA_2);
     GaussianBlur(_img, _src2, Size(FILTER_SIZE_2, FILTER_SIZE_2), SIGMA_2, SIGMA_2);
     _imgrad.setTo(0);
     _resp.setTo(0);
     double acc = 0;
     int count = 0;
-    const int SIZE = 1;
+    const int SIZE = 2;
     const int HSIZE = 1;
     for (int v = SIZE; v < _img.rows - SIZE; v++)
     {
         for (int u = SIZE; u < _img.cols - SIZE; u++)
         {
             //compute sharp gradient
-//            double gxSharp = ( _src1(v, u + 1) - _src1(v, u - 1)  - 0.3*(_src2(v, u + 1) - _src2(v, u - 1)) ) / 2.;
-//            double gySharp = ( _src1(v + 1, u) - _src1(v - 1, u) - 0.3*(_src2(v + 1, u) - _src2(v - 1, u)) ) / 2.;
+//            double gxSharp = ( _src1(v, u + 1) - _src1(v, u - 1)  
+//- 0.3*(_src2(v, u + 1) - _src2(v, u - 1)) ) / 2.;
+//            double gySharp = ( _src1(v + 1, u) - _src1(v - 1, u) 
+//- 0.3*(_src2(v + 1, u) - _src2(v - 1, u)) ) / 2.;
             double gxSharp = ( _src1(v, u + 1) - _src1(v, u - 1) ) / 2.;
             double gySharp = ( _src1(v + 1, u) - _src1(v - 1, u) ) / 2.;
             _gradx(v, u) = gxSharp * 0.01;
@@ -296,83 +298,113 @@ void CornerDetector::computeResponse()
     {
         imshow ("img", _img );
         imshow ("imgrad", _imgrad / 500);
-        imshow ("resp", _resp / 1000);
+        imshow ("resp", _resp / 100);
         waitKey();
     }
 }
 
 bool CornerDetector::checkCorner(const Vector2i & pt)
 {   
+    if (DEBUG) cout << "check corner" << endl;
 //    return true;
-    Polynomial2 circle = Polynomial2::Circle(pt[0], pt[1], INIT_RADIUS);
-    
-    Vector2i pt0(pt[0] + INIT_RADIUS, pt[1]);
-    CurveRasterizer<int, Polynomial2> raster(pt[0] + INIT_RADIUS, pt[1],
-                                             pt[0], pt[1] + INIT_RADIUS, circle);
-    
-    vector<double> sampleVec;
-    Vector2iVec circleVec;
-    for (int i = 0;
-         not (i > 5 and abs(raster.u - pt0[0]) <= 1 and abs(raster.v - pt0[1]) <= 1);
-         i++, raster.step())
+    int faults = 0;
+    const int MAX_FAULTS = 1;
+    for (int radiusIncr = 0; radiusIncr <= INIT_RADIUS and faults <= MAX_FAULTS; radiusIncr++)
     {
-        sampleVec.push_back(_img(raster.v, raster.u));
-        circleVec.emplace_back(raster.u, raster.v);
-    }
-    
-    vector<double> transitionVec;
-    
-    transitionVec.push_back(sampleVec[1] - sampleVec.back());
-    
-    for (int i = 1; i < sampleVec.size() - 1; i++)
-    {
-        transitionVec.push_back(sampleVec[i + 1] - sampleVec[i - 1]);
-    }
-    int idxLast = sampleVec.size() - 2;
-    transitionVec.push_back(sampleVec.front() - sampleVec[idxLast]);
-                            
-    // find the strongest
-    int distThresh = sampleVec.size() / 2 - 3;
-    
-    const auto itMax = max_element(transitionVec.begin(), transitionVec.end());
-    double transMax = *itMax;
-//        cout << endl << setw(10) << *itMax;
-    // remove the maximum and its neighbors
-    setZero(transitionVec.begin(), transitionVec.end(), itMax);
-    // check the other three : must be at least 0.75
-    
-    const auto itMax2 = max_element(transitionVec.begin(), transitionVec.end());
-//        cout << setw(10) << *itMax2;
-    
-    if (*itMax2 < transMax * 0.5) return false;
-    setZero(transitionVec.begin(), transitionVec.end(), itMax2);
-    
-    if (abs(distance(itMax, itMax2)) < distThresh) return false;
+        if (DEBUG) cout << "scale : " << radiusIncr << endl;
+        const int LOCAL_INIT_RADIUS = INIT_RADIUS + radiusIncr;
+        Polynomial2 circle = Polynomial2::Circle(pt[0], pt[1], LOCAL_INIT_RADIUS);
         
-    auto itMax3 = max_element(transitionVec.begin(), transitionVec.end());
-    
-    if (*itMax3 > transMax * 0.5) return false;
-    setZero(transitionVec.begin(), transitionVec.end(), itMax3);
-    
-    const auto itMin = min_element(transitionVec.begin(), transitionVec.end());
-//        cout << setw(10) << *itMin;
-    
-    if (*itMin > transMax * -0.5) return false;
-    setZero(transitionVec.begin(), transitionVec.end(), itMin);
-    
-    const auto itMin2 = min_element(transitionVec.begin(), transitionVec.end());
-//        cout << setw(10) << *itMin2;
-    
-    if (*itMin2 > transMax * -0.5) return false;
-    setZero(transitionVec.begin(), transitionVec.end(), itMin2);
-    
-    if ( abs(distance(itMin, itMin2)) < distThresh) return false;
-    
-    auto itMin3 = min_element(transitionVec.begin(), transitionVec.end());
-    
-    if (*itMin3 < transMax * -0.5) return false;
-    setZero(transitionVec.begin(), transitionVec.end(), itMin3);
-    
+        Vector2i pt0(pt[0] + LOCAL_INIT_RADIUS, pt[1]);
+        CurveRasterizer<int, Polynomial2> raster(pt[0] + LOCAL_INIT_RADIUS, pt[1],
+                                                 pt[0], pt[1] + LOCAL_INIT_RADIUS, circle);
+        
+        vector<double> sampleVec;
+        Vector2iVec circleVec;
+        int i = 0;
+        while (true)
+        {
+            sampleVec.push_back(_img(raster.v, raster.u));
+//            _img(raster.v, raster.u) = 128;
+            circleVec.emplace_back(raster.u, raster.v);
+            if (i > 5 and abs(raster.u - pt0[0]) <= 1 and abs(raster.v - pt0[1]) <= 1) break;
+            i++; 
+            raster.step();
+        }  
+        
+//        imshow ("img", _img );
+        
+        vector<double> transitionVec;
+        
+        transitionVec.push_back(sampleVec[1] - sampleVec.back());
+        
+        for (int i = 1; i < sampleVec.size() - 1; i++)
+        {
+            transitionVec.push_back(sampleVec[i + 1] - sampleVec[i - 1]);
+        }
+        int idxLast = sampleVec.size() - 2;
+        transitionVec.push_back(sampleVec.front() - sampleVec[idxLast]);
+       
+        if (DEBUG)
+        { 
+            for (auto & x : transitionVec)
+            {
+                cout << setw(6) << x;
+            }
+            cout << endl;
+            for (auto & x : sampleVec)
+            {
+                cout << setw(6) << x;
+            }
+            cout << endl;
+        }
+        // find the strongest
+        int distThresh = sampleVec.size() / 2 - 2;
+        int distThresh2 = sampleVec.size() - distThresh;
+        const auto itMax = max_element(transitionVec.begin(), transitionVec.end());
+        double transMax = *itMax;
+//        cout << "max1 : " << *itMax << endl;
+        // remove the maximum and its neighbors
+        setZero(transitionVec.begin(), transitionVec.end(), itMax);
+        // check the other three : must be at least 0.75
+        
+        const auto itMax2 = max_element(transitionVec.begin(), transitionVec.end());
+//        cout << "max2 : " << *itMax2 << endl;
+        
+        if (*itMax2 < transMax * 0.3)  { faults++; continue; } //return false;
+        setZero(transitionVec.begin(), transitionVec.end(), itMax2);
+        
+//        cout << "dist : " <<  abs(distance(itMax, itMax2)) << " " << distThresh << endl;
+        if (abs(distance(itMax, itMax2)) < distThresh or 
+            abs(distance(itMax, itMax2)) > distThresh2) { faults++; continue; } //return false;
+            
+        auto itMax3 = max_element(transitionVec.begin(), transitionVec.end());
+        
+        if (*itMax3 > transMax * 0.3) { faults++; continue; } //return false;
+        setZero(transitionVec.begin(), transitionVec.end(), itMax3);
+        
+        const auto itMin = min_element(transitionVec.begin(), transitionVec.end());
+//        cout << "min1 : " << *itMin << endl;
+        
+        if (*itMin > transMax * -0.3) { faults++; continue; } //return false;
+        setZero(transitionVec.begin(), transitionVec.end(), itMin);
+        
+        const auto itMin2 = min_element(transitionVec.begin(), transitionVec.end());
+//        cout << "min2 : " << *itMin2 << endl;
+        
+        if (*itMin2 > transMax * -0.3) { faults++; continue; } //return false;
+        setZero(transitionVec.begin(), transitionVec.end(), itMin2);
+        
+//        cout << abs(distance(itMin, itMin2)) << " " << distThresh << endl;
+        if (abs(distance(itMin, itMin2)) < distThresh or
+            abs(distance(itMin, itMin2)) > distThresh2) { faults++; continue; } //return false;
+        
+        auto itMin3 = min_element(transitionVec.begin(), transitionVec.end());
+        
+        if (*itMin3 < transMax * -0.3) { faults++; continue; } //return false;
+        setZero(transitionVec.begin(), transitionVec.end(), itMin3);
+    }
+    if (faults > MAX_FAULTS) return false;
 //    if ( abs( abs(distance(itMin, itMin2)) - abs(distance(itMax, itMax2)) ) > 2 )
 //    {
 //        if (DEBUG)
@@ -397,9 +429,9 @@ bool CornerDetector::checkCorner(const Vector2i & pt)
 //and more generally try to detect the board on different scales with different filter size etc
 bool CornerDetector::scaleInvarient(const Vector2i & pt)
 {
-    const double MIN_GRAD_THRESH = 15e-4;
-    const double CRITERION_THRESH = 0.25;
-    const int WINDOW_SIZE = INIT_RADIUS;
+    const double MIN_GRAD_THRESH = 1e-3;
+    const double CRITERION_THRESH = 0.3;
+    const int WINDOW_SIZE = 2*INIT_RADIUS;
     double acc = 0;
     int count = 0;
     double normAcc = 1e-10;
@@ -426,8 +458,8 @@ bool CornerDetector::scaleInvarient(const Vector2i & pt)
     }
     if (DEBUG)
     {
-        cout << pt.transpose() << endl;
-        cout << "invariance criterion : "  << acc / normAcc << endl;
+//        cout << pt.transpose() << endl;
+//        cout << "invariance criterion : "  << acc / normAcc << endl;
         if (acc / normAcc < CRITERION_THRESH)
         {
             _detected(pt[1], pt[0]) = 128;
@@ -436,6 +468,8 @@ bool CornerDetector::scaleInvarient(const Vector2i & pt)
         {
             _detected(pt[1], pt[0]) = 25;
         }
+//        imshow("detected", _detected);
+//        waitKey();
     }
     return (acc / normAcc < CRITERION_THRESH);
 }
@@ -496,7 +530,7 @@ void CornerDetector::selectCandidates()
         threshHeap.pop_back();
     }
     
-    const double VAL_THRESH = 0.01 * acc / REF_ITEM_COUNT;
+    const double VAL_THRESH = 0.02 * acc / REF_ITEM_COUNT;
     
     
     /// Check coner-ness   
@@ -513,8 +547,17 @@ void CornerDetector::selectCandidates()
         maximaHeap.pop_back();
         // compute transitions
         
-//        if (not checkCorner(pt)) continue;
-        if (not scaleInvarient(pt)) continue;
+        if (not checkCorner(pt))
+        {
+            if (DEBUG) 
+            {
+                _detected(pt[1], pt[0]) = 64;
+                imshow ("detected", _detected);
+                waitKey();
+            }
+            continue;
+        }
+//        if (not scaleInvarient(pt)) continue;
         if (DEBUG) _detected(pt[1], pt[0]) = 255;
         
         _hypHeap.emplace_back(-pt[0] - pt[1], pt);
@@ -561,7 +604,7 @@ void CornerDetector::constructGraph()
     
     const int CANDIDATE_COUNT = _arcVec.size();
     const int SEARCH_REACH = 140;
-    const double SQUARED_GRAD_MAX = 15;
+    const double SQUARED_GRAD_MAX = 25;
     const int RADIUS_THRESH = INIT_RADIUS * INIT_RADIUS; // how far the search can go with no constraints
     while (not fringe.empty() and fringe.front().t < SEARCH_REACH)
     {
@@ -631,7 +674,7 @@ double compareVectors(Vector2i v1, Vector2i v2)
     double len2 = pow((norm1 - norm2) / norm1, 2);
     double c = v1.dot(v2) / norm1 / norm2;
     double th2 = 2. * (1. - c);
-    return th2 + len2/10; //FIXME parameters to tune
+    return th2/3 + len2/10; //FIXME parameters to tune
 }
 
 vector<int> CornerDetector::extractSequence(int idx0, int idx1)
@@ -643,7 +686,7 @@ vector<int> CornerDetector::extractSequence(int idx0, int idx1)
     Vector2i d1 = _ptVec[idx1] - _ptVec[idx0];
     
     int idx2 = -1;
-    double bestNormDiff = 0.1; //TODO a parameter to be set
+    double bestNormDiff = 0.3; //TODO a parameter to be set
     for (auto & n2 : _arcVec[idx1])
     {
         Vector2i d2 = _ptVec[n2] - _ptVec[idx1];

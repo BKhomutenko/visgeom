@@ -63,13 +63,20 @@ struct PhotometricCostFunction : ceres::CostFunction
     virtual bool Evaluate(double const * const * parameters, double * residual, double ** jacobian) const;
 
     void lossFunction(const double x, double & rho, double & drhodx) const;
+    
+    double getUMapgin(const double & u) const;
+    double getVMapgin(const double & v) const;
+    
     ICamera * _camera;
     const Transf _xiBaseCam;
     const PhotometricPack & _dataPack;
     const Grid2D<float> _imageGrid;
+    
+    
 //    const double _scale;
     const double _invScale;
-    const double LOSS_FACTOR = 3;     // defines how quickly the impact of data points is reduced with error
+    const double LOSS_FACTOR = 5;     // defines how quickly the impact of data points is reduced with error
+    const double MARGIN_SIZE;
 };
 
 

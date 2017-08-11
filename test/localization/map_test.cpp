@@ -14,6 +14,23 @@
 
 #include "render/render.h"
 
+void computeErr(const Mat8u & img1, const Mat8u & img2, Mat8u & dst)
+{
+    dst.create(img1.size());
+    for (int v = 0; v < img1.rows; v++)
+    {
+        for (int u = 0; u < img1.cols; u++)
+        {
+            if (img1(v, u) == 0 or img2(v, u) == 0)
+            {
+                dst(v, u) = 0;
+                continue;
+            }
+            dst(v, u) = 127 + img1(v, u) - img2(v, u);
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     ptree root;
@@ -48,10 +65,27 @@ int main(int argc, char** argv)
 //                    cv::flip(img0, img1, 0);
                     
                     device.render(img1);
-//                    Vector6d noise = Vector6d::Random() / 100;
-//                    Transf eps(noise.data());
-//                    odom.feedOdometry(xi.compose(eps));
-                    odom.feedOdometry(xi);
+                    if (i > 2)
+                    {
+                        Vector6d noise = Vector6d::Random() / 100;
+                        Transf eps(noise.data());
+                        odom.feedOdometry(xi.compose(eps));
+                    }
+                    else
+                    {
+                        odom.feedOdometry(xi);
+                    }
+                    
+//                    if (not odom._depth.empty())
+//                    { 
+//                        Mat8u dst;
+//                        odom._localizer.setDepth(odom._depth);
+//                        odom._localizer.wrapImage(img1, dst, odom._xiLocal);
+//                        Mat8u err;
+//                        computeErr(odom._interFrame.img, dst, err);
+//                        imshow("err_0", err);
+//                    }
+                    
                     odom.feedImage(img1);
                     cout << "GROUND TRUTH : " << endl;
                     cout << "    " << xi << endl;
@@ -59,14 +93,29 @@ int main(int argc, char** argv)
                     cout << "    " << odom._interFrame.xi.compose(odom._xiLocal) << endl;
                     imshow("rendered", img1);
                     
-                    Mat32f depthMat;
+                    
+                    
+                    
+                    
+                    
                     if (not odom._depth.empty())
-                    { 
+                    {   
+                        Mat8u dst;
+                        Mat32f depthMat;
+                        odom._localizer.setDepth(odom._depth);
+                        odom._localizer.wrapImage(img1, dst, odom._xiLocal);
+                        imshow("wrapped", dst);
+                        imshow("base", odom._interFrame.img);
+                        Mat8u err;
+                        computeErr(odom._interFrame.img, dst, err);
+                        imshow("err", err);
+                        
                         odom._depth.toMat(depthMat);
                         imshow("depth", depthMat / 10);
-                        imwrite("depth" + to_string(depthMapCount++) + ".png", depthMat  * 25);
+//                        imwrite("depth" + to_string(depthMapCount++) + ".png", depthMat  * 25);
                     }
-                    waitKey(50);
+                    if (xi.trans().norm() > 20.65) waitKey();
+                    else waitKey(50);
                 }
     
         }

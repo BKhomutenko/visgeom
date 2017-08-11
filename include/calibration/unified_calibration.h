@@ -65,6 +65,7 @@ struct ImageData
     bool userGuided = false;
     bool doNotSolve = false;
     bool doNotSolveGlobal = false;
+    bool saveOutlierImages = false;
     double drawScale = 7;
     
     int getFirstExtractedIdx() const
