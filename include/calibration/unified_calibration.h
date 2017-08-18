@@ -89,6 +89,7 @@ protected:
     //TODO map<string, map<string, Array6d>> sequenceTransformMap;
     //make it a map from image's name
     map<string, vector<Array6d>> sequenceTransformMap;
+    map<string, vector<bool>> sequenceInitMap;
     map<string, TransformInfo> transformInfoMap;
     map<string, ICamera*> cameraMap;
     map<string, bool> cameraConstantMap; //TODO make a structure

@@ -20,6 +20,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "eigen.h"
 #include "ceres.h"
 #include "ocv.h"
+#include "std.h"
 //#include "io.h"
 
 class SubpixelCorner : public ceres::FirstOrderFunction 
@@ -58,7 +59,7 @@ public:
     bool detectPattern(Vector2dVec & ptVec);
     
     //out : _src, _imgrad, _resp, _avgVal
-    void computeResponse();
+    void computeResponse(const double SIGMA_1, const double SIGMA_2);
     
     //out : _hypHeap, _detected
     void selectCandidates();
@@ -66,7 +67,7 @@ public:
     //TODO rewrite
     // /home/bogdan/projects/data/mapping/fluence_calibration/right/000411.png 
     // /home/bogdan/projects/data/mapping/fluence_calibration/right/000402.png
-    bool checkCorner(const Vector2i & pt);
+    bool checkCorner(const Vector2i & pt, const int checkRadius);
     
     bool scaleInvarient(const Vector2i & pt);
     
@@ -74,16 +75,24 @@ public:
     void constructGraph();
     
     vector<int> selectPattern();
+    vector<int> selectBestOrthogonalChain(const int idxPrev, const int idxCur,
+                                            const int eps, const int LENGTH);
+    vector<int> weaveGrid(const vector<int> & chainX, const vector<int> & chainY);
+    
     
     vector<int> extractSequence(int idx0, int idx1);
     
     bool verifyDetection(const vector<int> & idxVec);
     
-    void improveCorners(Vector2dVec & pointVec) const;   
+    void improveCorners(Vector2dVec & pointVec);   
     
-    void initPoin(const Vector2d & pt, double * data) const;
+    int initPoin(const Vector2i & pt, double * data);
     
+    Vector2iVec getCircle(const Vector2i & pt, const int radius) const;
+    vector<double> getSamples(const Vector2iVec & ptVec) const;
+    vector<double> centralDifferences(const vector<double> & sampleVec) const;
     
+    Vector2iVec getTransitions(const Vector2i & pt);
     
 private:
 
@@ -101,7 +110,9 @@ private:
     Mat16s _idxMap;
     
     vector<vector<int>> _arcVec;
-    vector<Vector2i> _ptVec;
+    vector<double> _gradThresh;
+    map<pair<int, int>, int> _arcSign;
+    Vector2iVec _ptVec;
     
     //detected strongest maxima sorted by (u + v)
     vector<pair<double, Vector2i>> _hypHeap;
@@ -112,7 +123,7 @@ private:
     Mat8u _img;
     
     const bool IMPROVE_DETECTION;
-    const int INIT_RADIUS;
+    int INIT_RADIUS;
     
     //STRUCTURES AND FUNCTIONS
     
@@ -154,5 +165,15 @@ private:
             if (itInv == begin) itInv = end;
             itInv--;
         } while (*itInv * ref > 0);
+    }
+    
+    Vector2i normalizePoint(const Vector2i & pt) const
+    {
+        return normalizePoint(pt[0], pt[1]);
+    }
+    
+    Vector2i normalizePoint(const int u, const int v) const
+    {
+        return Vector2i( max(0, min(u, _img.cols - 1)), max(0, min(v, _img.rows - 1)));
     }
 };

@@ -112,6 +112,7 @@ void GenericCameraCalibration::parseTransforms()
         else 
         {
             sequenceTransformMap[name] = vector<Array6d>();
+            sequenceInitMap[name] = vector<bool>();
             if (info.prior)
             {
                 auto & valVec = sequenceTransformMap[name];
@@ -399,13 +400,15 @@ void GenericCameraCalibration::initTransforms(const ImageData & data, const stri
             {
                 cout << "WARNING : " << initName << " " << transfIdx
                      << " is not initialized, no board extracted" << endl;
-                sequenceTransformMap[initName].push_back(Array6d{0, 0, 1, 0, 0, 0});    
+                sequenceTransformMap[initName].push_back(Array6d{0, 0, 1, 0, 0, 0});  
+                sequenceInitMap[initName].push_back(false);
             }
             else
             {
                 auto xi = estimateInitialGrid(data, transfIdx);
                 xi = getInitTransform(xi, initName, data, transfIdx);
                 sequenceTransformMap[initName].push_back(xi.toArray());
+                sequenceInitMap[initName].push_back(true);
             }
         }
     }
@@ -426,10 +429,11 @@ void GenericCameraCalibration::initTransforms(const ImageData & data, const stri
 void GenericCameraCalibration::addGridResidualBlocks(const ImageData & data)
 {
     if (data.doNotSolveGlobal) return;
+
     for (int transfIdx = 0; transfIdx < data.detectedCornersVec.size(); transfIdx++)
     {
         if (data.detectedCornersVec[transfIdx].empty()) continue;
-        
+
         // make the vector of pointers to the transformation data
         vector<double*> ptrVec;
         for (int i = 0; i < data.transNameVec.size(); i++)
@@ -548,14 +552,14 @@ void GenericCameraCalibration::parseData()
             if (dataInfo.second.get<bool>("init"))
             {
                 cout << transformName << endl;
-                for (auto & xx : sequenceTransformMap[transformName])
-                {
-                    for (auto & x : xx)
-                    {
-                        cout << x << "   ";
-                    }
-                    cout << endl;
-                }
+//                for (auto & xx : sequenceTransformMap[transformName])
+//                {
+//                    for (auto & x : xx)
+//                    {
+//                        cout << x << "   ";
+//                    }
+//                    cout << endl;
+//                }
                 if (not sequenceTransformMap[transformName].empty())
                 {
                     throw runtime_error(transformName + " has already been initialized");
@@ -564,6 +568,7 @@ void GenericCameraCalibration::parseData()
                 for (auto & xi : odometryVec)
                 {
                     sequenceTransformMap[transformName].emplace_back(xi.toArray());
+                    sequenceInitMap[transformName].push_back(true);
                 }
             }
             
@@ -620,15 +625,32 @@ void onMouse( int event, int x, int y, int, void* )
     yVec.push_back(y);
 }
 
-/* OLD VECSION FOR OPENCV COMPARISON
+// OLD VECSION FOR OPENCV COMPARISON --- segfault 0_o
+/*
 void GenericCameraCalibration::extractGridProjections(ImageData & data)
 {
     const int flags = cv::CALIB_CB_ADAPTIVE_THRESH;
     Size patternSize(data.Nx, data.Ny);
-    for (auto & fileName : data.imageNameVec)
+    string sequenceName;
+    for (auto & name : data.transNameVec)
+    {
+        if (transformInfoMap[name].global == false)
+        {
+            sequenceName = name;
+            break;
+        }
+    }
+    bool initialized = transformInfoMap[sequenceName].initialized;
+    const vector<bool> & initVec = sequenceInitMap[sequenceName];
+    for (int i = 0; i < data.imageNameVec.size(); i++)
     {
         cout << "." << flush;
         data.detectedCornersVec.emplace_back();
+        
+        //grid has not been found on the corresponding image in the ini sequence
+        if (initialized and not initVec[i]) continue;
+        
+        const string & fileName = data.imageNameVec[i];
         Mat8u frame = imread(fileName, 0);
         if (frame.empty())
         {
@@ -717,7 +739,7 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
             cornerVec.emplace_back(pt.x, pt.y);
             if (data.drawImproved) 
             {
-                cross(cornerImg, Point(pt.x * K + 0.5*K, pt.y * K + 0.5*K), 25, Scalar(255, 0, 0), 3);
+                cross(cornerImg, pt.x * K + 0.5*K, pt.y * K + 0.5*K, 25, 255, 3);
             }
         }
         
@@ -725,7 +747,7 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
         if (data.improveDetection)
         {
             double minDist = findMinDistance(cornerVec, data.Ny, data.Nx);
-            CornerDetector detector(frame, min(minDist / 2., 15.));
+            CornerDetector detector(data.Nx, data.Ny, 3, true, false);
             detector.improveCorners(cornerVec);
         }
         
@@ -733,23 +755,47 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
         {
             for (auto pt : cornerVec)
             {
-                cross(cornerImg, Point(pt[0] * K + 0.5*K, pt[1] * K + 0.5*K), 25, Scalar(0, 0, 255), 3);
+                cross(cornerImg, pt[0] * K + 0.5*K, pt[1] * K + 0.5*K, 25, Scalar(0, 0, 255), 3);
             }
             imshow("corners", cornerImg);
             waitKey();
         }
     }
     cout << endl;
-}
-*/
+}*/
+
 
 void GenericCameraCalibration::extractGridProjections(ImageData & data)
 {
     CornerDetector detector(data.Nx, data.Ny, 3, data.improveDetection);
-    for (auto & fileName : data.imageNameVec)
+    
+    string sequenceName;
+    for (auto & name : data.transNameVec)
     {
-        cout << "." << flush;
+        if (transformInfoMap[name].global == false)
+        {
+            sequenceName = name;
+            break;
+        }
+    }
+    bool initialized = transformInfoMap[sequenceName].initialized;
+    const vector<bool> & initVec = sequenceInitMap[sequenceName];
+    for (int i = 0; i < data.imageNameVec.size(); i++)
+    {
+        cout <<data.imageNameVec[i] << endl;
+//        cout << "." << flush;
         data.detectedCornersVec.emplace_back();
+        
+        //grid has not been found on the corresponding image in the ini sequence
+        
+        const string & fileName = data.imageNameVec[i];
+        
+        if (initialized and not initVec[i])
+        {
+            cout << fileName << " : ERROR, the pattern has not been found on the corresponding image" << endl;
+            continue;
+        }
+        
         Mat8u frame = imread(fileName, 0);
         if (frame.empty())
         {
@@ -935,7 +981,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
         {
             Vector2d err = data.detectedCornersVec[transfIdx][i] - projectedVec[i];
             double errNorm = err.norm();
-            if (errNorm < 3 * sigma and sigma < 0.5) // px is for the case when all the points are off
+            if (errNorm < 3 * sigma and errNorm < 1.) // px is for the case when all the points are off
             {                                        // we are looking for the sub-pixel precision
                 inlierVec.push_back(projectedVec[i]);
             }
@@ -965,7 +1011,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
             for (int i = 0; i < outlierVec.size(); i++)
             {
                 circle(img, Point(outlierVec[i][0], outlierVec[i][1]), 9, Scalar(0, 127, 255), 5);
-//                cout << outlierVec[i] << "   err : " << errVec[i] << endl;
+                cout << outlierVec[i].transpose() << "   err : " << errVec[i] << endl;
             }
             
             //detected
@@ -979,7 +1025,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
             {
                 imwrite( "outliers_" + to_string(transfIdx) + ".png", img(Rect(800, 370, 400, 360)) );
             }
-            else
+            if (data.showOutliers) 
             {
                 imshow("outliers", img);
                 waitKey();

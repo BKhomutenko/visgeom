@@ -39,3 +39,23 @@ using std::setw;
 using std::flush;
 using std::to_string;
 
+
+template <typename T>
+void printVector(const T begin, const T end, int w = 8)
+{
+    for (auto it = begin; it != end; it++)
+    {
+        cout << setw(w) << *it;
+    }
+    cout << endl;
+}
+
+template <typename T>
+void printPointVector(const T begin, const T end)
+{
+    for (auto it = begin; it != end; it++)
+    {
+        cout << (*it).transpose() << endl;
+    }
+}
+
