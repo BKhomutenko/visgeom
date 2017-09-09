@@ -86,6 +86,18 @@ target_link_libraries( calib
     ${Boost_LIBRARIES}
 )
 
+
+add_executable( rectify
+    test/calibration/rectify.cpp
+)
+
+target_link_libraries( rectify
+    calibration
+    ${OpenCV_LIBS}  
+    ${CERES_LIBRARIES}
+    ${Boost_LIBRARIES}
+)
+
 add_executable( odom_interpolation
     test/calibration/odometry_interpolation.cpp
 )
@@ -177,6 +189,19 @@ add_executable( mapping
 )
 
 target_link_libraries( mapping  
+    reconstruction
+    localization
+    render
+    ${OpenCV_LIBS}
+    ${CERES_LIBRARIES}
+    ${Boost_LIBRARIES}
+)
+
+add_executable( map_real_data
+    test/localization/map_real_data.cpp
+)
+
+target_link_libraries( map_real_data  
     reconstruction
     localization
     render

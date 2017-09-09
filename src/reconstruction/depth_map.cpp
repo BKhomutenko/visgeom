@@ -750,7 +750,7 @@ DepthMap DepthMap::wrapDepth(const Transformation<double> T12) const
             {
                 const double dist = cloud12[i].norm();
                 dMap2.at(idx2) = dist;
-                dMap2.sigma(idx2) = sigma(idx1) + 0.01*dist;
+                dMap2.sigma(idx2) = sigma(idx1) + 0.005*dist;
                 dMap2.cost(idx2) = cost(idx1);
             }
         }

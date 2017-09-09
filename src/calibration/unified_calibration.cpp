@@ -976,12 +976,12 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
             stdAcc += err.squaredNorm();
         }
         
-        double sigma = sqrt(stdAcc / (projectedVec.size() - 1));
+        double sigma = sqrt(stdAcc / (projectedVec.size() - 2));
         for (int i = 0; i < projectedVec.size(); i++)
         {
             Vector2d err = data.detectedCornersVec[transfIdx][i] - projectedVec[i];
             double errNorm = err.norm();
-            if (errNorm < 3 * sigma and errNorm < 1.) // px is for the case when all the points are off
+            if (errNorm < 3.6 * sigma and errNorm < 1.) // px is for the case when all the points are off
             {                                        // we are looking for the sub-pixel precision
                 inlierVec.push_back(projectedVec[i]);
             }
@@ -998,7 +998,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
             cout << transfVec[transfIdx] << endl;
             cout << data.imageNameVec[transfIdx] << endl;
             cout << "standard deviation : " << sigma << endl;
-            cout << "3 sigma : " << 3 * sigma << endl;
+//            cout << "6 sigma : " << 6 * sigma << endl;
             Mat img = imread(data.imageNameVec[transfIdx], CV_LOAD_IMAGE_COLOR);
             
             drawPoints(img, data.detectedCornersVec[transfIdx]);

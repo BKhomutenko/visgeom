@@ -568,7 +568,7 @@ bool SparseReprojectCost::Evaluate(double const * const * params,
         if (_camera->projectPoint(xVec2[i], modProj)) 
         {
             Map<Vector2d> diff(residual + 2*i);
-            diff = modProj - _pVec2[i];
+            diff = (modProj - _pVec2[i]) / _sizeVec[i];
         }
         else
         {
@@ -632,6 +632,14 @@ bool SparseReprojectCost::Evaluate(double const * const * params,
                 dvdt += dpdl[1] * dldt;
                 dvdr += dpdl[1] * dldr;
             }
+            
+            for (int i = 0; i < xVec2.size(); i++)
+            {
+                for (double* jptr = jacobian[0] + i*12; jptr < jacobian[0] + i*12 + 6; jptr++)
+                {
+                    *jptr /= _sizeVec[i];
+                }
+            }
         }
     }
     return true;
@@ -673,13 +681,37 @@ OdometryPrior::OdometryPrior(const double errV, const double errW,
 //    cout << U.transpose() * U << endl;
 //    cout << CxInv << endl;
 
-    _A.topLeftCorner<2, 2>() = U.topLeftCorner<2, 2>();
-    _A.topRightCorner<2, 1>() = U.topRightCorner<2, 1>();
-    _A(2, 2) = 1. / lambdaT;
-    _A(3, 3) = 1. / lambdaR;
-    _A(4, 4) = 1. / lambdaR;
-    _A(5, 5) = U(2, 2);
+//    _A.topLeftCorner<2, 2>() = U.topLeftCorner<2, 2>();
+//    _A.topRightCorner<2, 1>() = U.topRightCorner<2, 1>();
+//    _A(2, 2) = 1. / lambdaT;
+//    _A(3, 3) = 1. / lambdaR;
+//    _A(4, 4) = 1. / lambdaR;
+//    _A(5, 5) = U(2, 2);
     
+    //FOR THE SIMULATION 
+    //Z -- forward, Y -- rotation
+    _A(0, 0) = U(1, 1);
+    _A(0, 2) = U(0, 1);
+    _A(2, 2) = U(0, 0);
+    _A(0, 4) = U(1, 2);
+    _A(2, 4) = U(0, 2);
+    _A(1, 1) = 1. / lambdaT;
+    _A(3, 3) = 1. / lambdaR;
+    _A(4, 4) = U(2, 2);
+    _A(5, 5) = 1. / lambdaR;
+    
+        //FOR THE REAL DATA 
+    //Y -- forward, Z -- rotation
+//    _A(1, 1) = U(0, 0);
+//    _A(0, 0) = -U(1, 1);
+//    _A(0, 1) = -U(0, 1);
+//    _A(0, 5) = -U(1, 2);
+//    _A(1, 5) = U(0, 2);
+//    _A(2, 2) = 1. / lambdaT;
+//    _A(3, 3) = 1. / lambdaR;
+//    _A(4, 4) = 1. / lambdaR;
+//    _A(5, 5) = U(2, 2);
+
     Matrix3d M = interOmegaRot(xiOdom.rot());
     Matrix3d R = xiOdom.rotMatInv();
     

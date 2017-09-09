@@ -140,7 +140,7 @@ public:
     
     friend std::ostream& operator << (std::ostream & os, const Transformation & transfo)
     {
-        os << transfo.mtrans.transpose() << " # " << transfo.mrot.transpose();
+        os << transfo.mtrans.transpose() << " " << transfo.mrot.transpose();
         return os;
     }
 

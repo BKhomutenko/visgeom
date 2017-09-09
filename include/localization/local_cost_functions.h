@@ -244,8 +244,9 @@ struct SparseReprojectCost : ceres::CostFunction
 {
     SparseReprojectCost(const ICamera * camera,
             const Vector3dVec & xVec1, const Vector3dVec & xVec2,
-            const Vector2dVec & pVec2, const Transf xiBaseCam):
-    _pVec2(pVec2), _xVec1(xVec1), _xVec2(xVec2),  _camera(camera->clone()), _xiBaseCam(xiBaseCam) 
+            const Vector2dVec & pVec2, const vector<double> & sizeVec, const Transf xiBaseCam):
+        _pVec2(pVec2), _xVec1(xVec1), _xVec2(xVec2), _sizeVec(sizeVec),
+        _camera(camera->clone()), _xiBaseCam(xiBaseCam) 
     {
         assert(_pVec2.size() == _xVec1.size());
         assert(_pVec2.size() == _xVec2.size());
@@ -263,7 +264,7 @@ struct SparseReprojectCost : ceres::CostFunction
     const Vector3dVec _xVec2;
     const Vector2dVec _pVec2;
     Transf _xiBaseCam;
-    vector<double> _aVec;
+    vector<double> _sizeVec;
 };
 
 struct OdometryPrior : ceres::SizedCostFunction<6, 6>

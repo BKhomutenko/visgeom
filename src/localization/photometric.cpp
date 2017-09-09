@@ -64,10 +64,12 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
             double gu = gradU1(vs, us);
             double gv = gradV1(vs, us);
             if (gu*gu + gv*gv < GRAD_THRESH) continue; 
+            
             //TODO change the threshold depending on the image size or use adaptive random sampling
             // to speed up the computation
             int ub = scaleSpace1.uConv(us);
             int vb = scaleSpace1.vConv(vs);
+            if (depthMap.nearest(ub, vb) > DIST_MAX) continue;
             if (verbosity > 4) cout << "    " << vs << " " << us << endl;
             valVec.push_back(img1(vs, us));
             imagePointVec.emplace_back(ub, vb);
@@ -134,7 +136,7 @@ void ScalePhotometric::computePose(int scaleIdx, Transf & T12)
     if (useMotionPrior and 0) //FIXME experimental
     {
         //A proper nose model on the depth map localization must be applied
-        OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.01, 0.03, _xiPrior);
+        OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.03, 0.03, _xiPrior);
         problem.AddResidualBlock(odometryCost, NULL, pose.data());
     }
     
@@ -158,7 +160,7 @@ Transf ScalePhotometric::computePoseMI(const Transf & T12)
     }
     Transf xi = T12;
     //TODO set the optimization depth with the parameters   v
-    for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 1; scaleIdx--)
+    for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 0; scaleIdx--)
     {
         computePoseMI(scaleIdx, xi);
     }
@@ -246,6 +248,13 @@ void ScalePhotometric::computePoseMI(int scaleIdx, Transf & T12)
     array<double, 6> pose = T12.toArray();
     MutualInformation * costFunction = new MutualInformation(camPtr2, dataPack, _xiBaseCam,
                                 scaleSpace2.get(), scaleSpace2.getActiveScale(), 8, 255);
+    
+//    if (useMotionPrior) //FIXME experimental
+//    {
+//        //A proper nose model on the depth map localization must be applied
+//        OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.01, 0.03, _xiPrior);
+//        problem.AddResidualBlock(odometryCost, NULL, pose.data());
+//    }
     
     //TODO put to a separate file                                                    
 //    array<double, 6> grad;

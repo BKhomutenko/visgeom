@@ -68,7 +68,7 @@ public:
     }
 
     //TODO implement the projection and distortion Jacobian
-    virtual bool projectionJacobian(const Vector3d & src, Matrix23d & Jac) const
+    virtual bool projectionJacobian(const Vector3d & src, double * dudx, double * dvdx) const
     {
         const double & u0 = params[0];
         const double & v0 = params[1];
@@ -77,12 +77,12 @@ public:
         const double & y = src(1);
         const double & z = src(2);
         double zz = z * z;
-        Jac(0, 0) = f/z;
-        Jac(0, 1) = 0;
-        Jac(0, 2) = -x * f/ zz;
-        Jac(1, 0)= 0;
-        Jac(1, 1) = f/z;
-        Jac(1, 2) = -y * f/ zz;
+        dudx[0] = f/z;
+        dudx[1] = 0;
+        dudx[2] = -x * f/ zz;
+        dvdx[0] = 0;
+        dvdx[1] = f/z;
+        dvdx[2] = -y * f/ zz;
     }
     
     virtual Pinhole * clone() const

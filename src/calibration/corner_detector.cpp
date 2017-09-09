@@ -1113,7 +1113,7 @@ Vector2iVec CornerDetector::getTransitions(const Vector2i & pt)
     Vector2iVec res;
     bool detected = false;
     double bestMaxTransition;
-    for (int radius = 1; radius <= 6; radius++)
+    for (int radius = 1; radius <= INIT_RADIUS + 1; radius++)
     {
         
         //go along the circle and save the transition strengths

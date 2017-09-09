@@ -31,20 +31,22 @@ Relative camera pose estimation based on photometric error and depth map
 
 //TODO make a parameter structure
 //const double MIN_INIT_DIST = 0.25;   // minimal distance traveled befor VO is used
-//const double MIN_STEREO_BASE = 0.20; // minimal acceptable stereo base
+//const double MIN_STEREO_BASE = 0.25; // minimal acceptable stereo base
  // Feature matching threshold
 
 class SparseOdometry
 {
 public:
     SparseOdometry(const ICamera * cameraPtr,
-                Transf xiBaseCam):
+                Transf xiBaseCam, double minDist = 0.):
     xiBaseCam(xiBaseCam),
     depthState(STATE_EMPTY),
     keyframeState(STATE_EMPTY),
     camera(cameraPtr->clone()),
-    detector(40, 0, 2) ,
-    numRansacPoints(3)
+//    detector(25, 3, 1),
+    numRansacPoints(2),
+    MIN_STEREO_BASE(minDist),
+    _g(0)
     { }
         
     ~SparseOdometry() { delete camera; }
@@ -53,19 +55,35 @@ public:
     
       
     double computeTransfSparse(const Vector3dVec & xVec1, const Vector3dVec & xVec2, 
-            const Vector2dVec & pVec2, const Transf xiOdom, Transf & xiOut, bool report = false);
+            const Vector2dVec & pVec2, const vector<double> & sizeVec, const Transf xiOdom, Transf & xiOut, bool report = false);
     
     void ransacNPoints(const Vector3dVec & cloud1,
         const Vector3dVec & cloud2, const Vector2dVec & ptVec2,
+        const vector<double> & sizeVec,
         const Transf xiOdom, vector<bool> & inlierMask);
+    
+    void motionMatchesFilter(const Vector3dVec & cloud1,
+        const Vector3dVec & cloud2, const Vector2dVec & ptVec2,
+        const Transf xiOdom, vector<bool> & inlierMask);
+    
+    Vector2dVec reprojectPoints(const Vector3dVec & cloud1,
+    const Vector3dVec & cloud2, const Transf dxi);
     
     const Transf & getIncrement() const { return xiIncr; }
     const Transf & getIntegrated() const { return xiLocal; }
+    
 private:
-    vector<KeyPoint> keypointVec1;
-    vector<KeyPoint> keypointVec2;
+    
+    //TODO TEST
+    Vector2dVec keypointVec1;
+    Vector2dVec keypointVec2;
+    
+//    vector<KeyPoint> keypointVec1;
+//    vector<KeyPoint> keypointVec2;
     
     Mat32f desc1, desc2;
+    
+    Mat8u imageOld;
     
     ICamera * camera;
     
@@ -87,8 +105,10 @@ private:
     DataState keyframeState;
     BRISK detector;
 //    cv::ORB detector;
+    mt19937 _g;
     
-    const int distThresh = 100;
+    const int distThresh = 2500; //for descriptor comparison
+    const double MIN_STEREO_BASE;  // minimal acceptable stereo base
 };
 
 

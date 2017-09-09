@@ -37,12 +37,35 @@ SLAM system
 
 struct MappingParameters
 {
-    MappingParameters(const ptree & params) {}
+    MappingParameters(const ptree & params) 
+    {
+        for (auto & item : params)
+        {
+            const string & pname = item.first;
+            if (pname == "new_kf_distance_thresh") distThreshSq = pow(item.second.get_value<double>(), 2);
+            else if (pname == "new_kf_angular_thresh") angularThreshSq = pow(item.second.get_value<double>(), 2);
+            else if (pname == "min_init_dist")  minInitDist = item.second.get_value<double>();
+            else if (pname == "min_stereo_base") minStereoBase = item.second.get_value<double>();
+            else if (pname == "dist_thresh") maxDistance = item.second.get_value<double>();
+            else if (pname == "normalize_scale") normalizeScale = item.second.get_value<bool>();
+        }
+        
+    }
+    
     MappingParameters() {}
+    //defines the conditions for the new frame instantiation
     double distThreshSq = 0.03;
     double angularThreshSq = 0.25;
+    
+    //minimum distance to initialize the depth map and the whole system
     double minInitDist = 0.1;
-    double minStereoBase = 0.03;
+    
+    //if the stereo base is below the stereo is not computed
+    double minStereoBase = 0.07;
+    
+    //beyond this distance the points are not used for the localization
+    double maxDistance = 5;
+    bool normalizeScale = true;
 };
 
 

@@ -30,78 +30,190 @@ Relative camera pose estimation based on photometric error and depth map
 #include "projection/generic_camera.h"
 #include "reconstruction/triangulator.h"
 #include "localization/local_cost_functions.h"
+
+
+
+//FIXME TMP HARRIS FEATURES
+Vector2dVec harrisCorners(const Mat8u & img)
+{
+    Mat32f resp;
+    resp.create(img.size());
+    cornerHarris(img, resp, 7, 3, 0.05);
     
+    vector<pair<double, int>> respHeap;
+    Vector2dVec maxVec;
+    
+    for (int v = 7; v < img.rows - 7; v++)
+    {
+        for (int u = 7; u < img.cols - 7; u++)
+        {
+            double respVal = resp(v, u);
+            bool isMax = true;
+            for (int dv = -1; dv <= 1 and isMax; dv++)
+            {
+                for (int du = -1; du <= 1 and isMax; du++)
+                {
+                    if (du == 0 and dv == 0) continue;
+                    if (respVal <= resp(v + dv, u + du)) isMax = false;
+                }
+            }
+            if (isMax)
+            {
+                maxVec.emplace_back(u, v);
+                respHeap.emplace_back(respVal, maxVec.size() - 1);
+            }
+        }
+    }
+    make_heap(respHeap.begin(), respHeap.end());
+    
+    Vector2dVec resVec;
+    const int NUM_FEATURES = 500;
+    while (resVec.size() < NUM_FEATURES and not respHeap.empty())
+    {
+        pop_heap(respHeap.begin(), respHeap.end());
+        int idx = respHeap.back().second;
+        respHeap.pop_back();
+        resVec.push_back(maxVec[idx]);
+    } 
+    return resVec;
+}
+
+void descriptors(const Mat8u & img, Mat32f & out, const Vector2dVec & pointVec, const int DESC_SIZE = 4)
+{
+    out.create( Size(pow(2 * DESC_SIZE + 1, 2), pointVec.size()) );
+    vector<pair<double, int>> respHeap;
+    Vector2dVec maxVec;
+    
+    vector<double> kernel;
+    
+    for (int v = -DESC_SIZE; v <= DESC_SIZE; v++)
+    {
+        double y = (2. * v) / DESC_SIZE;
+        for (int u = -DESC_SIZE; u <= DESC_SIZE; u++)
+        {   
+            double x = (2. * u) / DESC_SIZE;
+            kernel.push_back( exp(-0.5*(x*x + y*y)) );
+        }
+    }
+    
+    for (int idx = 0; idx < pointVec.size(); idx++)
+    {
+        bool isMax = true;
+        const int u = round(pointVec[idx][0]);
+        const int v = round(pointVec[idx][1]);
+        float * outPtr = (float*)(out.row(idx).data);
+        auto kernelIter = kernel.begin();
+        for (int dv = -DESC_SIZE; dv <= DESC_SIZE; dv++)
+        {
+            for (int du = -DESC_SIZE; du <= DESC_SIZE; du++, outPtr++, kernelIter++)
+            {   
+                *outPtr = *kernelIter * img(v + dv, u + du);
+            }
+        }
+    }
+}
+
 void SparseOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
 {
     Transf dxi = xiBaseCam.inverseCompose(xiOdom.inverseCompose(xiOdomNew)).compose(xiBaseCam);
     //FIXME for debug
-//    if (dxi.trans().norm() < MIN_STEREO_BASE and not keypointVec1.empty()) return;
+    if (dxi.trans().norm() < MIN_STEREO_BASE and not keypointVec1.empty()) return;
     
-    keypointVec2.clear();
-    detector.detect(imageNew, keypointVec2);
-    detector.compute(imageNew, keypointVec2, desc2);
-    cout << "detected : " << keypointVec2.size() << endl; 
+    cout << "DETECT" << endl;
+//    keypointVec2 = harrisCorners(imageNew.rowRange(0, 300));
+    keypointVec2 = harrisCorners(imageNew);
+    cout << "EXTRACT" << endl;
+    descriptors(imageNew, desc2, keypointVec2);
+    
+//    detector.detect(imageNew.rowRange(0, 300), keypointVec2);
+    
+//    for (auto & x : keypointVec2)
+//    {
+//        x.angle = 0;
+//    }
+    
+//    detector.compute(imageNew, keypointVec2, desc2);
+
+//    cout << "detected : " << keypointVec2.size() << endl; 
     if (not keypointVec1.empty())
     {
+        cout << "MATCH" << endl;
         //correspondence
-        BFMatcher matcher(cv::NORM_HAMMING, true);
+        BFMatcher matcher(cv::NORM_L1, true);
         vector<DMatch> matchVec;
         matcher.match(desc1, desc2, matchVec);
+        
+        
+        
+        
+        
+        
+        
         
         //reconstruct
         vector<DMatch> goodMatchVec;
         Vector2dVec pointVec1, pointVec2;
+        vector<double> sizeVec;
         for (auto & match : matchVec)
         {
             if (match.distance > distThresh) continue;
-            
+//            if (abs(keypointVec1[match.queryIdx].size - keypointVec2[match.trainIdx].size) /
+//                (keypointVec1[match.queryIdx].size + keypointVec2[match.trainIdx].size) > 0.07) continue;
             goodMatchVec.push_back(match);
-            const auto & pt1 = keypointVec1[match.queryIdx].pt;
-            const auto & pt2 = keypointVec2[match.trainIdx].pt;
             
-//                if (norm(pt1 - pt2) < 3) continue;
+//            const auto & pt1 = keypointVec1[match.queryIdx].pt;
+//            const auto & pt2 = keypointVec2[match.trainIdx].pt;
+//            
+////                if (norm(pt1 - pt2) < 3) continue;
+//            
+//            pointVec1.emplace_back(pt1.x, pt1.y);
+//            pointVec2.emplace_back(pt2.x, pt2.y);
+
+            pointVec1.push_back(keypointVec1[match.queryIdx]);
+            pointVec2.push_back(keypointVec2[match.trainIdx]);
             
-            pointVec1.emplace_back(pt1.x, pt1.y);
-            pointVec2.emplace_back(pt2.x, pt2.y);
+            sizeVec.push_back(1);
         }
-        cout << endl;
+//        cout << endl;
+//        Mat img_matches;
+//        vector<KeyPoint> kp1Vec, kp2Vec;
+//        for (auto & x : keypointVec1)
+//        {
+//            kp1Vec.emplace_back(x[0], x[1], 1);
+//        }
+//        for (auto & x : keypointVec2)
+//        {
+//            kp2Vec.emplace_back(x[0], x[1], 1);
+//        }
+//        drawMatches( imageOld, kp1Vec, imageNew, kp2Vec,
+//            goodMatchVec, img_matches, Scalar::all(-1), Scalar::all(-1),
+//            vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//        imshow("matches", img_matches);
+//        waitKey();
+//        
+        
+
         Vector3dVec reconstVec1, reconstVec2;
         camera->reconstructPointCloud(pointVec1, reconstVec1);
         camera->reconstructPointCloud(pointVec2, reconstVec2);
         
+        
+        
+        
+        
         //RANSAC
+        cout << "RANSAC" << endl;
         vector<bool> inlierMask;
-        ransacNPoints(reconstVec1, reconstVec2, pointVec2,
+        ransacNPoints(reconstVec1, reconstVec2, pointVec2, sizeVec,
                 xiOdom.inverseCompose(xiOdomNew), inlierMask);
         
-        if (0) //to display the RANSAC result
-        {
-            Mat img_matches;
-            drawMatches( imageNew, keypointVec1, imageNew, keypointVec2,
-               goodMatchVec, img_matches, Scalar::all(-1), Scalar::all(-1),
-               vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-            
-            Mat8u lineMat;
-            imageNew.copyTo(lineMat);
-            lineMat *= 0.8;
-            
-            imshow("matches", img_matches);
-            for (int i = 0; i < inlierMask.size(); i++)
-            {   
-                if (inlierMask[i]) 
-                {
-                    line(lineMat, Point(pointVec1[i][0], pointVec1[i][1]),
-                                        Point(pointVec2[i][0], pointVec2[i][1]), 255);
-                }
-            }
-            imshow("lines", lineMat);
-            waitKey();
-        }
         
         
+        cout << "FINAL" << endl;
         //refinement
         Vector3dVec xInlierVec1, xInlierVec2;
         Vector2dVec pInlierVec2;
+        vector<double> sizeVec2;
         for (int i = 0; i < inlierMask.size(); i++)
         {
             if (not inlierMask[i]) continue;
@@ -109,32 +221,112 @@ void SparseOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
             xInlierVec1.push_back(reconstVec1[i]);
             xInlierVec2.push_back(reconstVec2[i]);
             pInlierVec2.push_back(pointVec2[i]);
+            sizeVec2.push_back(sizeVec[i]);
         }
-        computeTransfSparse(xInlierVec1, xInlierVec2, pInlierVec2, 
+        computeTransfSparse(xInlierVec1, xInlierVec2, pInlierVec2, sizeVec2,
                 xiOdom.inverseCompose(xiOdomNew), xiIncr, true);
+                
+        ///// Recompute the motions with discarded close outliers
+        Transf xiTest = xiBaseCam.inverseCompose(xiIncr).compose(xiBaseCam);
+        Vector2dVec reprojectedVec = reprojectPoints(xInlierVec1, xInlierVec2, dxi);
+        
+        // compute sigma
+        double sigmaSqAcc = 0;
+        vector<double> errVec;
+        for (int i = 0; i < reprojectedVec.size(); i++)
+        {
+            const double err = (pInlierVec2[i] - reprojectedVec[i]).squaredNorm();
+            errVec.push_back(err);
+            sigmaSqAcc += err;
+        }
+        const double sigmaSq = sigmaSqAcc / (reprojectedVec.size() - 2); // 2 degrees of freedom
+        
+        Vector3dVec xInlierVec1Ref, xInlierVec2Ref;
+        Vector2dVec pInlierVec2Ref;
+        vector<double> sizeVec2Ref;
+        
+        // select inliers
+        for (int i = 0; i < reprojectedVec.size(); i++)
+        {
+            if (errVec[i] < 3.6*sigmaSq)
+            {
+                xInlierVec1Ref.push_back(xInlierVec1[i]);
+                xInlierVec2Ref.push_back(xInlierVec2[i]);
+                pInlierVec2Ref.push_back(pInlierVec2[i]);
+                sizeVec2Ref.push_back(sizeVec2[i]);
+            }
+        }
+        
+        computeTransfSparse(xInlierVec1Ref, xInlierVec2Ref, pInlierVec2Ref, sizeVec2Ref,
+                xiOdom.inverseCompose(xiOdomNew), xiIncr, true);
+        
         xiLocal = xiLocal.compose(xiIncr);
+        
+        if (abs(xiOdom.inverseCompose(xiOdomNew).trans().norm() - xiIncr.trans().norm()) / xiIncr.trans().norm() > 0.05 or 0) //to display the RANSAC result
+        {
+//            Mat img_matches;
+//            drawMatches( imageOld, keypointVec1, imageNew, keypointVec2,
+//               goodMatchVec, img_matches, Scalar::all(-1), Scalar::all(-1),
+//               vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//            imshow("matches", img_matches);
+
+            Mat8uc3 lineMat;
+             cvtColor(imageNew, lineMat, CV_GRAY2BGR);
+            Transf dxi = xiBaseCam.inverseCompose(xiIncr).compose(xiBaseCam);
+            Vector2dVec reprojectedVec = reprojectPoints(reconstVec1, reconstVec2, dxi);
+            
+            for (auto & x : pInlierVec2Ref)
+            {
+                cross(lineMat, x[0], x[1], 3, Scalar(0, 0, 255), 3);
+            }
+            
+            for (int i = 0; i < inlierMask.size(); i++)
+            {   
+                if (inlierMask[i]) 
+                {
+                    
+                    cross(lineMat, reprojectedVec[i][0], reprojectedVec[i][1], 3, Scalar(250, 0, 0), 1);
+                    line(lineMat, Point(pointVec1[i][0], pointVec1[i][1]),
+                                        Point(pointVec2[i][0], pointVec2[i][1]), Scalar(0, 255, 0));
+                    
+//                    cout << setw(5) << i << setw(15) << pointVec2[i].transpose() 
+//                            << setw(15) << reprojectedVec[i].transpose() << setw(15) << sizeVec[i] << endl;
+//                    if ((pointVec1[i] - pointVec2[i]).norm() > 25)
+//                    {
+//                        imshow("lines", lineMat);
+//                        waitKey();
+//                    }
+                }
+                
+            }
+            imshow("lines", lineMat);
+            waitKey();
+        }
+        
     }
     
     //refresh state
     keypointVec1.swap(keypointVec2);
     swap(desc1, desc2);
+    imageNew.copyTo(imageOld);
     xiOdom = xiOdomNew;
 }
     
       
 double SparseOdometry::computeTransfSparse(const Vector3dVec & xVec1, const Vector3dVec & xVec2, 
-        const Vector2dVec & pVec2, const Transf xiOdom, Transf & xiOut, bool report)
+        const Vector2dVec & pVec2, const vector<double> & sizeVec, const Transf xiOdom, Transf & xiOut, bool report)
 {
     Problem problem;
     //TODO avoid reconstruction in first place
     
     array<double, 6> xiArr = xiOdom.toArray();
     
-    OdometryPrior * odometryCost = new OdometryPrior(0.01, 0.01, 0.005, 0.01, xiOdom);
+    OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.5, 0.03, 0.05, xiOdom);
     problem.AddResidualBlock(odometryCost, NULL, xiArr.data());
     
+    //TODO use inlier mask instead
     SparseReprojectCost * projectionCost = new SparseReprojectCost(camera,
-                                                    xVec1, xVec2, pVec2, xiBaseCam);
+                                                    xVec1, xVec2, pVec2, sizeVec, xiBaseCam);
     problem.AddResidualBlock(projectionCost, NULL, xiArr.data());
     
     Solver::Options options;
@@ -147,19 +339,59 @@ double SparseOdometry::computeTransfSparse(const Vector3dVec & xVec1, const Vect
 //        options.numeric_derivative_relative_step_size = 1e-8;
     Solve(options, &problem, &summary);
 //        cout << summary.BriefReport() << endl;
-    if (report) cout << summary.FullReport() << endl;
+//    if (report) cout << summary.FullReport() << endl;
     xiOut = Transf(xiArr.data());
     return summary.final_cost; 
 }
+
+
+Vector2dVec SparseOdometry::reprojectPoints(const Vector3dVec & cloud1,
+    const Vector3dVec & cloud2, const Transf dxi)
+{    
+    vector<double> lambdaVec(cloud1.size());
+    Triangulator(dxi).computeRegular(cloud1, cloud2, lambdaVec.data());
+    Vector3dVec cloudScaled;
+    cloudScaled.reserve(cloud1.size());
+//    cout << "LAMBDAS" << endl;
+    for (int i = 0; i < cloud1.size(); i++)
+    {
+//        cout << setw(5) << i << setw(15) << lambdaVec[i] << endl;
+        cloudScaled.emplace_back(cloud1[i] * lambdaVec[i]);
+    }
     
+    Vector3dVec cloudTransformed;
+    
+    dxi.inverseTransform(cloudScaled, cloudTransformed);
+//    cout << "TRANSFORMED" << endl;
+//    for (int i = 0; i < cloud1.size(); i++)
+//    {
+//        cout    << setw(5) << i << setw(15) << cloudScaled[i].transpose() 
+//                << setw(15) << cloudTransformed[i].transpose() << endl;
+//    }
+    
+    Vector2dVec ptCheckVec;
+    camera->projectPointCloud(cloudTransformed, ptCheckVec);
+    
+//    Vector2dVec ptOrigVec; //FIXME debug
+//    camera->projectPointCloud(cloud2, ptOrigVec);
+//    for (int i = 0; i < cloud1.size(); i++)
+//    {
+//        cout    << setw(5) << i << setw(15) << ptOrigVec[i].transpose() 
+//                << setw(15) << ptCheckVec[i].transpose() << endl;
+//    }
+    
+    return ptCheckVec;
+}
+
+   
 void SparseOdometry::ransacNPoints(const Vector3dVec & cloud1,
-    const Vector3dVec & cloud2, const Vector2dVec & ptVec2,
+    const Vector3dVec & cloud2, const Vector2dVec & ptVec2, const vector<double> & sizeVec,
     const Transf xiOdom, vector<bool> & inlierMask)
 {
     assert(cloud1.size() == cloud2.size());
     //define constants
-    int maxIteration = 100;
-    double thresh = 3;
+    const int maxIteration = 200;
+    const double thresh = 1.;
     int inlierCount = numRansacPoints;
     
     vector<int> indexVec;
@@ -171,24 +403,27 @@ void SparseOdometry::ransacNPoints(const Vector3dVec & cloud1,
     //triangulate all the vectors
     Transf dxi = xiBaseCam.inverseCompose(xiOdom).compose(xiBaseCam);
     
-    mt19937 g(0);
+    
     for (int ransacIteration = 0; ransacIteration < maxIteration; ransacIteration++)
     {
         //TODO optimiza the step
-        shuffle(indexVec.begin(), indexVec.end(), g);
+        shuffle(indexVec.begin(), indexVec.end(), _g);
         Vector3dVec xSampleVec1, xSampleVec2;
         Vector2dVec pSampleVec2;
+        vector<double> sizeVec2;
         for (auto iter = indexVec.begin(); iter != indexVec.begin() + numRansacPoints; ++iter)
         {
             xSampleVec1.push_back(cloud1[*iter]);
             xSampleVec2.push_back(cloud2[*iter]);
             pSampleVec2.push_back(ptVec2[*iter]);
+            sizeVec2.push_back(sizeVec[*iter]);
+//            sizeVec2.push_back(1);
         }
         
         // fit the model
         Transf xiOut;
         //TODO // chi2 test, 16 variables, 2% confidence
-        computeTransfSparse(xSampleVec1, xSampleVec2, pSampleVec2, xiOdom, xiOut);
+        computeTransfSparse(xSampleVec1, xSampleVec2, pSampleVec2, sizeVec2, xiOdom, xiOut);
         
         vector<double> lambdaVec(cloud1.size());
         xiOut = xiBaseCam.inverseCompose(xiOut).compose(xiBaseCam);
@@ -208,8 +443,8 @@ void SparseOdometry::ransacNPoints(const Vector3dVec & cloud1,
         
         for (int idx = 0; idx < ptCheckVec.size(); idx++)
         {
-            double res = (ptVec2[idx] - ptCheckVec[idx]).squaredNorm();
-            if (abs(res) < thresh)
+            double res = (ptVec2[idx] - ptCheckVec[idx]).norm();
+            if (res < thresh)
             {
                 inlierCountEstim++;
                 inlierMaskEstim.push_back(true);
@@ -223,12 +458,26 @@ void SparseOdometry::ransacNPoints(const Vector3dVec & cloud1,
         // refresh the best hypothesis
         if (inlierCountEstim > inlierCount)
         {
+            
+            
+            //FIXME DEBUG
+            cout << "RANSAC IMPROVE  " << ransacIteration << setw(10) << inlierCountEstim << endl;
+//            
+//            for (int i = 0; i < ptCheckVec.size(); i++)
+//            {
+//                if (inlierMaskEstim[i])
+//                {
+//                    cout << setw(5) << i << setw(15) << ptVec2[i].transpose() 
+//                            << setw(15) << ptCheckVec[i].transpose() << endl; 
+//                }
+//            }
+            
             inlierCount = inlierCountEstim;
             inlierMask.swap(inlierMaskEstim);
 //            if (inlierCount > 30) break;
         }
     }
-    cout << "inlierCount : " << inlierCount << endl;
+//    cout << "inlierCount : " << inlierCount << endl;
 }
 
 

@@ -25,7 +25,7 @@ SLAM system
 //Speed estimation and extrapolation are to be added
 //Assumed that the data arrives in the chronological order
 PhotometricMapping::PhotometricMapping(const ptree & params):
-//    _params(params.get_child("mapping_parameters")),
+    _params(params.get_child("mapping_parameters")),
     _xiBaseCam( readTransform(params.get_child("xi_base_camera")) ),
     _sgmParams(params.get_child("stereo_parameters")),
     _camera( new EnhancedCamera(readVector<double>(params.get_child("camera_params")).data()) ),
@@ -46,10 +46,15 @@ void PhotometricMapping::feedOdometry(const Transf & xi)
     {    //integrate
         _xiLocal = _xiLocal.composeInverse(_xiOdom).compose(xi);
     }
+    cout << "FEED ODOM" << endl;
+    cout << "xi local" << endl << _xiLocal << endl;
+    cout << "odom incr" << endl << _xiOdom.inverseCompose(xi) << endl;
     //refresh
     _xiOdom = xi;
     _odomInit = true;
 }
+
+const bool ODOM_MODE = false;
 
 void PhotometricMapping::feedImage(const Mat8u & img)
 {
@@ -74,7 +79,7 @@ void PhotometricMapping::feedImage(const Mat8u & img)
         
         _mapIdx = selectMapFrame(_interFrame.xi);
         
-        if (_mapIdx == -1)
+        if (_mapIdx == -1 or ODOM_MODE) //FIXME to test in ODOM mode
         {
             _state = MAP_SLAM; //the frame will be put into the map
         }
@@ -134,7 +139,7 @@ void PhotometricMapping::feedImage(const Mat8u & img)
         {
             pushInterFrame(img);
             _mapIdx = selectMapFrame(_interFrame.xi);
-            if (_mapIdx != -1)
+            if (_mapIdx != -1 and not ODOM_MODE) //FIXME to test in ODOM mode
             { 
                 _state = MAP_LOCALIZE;
                 localizeMI();
@@ -218,7 +223,7 @@ void PhotometricMapping::pushInterFrame(const Mat8u & img)
     
     img.copyTo(_interFrame.img);
     _interFrame.xi = _interFrame.xi.compose(_xiLocal);
-    _xiLocal = Transf(0, 0, 0, 0, 0, 0);
+    _xiLocalOld = _xiLocal = Transf(0, 0, 0, 0, 0, 0);
     
     _localizer.setBaseImage(img);
     _motionStereo.setBaseImage(img);
@@ -239,7 +244,7 @@ void PhotometricMapping::reInit(const Transf & xi)
         _frameVec.back().xi = _interFrame.xi;
     }
     _state = MAP_BEGIN;
-    _xiLocal = xi;
+    _xiLocalOld = _xiLocal = xi;
     _odomInit = false;
 }
 
@@ -250,8 +255,10 @@ int PhotometricMapping::selectMapFrame(const Transf & xi)
     for (int i = 0; i < _frameVec.size(); i++)
     {
         Transf delta = xi.inverseCompose(_frameVec[i].xi);
+        delta.trans()[1] = 0;
         double r = delta.rot().squaredNorm();
         double d = delta.trans().squaredNorm();
+        
         if (r > _params.angularThreshSq or
             d > _params.distThreshSq) continue;
         if (r + d < bestDist)
@@ -306,75 +313,89 @@ Transf PhotometricMapping::localizePhoto(const Mat8u & img)
     
     _xiLocal = _localizer.computePose( _xiLocal );
     
+//    _xiLocal = _localizer.computePoseMI( _xiLocal );
+    
     //Error correction
-    PhotometricPack dataPack;
-    vector<int> idxVec;
-    _depth.reconstruct(idxVec, dataPack.cloud);
     
-    const int POINT_NUMBER = dataPack.cloud.size();
-    
-    for (auto & idx : idxVec)
-    {
-        int u = _depth.uConv(idx % _depth.xMax);
-        int v = _depth.vConv(idx / _depth.xMax);
-        dataPack.valVec.push_back(_interFrame.img(v, u));
-    }
-    
-    Mat32f img1, img2;
-    _interFrame.img.convertTo(img1, CV_32F);
-    img.convertTo(img2, CV_32F);
-    
-    PhotometricCostFunction  costFunction1(_camera, _xiBaseCam, dataPack, img1, 1);
-    PhotometricCostFunction  costFunction2(_camera, _xiBaseCam, dataPack, img2, 1);
-    
-    Transf xi = getCameraMotion(_xiLocal);
-    
-    array<double, 6> arg;
-    MatrixXdrm J1(POINT_NUMBER, 6), J2(POINT_NUMBER, 6);
-    double * argPtr = arg.data();
-    double * J1ptr = J1.data();
-    double * J2ptr = J2.data();
-    
-    VectorXd Err(POINT_NUMBER);
+//    PhotometricPack dataPack;
+//    vector<int> idxVec;
+//    _depth.reconstruct(idxVec, dataPack.cloud);
+//    
+//    const int POINT_NUMBER = dataPack.cloud.size();
+//    
+//    for (auto & idx : idxVec)
+//    {
+//        int u = _depth.uConv(idx % _depth.xMax);
+//        int v = _depth.vConv(idx / _depth.xMax);
+//        dataPack.valVec.push_back(_interFrame.img(v, u));
+//    }
     
     
-    arg.fill(0);
-    costFunction1.Evaluate(&argPtr, Err.data(), &J1ptr);
-    arg = xi.toArray();
-    costFunction2.Evaluate(&argPtr, Err.data(), &J2ptr);
     
-    JacobiSVD<MatrixXdrm> svd(J1, ComputeThinU | ComputeThinV);
-    MatrixXdrm J1pinv;
-    pinv(svd, J1pinv);
-    MatrixXdrm projector = J2 - J1*(J1pinv * J2);
-    Vector6d a = (projector).jacobiSvd(ComputeThinU | ComputeThinV).solve(Err);
-    cout << "    #### CORRECTION : " << endl << a.transpose() << endl;
+//    Mat32f img1, img2;
+//    _interFrame.img.convertTo(img1, CV_32F);
+//    img.convertTo(img2, CV_32F);
+//    
+//    PhotometricCostFunction  costFunction1(_camera, _xiBaseCam, dataPack, img1, 1);
+//    PhotometricCostFunction  costFunction2(_camera, _xiBaseCam, dataPack, img2, 1);
+//    
+//    Transf xi = getCameraMotion(_xiLocal);
     
-    Transf dxi(a.data());
+    
+    
+//    array<double, 6> arg;
+//    MatrixXdrm J1(POINT_NUMBER, 6), J2(POINT_NUMBER, 6);
+//    double * argPtr = arg.data();
+//    double * J1ptr = J1.data();
+//    double * J2ptr = J2.data();
+//    
+//    VectorXd Err(POINT_NUMBER);
+//    
+//    
+//    arg.fill(0);
+//    costFunction1.Evaluate(&argPtr, Err.data(), &J1ptr);
+//    arg = xi.toArray();
+//    costFunction2.Evaluate(&argPtr, Err.data(), &J2ptr);
+//    
+//    JacobiSVD<MatrixXdrm> svd(J1, ComputeThinU | ComputeThinV);
+//    MatrixXdrm J1pinv;
+//    pinv(svd, J1pinv);
+//    MatrixXdrm projector = J2 - J1*(J1pinv * J2);
+//    Vector6d a = (projector).jacobiSvd(ComputeThinU | ComputeThinV).solve(Err);
+//    cout << "    #### CORRECTION : " << endl << a.transpose() << endl;
+    
+//    Transf dxi(a.data());
     
 //    _xiLocal = _xiLocal.composeInverse(dxi);
     
     
-    //SCALE FACTOR NORMALIZATION
-//    Transf zeta = _xiLocalOld.inverseCompose(_xiLocal);
-//    double lengthPrior = zetaPrior.trans().norm();
-//    double length = zeta.trans().norm();
-//    double K = lengthPrior / length;
-//    if (length > 1e-2) //TODO put a meaningful threshold
-//    {
-//        
-//        if (K > 1.2) //too much divergence between WO and VO
-//        {
-//            cout << "WARNING : discard VO result, scale error" << endl;
-//            _xiLocal = _xiLocalOld.compose(zetaPrior);
-//        }
-//        else
-//        {
-//            zeta.trans() *= K;
-//            _xiLocal = _xiLocalOld.compose(zeta);
-//        }
-//    }
-//    _xiLocalOld = _xiLocal;
+//////    SCALE FACTOR NORMALIZATION
+    if (_params.normalizeScale)
+    {
+        Transf zeta = _xiLocalOld.inverseCompose(_xiLocal);
+        double lengthPrior = zetaPrior.trans().norm();
+        double length = zeta.trans().norm();
+        double K = lengthPrior / length;
+        cout << "Correction : " << K << endl;
+        
+        cout << "prior : " << endl << zetaPrior << endl;
+        cout << "calc  : " << endl << zeta << endl;
+        if (length > 1e-2) //TODO put a meaningful threshold
+        {
+            
+            if (K > 1.2) //too much divergence between WO and VO
+            {
+                cout << "WARNING : discard VO result, scale error" << endl;
+                _xiLocal = _xiLocalOld.compose(zetaPrior);
+            }
+            else
+            {
+                zeta.trans() *= K;
+                _xiLocal = _xiLocalOld.compose(zeta);
+            }
+        }
+        _xiLocalOld = _xiLocal;
+    }
 }
 
 

@@ -18,19 +18,22 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "io.h"
 #include "ocv.h"
 #include "eigen.h"
+#include "json.h"
 
 #include "geometry/geometry.h"
 #include "projection/pinhole.h"
 #include "projection/eucm.h"
 
-void initRemap(const array<double, 6> & params1, const array<double, 3> & params2,
-    Mat32f & mapX, Mat32f & mapY, const array<double, 3> & rot)
+void initRemap(const vector<double> & params1, const vector<double> & params2,
+    Mat32f & mapX, Mat32f & mapY, const Transf & T)
 {
+    assert(params1.size() == 6);
+    assert(params2.size() == 5);
     EnhancedCamera cam1(params1.data());
-    Pinhole cam2(params2[0], params2[1], params2[2]);
+    Pinhole cam2(params2[2], params2[3], params2[4]);
     Vector2dVec imagePoints;
-    mapX.create(params2[1]*2, params2[0]*2);
-    mapY.create(params2[1]*2, params2[0]*2);
+    mapX.create(params2[1], params2[0]);
+    mapY.create(params2[1], params2[0]);
     for (unsigned int i = 0; i < mapX.rows; i++)
     {
         for (unsigned int j = 0; j < mapX.cols; j++)
@@ -40,7 +43,6 @@ void initRemap(const array<double, 6> & params1, const array<double, 3> & params
     }
     Vector3dVec pointCloud;
     cam2.reconstructPointCloud(imagePoints, pointCloud);
-    Transformation<double> T(0, 0, 0, rot[0], rot[1], rot[2]);
     T.transform(pointCloud, pointCloud);
     cam1.projectPointCloud(pointCloud, imagePoints);
     
@@ -58,52 +60,25 @@ void initRemap(const array<double, 6> & params1, const array<double, 3> & params
 
 int main(int argc, char** argv) {
 
-    // read parameters and image names
-    array<double, 6> params;
-    ifstream paramFile(argv[1]);
-    cout << argv[1] << endl;
-    cout << "EU Camera model parameters :" << endl;
-    for (auto & p: params) 
-    {
-        paramFile >> p;
-        cout << setw(10) << p;
-    }
-    cout << endl;
-    paramFile.ignore();
-    
-    array<double, 3> params2;
-    cout << "Pinhole rectified camera parameters :" << endl;
-    for (auto & p: params2) 
-    {
-        paramFile >> p;
-        cout << setw(10) << p;
-    }
-    cout << endl;
-    paramFile.ignore();
-    
-    array<double, 3> rotation;
-    cout << "Rotation of the pinhole camera :" << endl;
-    for (auto & p: rotation) 
-    {
-        paramFile >> p;
-        cout << setw(10) << p;
-    }
-    cout << endl;
-    paramFile.ignore();
-    
+
+    ptree root;
+    read_json(argv[1], root);
+    vector<double> paramsEucm = readVector<double>(root.get_child("camera_params"));
+
+    //u0, v0, f
+    vector<double> paramsPinhole = readVector<double>(root.get_child("pinhole_params"));
+    Transf xi = readTransform(root.get_child("xi_eucm_pinhole"));
+      
     Mat32f  mapX, mapY;
-    initRemap(params, params2, mapX, mapY, rotation);
+    initRemap(paramsEucm, paramsPinhole, mapX, mapY, xi);
     
-    string dirName, fileName;
-    getline(paramFile, dirName);
-    while (getline(paramFile, fileName))
+    int count = 0;
+    for (auto & x : root.get_child("image_names"))
     {
-        Mat32f img = imread(dirName + fileName, 0);
+        Mat32f img = imread(x.second.get_value<string>(), 0);
         Mat32f img2;
         remap(img, img2, mapX, mapY, cv::INTER_LINEAR);
-        imshow("orig", img/255);
-        imshow("res", img2/255);
-        waitKey();
+        imwrite("img_" + to_string(count++) + ".png", img2);
     }
 
     return 0;
