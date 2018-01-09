@@ -69,7 +69,11 @@ PhotometricPack ScalePhotometric::initPhotometricData(int scaleIdx)
             // to speed up the computation
             int ub = scaleSpace1.uConv(us);
             int vb = scaleSpace1.vConv(vs);
-            if (depthMap.nearest(ub, vb) > DIST_MAX) continue;
+            if (depthMap.nearest(ub, vb) > DIST_MAX
+                or depthMap.nearest(ub, vb) == OUT_OF_RANGE
+                or img1(vs, us) > 240
+                ) continue;
+            
             if (verbosity > 4) cout << "    " << vs << " " << us << endl;
             valVec.push_back(img1(vs, us));
             imagePointVec.emplace_back(ub, vb);
@@ -133,10 +137,10 @@ void ScalePhotometric::computePose(int scaleIdx, Transf & T12)
     problem.AddResidualBlock(costFunction, NULL, pose.data());    
     
     //add an odometry prior
-    if (useMotionPrior and 0) //FIXME experimental
+    if (useMotionPrior) //FIXME experimental
     {
         //A proper nose model on the depth map localization must be applied
-        OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.03, 0.03, _xiPrior);
+        OdometryPrior * odometryCost = new OdometryPrior(0.02, 0.02, 0.01, 0.01, _xiPrior);
         problem.AddResidualBlock(odometryCost, NULL, pose.data());
     }
     
@@ -252,7 +256,7 @@ void ScalePhotometric::computePoseMI(int scaleIdx, Transf & T12)
 //    if (useMotionPrior) //FIXME experimental
 //    {
 //        //A proper nose model on the depth map localization must be applied
-//        OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.01, 0.03, _xiPrior);
+//        OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.03, 0.03, _xiPrior);
 //        problem.AddResidualBlock(odometryCost, NULL, pose.data());
 //    }
     

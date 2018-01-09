@@ -36,21 +36,65 @@ int main(int argc, char** argv)
     ptree root;
     read_json(argv[1], root);
     PhotometricMapping odom(root);
-    int depthMapCount = 0;
+   
+    Transf xiMap;
+    bool xiMapInit = false;
+    // construct the map
+    int mapCount = 0;
+    for (auto & fileName : root.get_child("map_files"))
+    {
+        mapCount++;
+        ptree trajectoryData;
+        read_json(fileName.second.get_value<string>(), trajectoryData);
+        
+        vector<Transf> gtVec;
+        for (auto & x : trajectoryData.get_child("gt"))
+        {
+            gtVec.emplace_back(readTransform(x.second));
+        }
+        
+        vector<string> fnameVec;
+        for (auto & x : trajectoryData.get_child("names"))
+        {
+            fnameVec.emplace_back(x.second.get_value<string>());
+        }
+        if (not xiMapInit)
+        {
+            xiMapInit = true;
+            xiMap = gtVec[0];
+        }
+        ofstream fgt("gtMap" + to_string(mapCount) + ".txt");
+        for (int i = 0; i < fnameVec.size(); i++)
+        {
+            Mat8u img1 = imread(fnameVec[i], 0);
+            if(odom.constructMap(xiMap.inverseCompose(gtVec[i]), img1))
+            {
+                fgt << xiMap.inverseCompose(gtVec[i]) << endl;
+            }
+        }
+        fgt.close();
+        continue;
+    }
+    
+    // localize    
     int trajCount = 0;
     for (auto & fileName : root.get_child("trajectory_files"))
     {
         trajCount++;
+        
         ptree trajectoryData;
         read_json(fileName.second.get_value<string>(), trajectoryData);
-        
-        ofstream fvo("vo" + to_string(trajCount) + ".txt");
-        ofstream fwo("wo" + to_string(trajCount) + ".txt");
         
         vector<Transf> odomVec;
         for (auto & x : trajectoryData.get_child("odom"))
         {
             odomVec.emplace_back(readTransform(x.second));
+        }
+        
+        vector<Transf> gtVec;
+        for (auto & x : trajectoryData.get_child("gt"))
+        {
+            gtVec.emplace_back(readTransform(x.second));
         }
         
         vector<string> fnameVec;
@@ -59,22 +103,37 @@ int main(int argc, char** argv)
             fnameVec.emplace_back(x.second.get_value<string>());
         }
         
-        Transf xi(0, 0, 0, 0, 0, 0); //initial position
-        odom.reInit(xi);
+        ofstream fvo("vo" + to_string(trajCount) + ".txt");
+        ofstream fwo("wo" + to_string(trajCount) + ".txt");
+        ofstream fkf("kf" + to_string(trajCount) + ".txt");
+        ofstream fgt("gt" + to_string(trajCount) + ".txt");
+        
+        
+        bool initialized = false;
         for (int i = 0; i < fnameVec.size(); i++)
         {
+            //find the starting point
+            if (not initialized)
+            {
+                Transf xi = xiMap.inverseCompose(gtVec[i]); //initial position
+                if (odom.selectMapFrame(xi) == -1) continue;                
+                cout << xiMap << endl << gtVec[i] << endl;
+                odom.reInit(xi);
+                initialized = true;
+            }
+        
             odom.feedOdometry(odomVec[i]);
             Mat8u img1 = imread(fnameVec[i], 0);
             odom.feedImage(img1);
             
-            
-            
-            cout << "ODOMETRY : " << endl;
-            cout << "    " << odomVec[0].inverseCompose(odomVec[i]) << endl;
-            cout << "ESTIMATE : " << endl;
-            cout << "    " << odom._interFrame.xi.compose(odom._xiLocal) << endl;
             fvo << odom._interFrame.xi.compose(odom._xiLocal) << endl;
-            fwo << odomVec[0].inverseCompose(odomVec[i]) << endl;
+            fwo << xiMap.inverseCompose(odomVec[i]) << endl; //true only if odomVec contains GT
+            fgt << xiMap.inverseCompose(gtVec[i]) << endl;
+            if (odom._state == PhotometricMapping::MAP_SLAM) 
+            {
+                fkf << i << "       " << odom._interFrame.xi.compose(odom._xiLocal) << endl;
+                initialized = false;
+            }
             if (not odom._depth.empty())
             {   
                 Mat8u dst;
@@ -89,19 +148,14 @@ int main(int argc, char** argv)
                 
                 odom._depth.toMat(depthMat);
                 imshow("depth", depthMat / 100);
-                waitKey(50);
-//                        imwrite("depth" + to_string(depthMapCount++) + ".png", depthMat  * 25);
+                waitKey(30);
             }
 
         }
         fvo.close();
         fwo.close();
-        ofstream fkf("kf" + to_string(trajCount) + ".txt");
-        for (auto & kf : odom._frameVec)
-        {
-            fkf << kf.xi << endl;
-        }
         fkf.close();
+        fgt.close();
     }
     
     

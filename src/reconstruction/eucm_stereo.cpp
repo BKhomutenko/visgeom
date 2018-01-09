@@ -246,6 +246,8 @@ double EnhancedStereo::triangulate(double u1, double v1, double u2,
     }
 }
 
+//FIXME
+const double TRIANGULATE_DIST_MAX = 100;
 bool EnhancedStereo::triangulate(const double u1, const double v1, const double u21, const double v21,
         const double u22, const double v22, double & d, double & sigma, CameraIdx camIdx) const
 {
@@ -281,8 +283,16 @@ bool EnhancedStereo::triangulate(const double u1, const double v1, const double 
     }
     
     //result
-    sigma = abs(lambda2 - lambda1);
-    d = lambda1;
+    if (lambda1 < TRIANGULATE_DIST_MAX) 
+    {
+        sigma = abs(lambda2 - lambda1);
+        d = lambda1;
+    }
+    else
+    {
+        sigma = OUT_OF_RANGE;
+        d = OUT_OF_RANGE;
+    }
 }
 
 bool EnhancedStereo::triangulate(const Vector2d pt11, const Vector2d pt12, const Vector2d pt21,

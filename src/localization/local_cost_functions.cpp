@@ -49,11 +49,11 @@ PhotometricCostFunction::PhotometricCostFunction(const ICamera * camera, const T
     
 void PhotometricCostFunction::lossFunction(const double x, double & rho, double & drhodx) const
 {
-    double s = sign(x);
+    double s = 0.1*sign(x);
     const double arg = -abs(x) / LOSS_FACTOR;
     const double e = arg > -5 ? exp(-abs(x) / LOSS_FACTOR) : 0;
     rho = s * LOSS_FACTOR * (1. - e);
-    drhodx = e;
+    drhodx = 0.1*e;
 
     return;
 }

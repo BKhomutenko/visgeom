@@ -69,7 +69,7 @@ bool MotionStereo::selectPoint(int x, int y)
     gu2 = descRasterUncert.u;
     gv2 = descRasterUncert.v;
     
-    if (gstep < 1 or not _epipolarDescriptor.goodResp()) return false;
+    if (gstep != 1 or not _epipolarDescriptor.goodResp()) return false;
     flags |= GLB_STEP | GLB_DESCRIPTOR;
     return true;
 }

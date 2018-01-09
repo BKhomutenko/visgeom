@@ -121,7 +121,7 @@ public:
 int main(int argc, char** argv) 
 {
     const int Nx = 8;
-    const int Ny = 5;
+    const int Ny = 6;
     
     Mat8u frame = imread(argv[1], 0);
     
@@ -131,8 +131,11 @@ int main(int argc, char** argv)
     Vector2dVec cornerVec;
     detector.detectPattern(cornerVec);
     
-    drawPoints(frame, cornerVec);
-    imshow("res", frame);
+    Mat8uc3 frame3;
+    cvtColor(frame, frame3, CV_GRAY2BGR);
+    drawPoints(frame3, cornerVec);
+    imshow("res", frame3);
+    imwrite("res.png", frame3);
     waitKey();
     return 0;
 }

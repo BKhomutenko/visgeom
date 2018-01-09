@@ -132,6 +132,10 @@ int main(int argc, char** argv)
     cout << "odometry test" << endl;
     SparseOdometry odom(&camera, xiBaseCam);
     
+    
+    Transf xiBaseCam1(0.397979 , 1.55485 , 1.16112  ,  -1.59343, -0.00419144,   0.0167138);
+    Transf xiCam12(0.00221874  , -0.300893, -0.00215483,  0.00839828,  0.00243455, -0.00758349);
+    cout << xiBaseCam1.compose(xiCam12) << endl;
     //init stereoParameters
     SgmParameters stereoParams(root.get_child("stereo_parameters"));
     

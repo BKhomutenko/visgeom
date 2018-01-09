@@ -94,7 +94,7 @@ private:
     
     //TODO make a parameter structure
     // minimal squared norm of gradient for a pixel to be accepted
-    const double GRAD_THRESH = 100;
+    const double GRAD_THRESH = 250;
     const double GRAD_MAX = 255;
     const double DIST_MAX = 50;
     int verbosity;

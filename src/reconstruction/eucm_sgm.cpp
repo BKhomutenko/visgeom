@@ -282,7 +282,7 @@ void EnhancedSgm::computeCurveCost(const Mat8u & img1, const Mat8u & img2)
             }
             
             //TODO revise the criterion (step == 1)
-            if (_params.salientPoints and step <= 2 and _epipolarDescriptor.goodResp())
+            if (_params.salientPoints and step < 2 and _epipolarDescriptor.goodResp())
             {
                 _salientBuffer(y, x) = 1;
             }
@@ -575,7 +575,7 @@ void EnhancedSgm::reconstructDisparity()
             bestDisp = -1;
             const int base = x * _params.dispMax;
             if (_params.verbosity > 4) cout << "Err : ";
-            for (int d = 0; d < _params.dispMax; d++)
+            for (int d = 1; d < _params.dispMax; d++)
             {
                 const int & err = errRow[base + d];
                 if (_params.verbosity > 4) cout << setw(8) << err;

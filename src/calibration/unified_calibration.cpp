@@ -24,6 +24,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "ceres.h"
 #include "json.h"
 #include "except.h"
+#include "timer.h"
 
 #include <glog/logging.h>
 
@@ -31,7 +32,8 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "calibration/corner_detector.h"
 #include "projection/generic_camera.h"
 #include "projection/eucm.h"
-    
+#include "projection/ucm.h"
+
 bool GenericCameraCalibration::compute()
 {
     //run the solver
@@ -148,6 +150,15 @@ void GenericCameraCalibration::parseCameras()
                 throw runtime_error("invalid number of intrinsic parameters");
             }
             cameraMap[name] = new EnhancedCamera(intrinsicVec.data());
+        }
+        else if (cameraType == "ucm")
+        {
+            cout << "Model : UCM" << endl;
+            if (intrinsicVec.size() != 6) //FIXME must be 5
+            {
+                throw runtime_error("invalid number of intrinsic parameters");
+            }
+            cameraMap[name] = new UnifiedCamera(intrinsicVec.data());
         }
         else
         {
@@ -629,6 +640,7 @@ void onMouse( int event, int x, int y, int, void* )
 /*
 void GenericCameraCalibration::extractGridProjections(ImageData & data)
 {
+    Timer timer;
     const int flags = cv::CALIB_CB_ADAPTIVE_THRESH;
     Size patternSize(data.Nx, data.Ny);
     string sequenceName;
@@ -642,6 +654,7 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
     }
     bool initialized = transformInfoMap[sequenceName].initialized;
     const vector<bool> & initVec = sequenceInitMap[sequenceName];
+    int countSuccess = 0;
     for (int i = 0; i < data.imageNameVec.size(); i++)
     {
         cout << "." << flush;
@@ -742,14 +755,14 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
                 cross(cornerImg, pt.x * K + 0.5*K, pt.y * K + 0.5*K, 25, 255, 3);
             }
         }
+        countSuccess++;
         
-        
-        if (data.improveDetection)
-        {
-            double minDist = findMinDistance(cornerVec, data.Ny, data.Nx);
-            CornerDetector detector(data.Nx, data.Ny, 3, true, false);
-            detector.improveCorners(cornerVec);
-        }
+//        if (data.improveDetection)
+//        {
+//            double minDist = findMinDistance(cornerVec, data.Ny, data.Nx);
+//            CornerDetector detector(data.Nx, data.Ny, 3, true, false);
+//            detector.improveCorners(cornerVec);
+//        }
         
         if (data.drawImproved) 
         {
@@ -761,12 +774,18 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
             waitKey();
         }
     }
+    double telapsed = timer.elapsed();
     cout << endl;
+    cout << "DETECTION RATE : " << countSuccess << " of " 
+            << data.imageNameVec.size() << " detected" << endl;
+    cout << "ELAPSED : " << telapsed << "      or per image : " << telapsed / data.imageNameVec.size() << endl;
 }*/
+
 
 
 void GenericCameraCalibration::extractGridProjections(ImageData & data)
 {
+    Timer timer;
     CornerDetector detector(data.Nx, data.Ny, 3, data.improveDetection);
     
     string sequenceName;
@@ -780,6 +799,7 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
     }
     bool initialized = transformInfoMap[sequenceName].initialized;
     const vector<bool> & initVec = sequenceInitMap[sequenceName];
+    int countSuccess = 0;
     for (int i = 0; i < data.imageNameVec.size(); i++)
     {
         cout <<data.imageNameVec[i] << endl;
@@ -826,10 +846,16 @@ void GenericCameraCalibration::extractGridProjections(ImageData & data)
             }
         }
         
+        countSuccess++;
         data.detectedCornersVec.back() = patternVec;
     }
+    double telapsed = timer.elapsed();
     cout << endl;
+    cout << "DETECTION RATE : " << countSuccess << " of " 
+            << data.imageNameVec.size() << " detected" << endl;
+    cout << "ELAPSED : " << telapsed << "      or per image : " << telapsed / data.imageNameVec.size() << endl;
 }
+
 
 Transf GenericCameraCalibration::estimateInitialGrid(const ImageData & data, const int gridIdx)
 {
@@ -1007,10 +1033,15 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
             for (int i = 0; i < inlierVec.size(); i++)
             {
                 circle(img, Point(inlierVec[i][0], inlierVec[i][1]), 9, Scalar(0, 255, 0), 5);
+                
+//                circle(img, Point(inlierVec[i][0], inlierVec[i][1]), 15, Scalar(0, 127, 255), 8);
             }
             for (int i = 0; i < outlierVec.size(); i++)
             {
                 circle(img, Point(outlierVec[i][0], outlierVec[i][1]), 9, Scalar(0, 127, 255), 5);
+
+//                circle(img, Point(outlierVec[i][0], outlierVec[i][1]), 15, Scalar(0, 127, 255), 8);
+                
                 cout << outlierVec[i].transpose() << "   err : " << errVec[i] << endl;
             }
             
@@ -1023,7 +1054,7 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
             
             if (data.saveOutlierImages) 
             {
-                imwrite( "outliers_" + to_string(transfIdx) + ".png", img(Rect(800, 370, 400, 360)) );
+                imwrite( "outliers_" + to_string(transfIdx) + ".png", img);
             }
             if (data.showOutliers) 
             {

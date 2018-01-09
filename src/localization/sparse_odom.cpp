@@ -22,6 +22,7 @@ Relative camera pose estimation based on photometric error and depth map
 #include "localization/sparse_odom.h"
 
 #include "std.h"
+#include <tuple>
 #include "eigen.h"
 #include "ocv.h"
 #include "ceres.h" 
@@ -31,15 +32,139 @@ Relative camera pose estimation based on photometric error and depth map
 #include "reconstruction/triangulator.h"
 #include "localization/local_cost_functions.h"
 
+using std::get;
+using std::tie;
+using std::tuple;
 
+using cv::Vec3b;
+int imgCount = 0;
+
+
+
+void harrisResp(const Mat8u & img, Mat32f & respMat)
+{
+    Mat32f gx, gy;
+    Mat32f Ixx, Ixy, Iyy;
+    Sobel(img, gx, CV_32F, 1, 0, 3, 0.01);
+    Sobel(img, gy, CV_32F, 0, 1, 3, 0.01);
+    Ixx = gx.mul(gx);
+    Ixy = gx.mul(gy);
+    Iyy = gy.mul(gy);
+    GaussianBlur(Ixx, Ixx, Size(3, 3), 0.5, 0.5);
+    GaussianBlur(Ixy, Ixy, Size(3, 3), 0.5, 0.5);
+    GaussianBlur(Iyy, Iyy, Size(3, 3), 0.5, 0.5);
+    respMat = (Ixx.mul(Iyy) - Ixy.mul(Ixy) )/ ( 1 + Ixx + Iyy);
+    GaussianBlur(respMat, respMat, Size(3, 3), 0.7, 0.7);
+}
+
+void harrisBlobs(const Mat32f & respMat, vector<pair<double, int>> respHeap, const Vector2dVec &  maxVec)
+{
+    
+    Mat8u visited(respMat.size());
+    
+    Mat8uc3 visited2(respMat.size());
+    visited2.setTo(0);
+    imshow("harris", respMat);
+    int countFeatures = 0;
+    while (countFeatures < 100 and not respHeap.empty())
+    {
+        pop_heap(respHeap.begin(), respHeap.end());
+        
+        vector<tuple<double, int, int>> heap;
+        
+        int idx = respHeap.back().second;
+        double resp = respHeap.back().first;
+        respHeap.pop_back();
+        if (visited2(maxVec[idx][1], maxVec[idx][0])[0] != 0) continue;
+        countFeatures++;
+        heap.emplace_back(respMat(maxVec[idx][1], maxVec[idx][0]), maxVec[idx][0], maxVec[idx][1]);
+        visited.setTo(0);
+        double acc = 0;
+        int count = 0;
+        while (not heap.empty())
+        {
+            pop_heap(heap.begin(), heap.end());
+            double resp;
+            int u, v;
+            tie(resp, u, v) = heap.back();
+            heap.pop_back();
+            if (visited2(v, u)[0] != 0 or visited(v, u) == 255) continue;
+            if (2 * count * resp < acc) continue;
+            visited(v, u) = 255;
+            visited2(v, u) = Vec3b((countFeatures*17) % 255 + 150,
+                                    (countFeatures*37) % 255 + 150,
+                                    (countFeatures*47) % 255 + 150);
+                                    
+            acc += resp;
+            count++;
+            if (u > 0 and 2 * count * respMat(v, u - 1) > acc)
+            {
+                heap.emplace_back(respMat(v, u - 1), u - 1, v);
+                push_heap(heap.begin(), heap.end());
+            }
+            if (u < respMat.cols - 1 and 2 * count * respMat(v, u + 1) > acc)
+            {
+                heap.emplace_back(respMat(v, u + 1), u + 1, v);
+                push_heap(heap.begin(), heap.end());
+            }
+            if (v > 0 and 2 * count * respMat(v - 1, u) > acc)
+            {
+                heap.emplace_back(respMat(v - 1, u), u, v - 1);
+                push_heap(heap.begin(), heap.end());
+            }
+            if (v < respMat.rows - 1 and 2 * count * respMat(v + 1, u) > acc)
+            {
+                heap.emplace_back(respMat(v + 1, u), u, v);
+                push_heap(heap.begin(), heap.end());
+            }
+        }
+//        
+    }  
+    imshow("visited" + to_string(imgCount++), visited2);
+    waitKey();
+}
+
+void harrisTest()
+{
+    Mat32f respMat;
+    Mat8u img = imread("/home/bogdan/projects/stack/lena.png", 0);
+    harrisResp(img, respMat);
+    vector<pair<double, int>> respHeap;
+    Vector2dVec maxVec;
+    
+    for (int v = 7; v < img.rows - 7; v++)
+    {
+        for (int u = 7; u < img.cols - 7; u++)
+        {
+            double respVal = respMat(v, u);
+            bool isMax = true;
+            for (int dv = -1; dv <= 1 and isMax; dv++)
+            {
+                for (int du = -1; du <= 1 and isMax; du++)
+                {
+                    if (du == 0 and dv == 0) continue;
+                    if (respVal <= respMat(v + dv, u + du)) isMax = false;
+                }
+            }
+            if (isMax)
+            {
+                maxVec.emplace_back(u, v);
+                respHeap.emplace_back(respVal, maxVec.size() - 1);
+            }
+        }
+    }
+    make_heap(respHeap.begin(), respHeap.end());
+    harrisBlobs(respMat, respHeap, maxVec);
+}
 
 //FIXME TMP HARRIS FEATURES
 Vector2dVec harrisCorners(const Mat8u & img)
 {
+//    harrisTest();
     Mat32f resp;
     resp.create(img.size());
     cornerHarris(img, resp, 7, 3, 0.05);
-    
+//    harrisResp(img, resp);
     vector<pair<double, int>> respHeap;
     Vector2dVec maxVec;
     
@@ -65,7 +190,6 @@ Vector2dVec harrisCorners(const Mat8u & img)
         }
     }
     make_heap(respHeap.begin(), respHeap.end());
-    
     Vector2dVec resVec;
     const int NUM_FEATURES = 500;
     while (resVec.size() < NUM_FEATURES and not respHeap.empty())
@@ -300,7 +424,7 @@ void SparseOdometry::feedData(const Mat8u & imageNew, const Transf xiOdomNew)
                 
             }
             imshow("lines", lineMat);
-            waitKey();
+            waitKey(1500);
         }
         
     }

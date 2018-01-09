@@ -75,7 +75,7 @@ struct PhotometricCostFunction : ceres::CostFunction
     
 //    const double _scale;
     const double _invScale;
-    const double LOSS_FACTOR = 5;     // defines how quickly the impact of data points is reduced with error
+    const double LOSS_FACTOR = 3;     // defines how quickly the impact of data points is reduced with error
     const double MARGIN_SIZE;
 };
 

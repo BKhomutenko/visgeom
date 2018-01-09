@@ -34,31 +34,8 @@ ptree serializeTransform(const Transf & xi)
     return xiNode;
 }
 
-int main(int argc, char** argv) 
+void interpolate(const map<double, string> & nameMap, map<double, Transf> & transfMap, ptree & odomTree)
 {
-    
-    ptree odomRoot, imgRoot;
-    read_json(argv[1], odomRoot);
-    read_json(argv[2], imgRoot);
-    
-    map<double, Transf> transfMap;
-    for (auto & x : odomRoot)
-    {
-        double t = x.second.get<int>("time_s") + x.second.get<int>("time_ns") * 1e-9;
-        Transf xi = readTransform(x.second.get_child("pose"));
-        transfMap[t] = xi;
-    }
-
-    map<double, string> nameMap;
-    for (auto & x : imgRoot)
-    {
-        double t = x.second.get<int>("time_s") + x.second.get<int>("time_ns") * 1e-9;
-        string name = x.second.get<string>("fname");
-        nameMap[t] = name;
-    }
-    
-    
-    ptree odomTree, imgTree;
     for (auto & x : nameMap)
     {
         auto it = transfMap.lower_bound(x.first);
@@ -66,9 +43,6 @@ int main(int argc, char** argv)
         {
             ptree xiNode = serializeTransform(it->second);
             odomTree.push_back( make_pair("", xiNode) );
-            ptree valNode;
-            valNode.put_value(x.second);
-            imgTree.push_back( make_pair("", valNode) );   
         }
         else if (it != transfMap.end())
         {
@@ -84,14 +58,62 @@ int main(int argc, char** argv)
             Transf xi = xi0.compose(zeta);
             ptree xiNode = serializeTransform(xi);
             odomTree.push_back( make_pair("", xiNode) );
-            ptree valNode;
-            valNode.put_value(x.second);
-            imgTree.push_back( make_pair("", valNode) );         
         }
+    }
+}
+
+int main(int argc, char** argv) 
+{
+    const bool USING_GT = (argc > 3);
+    ptree odomRoot, imgRoot, gtRoot;
+    read_json(argv[1], imgRoot);
+    read_json(argv[2], odomRoot);
+    if (USING_GT) read_json(argv[3], gtRoot);
+    
+    map<double, Transf> transfMap;
+    for (auto & x : odomRoot)
+    {
+        double t = x.second.get<int>("time_s") + x.second.get<int>("time_ns") * 1e-9;
+        Transf xi = readTransform(x.second.get_child("pose"));
+        transfMap[t] = xi;
+    }
+    map<double, Transf> gtMap;
+    if (USING_GT)
+    {
+        for (auto & x : gtRoot)
+        {
+            double t = x.second.get<int>("time_s") + x.second.get<int>("time_ns") * 1e-9;
+            Transf xi = readTransform(x.second.get_child("pose"));
+            gtMap[t] = xi;
+        }
+    }
+    
+    
+    map<double, string> nameMap;
+    for (auto & x : imgRoot)
+    {
+        double t = x.second.get<int>("time_s") + x.second.get<int>("time_ns") * 1e-9;
+        string name = x.second.get<string>("fname");
+        nameMap[t] = name;
+    }
+    
+    
+    
+    
+    ptree odomTree, gtTree, imgTree;
+    interpolate(nameMap, transfMap, odomTree);
+    if (USING_GT) interpolate(nameMap, gtMap, gtTree);
+    
+    for (auto & x : nameMap)
+    {
+        ptree valNode;
+        valNode.put_value(x.second);
+        imgTree.push_back( make_pair("", valNode) );         
     }
     ptree pout;
     pout.add_child("names", imgTree);
     pout.add_child("odom", odomTree);
+    if (USING_GT) pout.add_child("gt", gtTree);
     write_json("prepared.json", pout);
 }
 

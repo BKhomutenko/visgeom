@@ -84,6 +84,9 @@ class PhotometricMapping
 public:
     PhotometricMapping(const ptree & params);
     
+    //true if the frame has been inserted
+    bool constructMap(const Transf & xi, const Mat8u & img);
+    
     void feedOdometry(const Transf & xi);
     
     void feedImage(const Mat8u & img);
@@ -106,12 +109,17 @@ public:
 //private:
 
     enum State {MAP_BEGIN, MAP_INIT, MAP_LOCALIZE, MAP_SLAM};
+    enum WarningType {WARNING_NONE, WARNING_SCALE, WARNING_ROTATION};
+    
+    
     
     MappingParameters _params;
     
     EnhancedCamera * _camera;
     //state variables
     State _state;
+    WarningType _warningState;
+    
     int _mapIdx; //currently active map frame
     bool _odomInit;
     Frame _interFrame;

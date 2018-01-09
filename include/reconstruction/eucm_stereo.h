@@ -65,7 +65,7 @@ struct StereoParameters : public ScaleParameters
     //descriptor computation parameters
     int descLength = 5;
     vector<int> scaleVec = {1, 2, 3, 5};
-    int descRespThresh = 3;
+    int descRespThresh = 5;
     
     int numEpipolarPlanes = 2000;
 };

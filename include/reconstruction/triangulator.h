@@ -31,7 +31,7 @@ double regDiv(double num, double denom, double EPS);
 class Triangulator
 {
 public:
-    Triangulator(double epsilon = 1e-3) : eps(epsilon) {}
+    Triangulator(double epsilon = 3e-2) : eps(epsilon) {}
     Triangulator(const Transf & transf, double epsilon = 1e-3) :
             R(transf.rotMat()), t(transf.trans()), eps(epsilon) {}
     

@@ -40,11 +40,15 @@ Transformation<T> transformFromData(const vector<T> & valVec)
     {
         return Transformation<T>(valVec[0], valVec[1], 0, 0, 0, valVec[2]);
     }
-    else  if (valVec.size() == 6)   //full 6 dof
+    else  if (valVec.size() == 6)   //full 6 dof -- angle-axis rotation
     {
         return Transformation<T>(valVec.data());
     }
-    
+    else  if (valVec.size() == 7)   //full 6 dof -- quaternion rotation
+    {
+        return Transformation<T>(valVec[0], valVec[1], valVec[2],
+                                 valVec[3], valVec[4], valVec[5], valVec[6]);
+    }
     else  if (valVec.size() == 12)    //homogeneous transformation
     {
         Matrix3<T> R;

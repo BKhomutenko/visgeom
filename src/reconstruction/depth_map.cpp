@@ -888,11 +888,14 @@ void DepthMap::filterNoise()
             double acc = depthVal * CENTRAL_WEIGHT;
             for (int i = 0; i < 8; i++)
             {
-                double neighDepthVal = myCopy.at(x + dxArr[i], y + dyArr[i]);
+                int x2 = x + dxArr[i];
+                int y2 = y + dyArr[i];
+                double neighDepthVal = myCopy.at(x2, y2);
 //                double neighSigmaVal = myCopy.sigma(x + dxArr[i], y + dyArr[i]);
                 if (neighDepthVal == OUT_OF_RANGE) continue;
                 countFilled++;
-                if (abs(depthVal - neighDepthVal) > sigmaVal) continue;
+                double err = abs(depthVal - neighDepthVal);
+                if (err > sigmaVal or err > 3*myCopy.sigma(x2, y2)) continue;
                 countMatches++;
                 acc += neighDepthVal;
             }
