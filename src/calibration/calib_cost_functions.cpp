@@ -30,9 +30,9 @@ bool GenericProjectionJac::Evaluate(double const * const * params,
 {
     //compute the transformation chain
     Transformation<double> xiAcc;
-    for (int paramIdx = 0; paramIdx < _transformStatusVec.size(); paramIdx++)
+    for (int paramIdx = 1; paramIdx <= _transformStatusVec.size(); paramIdx++)
     {
-        auto const status = _transformStatusVec[paramIdx];
+        auto const status = _transformStatusVec[paramIdx - 1];
         if (status == TRANSFORM_DIRECT)
         {
             Transformation<double> xi(params[paramIdx]);
@@ -50,7 +50,8 @@ bool GenericProjectionJac::Evaluate(double const * const * params,
     xiAcc.transform(_grid, pointCamVec);
     
     //get the intrinsic parameters
-    const int cameraIntrinsicIdx = _transformStatusVec.size();
+//    const int cameraIntrinsicIdx = _transformStatusVec.size(); //FIXME
+    const int cameraIntrinsicIdx = 0;
     _camera->setParameters(params[cameraIntrinsicIdx]);
     
     //compute the reprojection error
@@ -74,9 +75,10 @@ bool GenericProjectionJac::Evaluate(double const * const * params,
     {
         //compute the transformation chain
         Transformation<double> xiAcc;
-        for (int paramIdx = 0; paramIdx < _transformStatusVec.size(); paramIdx++)
+//        for (int paramIdx = 0; paramIdx < _transformStatusVec.size(); paramIdx++) //FIXME
+        for (int paramIdx = 1; paramIdx <= _transformStatusVec.size(); paramIdx++)
         {
-            auto const status = _transformStatusVec[paramIdx];
+            auto const status = _transformStatusVec[paramIdx - 1];
             Transformation<double> xi23(params[paramIdx]);
             Transformation<double> xi13;
             if (status == TRANSFORM_DIRECT)

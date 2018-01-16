@@ -33,13 +33,14 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "projection/generic_camera.h"
 #include "projection/eucm.h"
 #include "projection/ucm.h"
+#include "projection/mei.h"
 
 bool GenericCameraCalibration::compute()
 {
     //run the solver
     Solver::Options options;
-//        options.check_gradients = true;
-    options.gradient_check_relative_precision = 1e-5;
+//    options.check_gradients = true;
+//    options.gradient_check_relative_precision = 1e-5;
     options.max_num_iterations = 1000;
     options.function_tolerance = 1e-15;
     options.gradient_tolerance = 1e-15;
@@ -159,6 +160,15 @@ void GenericCameraCalibration::parseCameras()
                 throw runtime_error("invalid number of intrinsic parameters");
             }
             cameraMap[name] = new UnifiedCamera(intrinsicVec.data());
+        }
+        else if (cameraType == "mei")
+        {
+            cout << "Model : MEI" << endl;
+            if (intrinsicVec.size() != 10) //FIXME must be 5
+            {
+                throw runtime_error("invalid number of intrinsic parameters");
+            }
+            cameraMap[name] = new MeiCamera(intrinsicVec.data());
         }
         else
         {
@@ -317,25 +327,27 @@ void GenericCameraCalibration::initGlobalTransform(const ImageData & data, const
             break;
         case 1:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    ptrVec[0], intrinsicMap[data.cameraName].data());
+                    intrinsicMap[data.cameraName].data(), ptrVec[0]); //FIXME
             break;
         case 2:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    ptrVec[0], ptrVec[1], intrinsicMap[data.cameraName].data());
+                    intrinsicMap[data.cameraName].data(), ptrVec[0], ptrVec[1]);
             break;
         case 3:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
-                    ptrVec[0], ptrVec[1], ptrVec[2], intrinsicMap[data.cameraName].data());
+                    intrinsicMap[data.cameraName].data(), ptrVec[0], ptrVec[1], ptrVec[2]);
             break;
         case 4:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                    intrinsicMap[data.cameraName].data(),
                     ptrVec[0], ptrVec[1], ptrVec[2],
-                    ptrVec[3], intrinsicMap[data.cameraName].data());
+                    ptrVec[3]);
             break;
         case 5:
             problem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                    intrinsicMap[data.cameraName].data(),
                     ptrVec[0], ptrVec[1], ptrVec[2],
-                    ptrVec[3], ptrVec[4], intrinsicMap[data.cameraName].data());
+                    ptrVec[3], ptrVec[4]);
             break;
         }
         
@@ -458,36 +470,73 @@ void GenericCameraCalibration::addGridResidualBlocks(const ImageData & data)
         GenericProjectionJac * costFunction = new GenericProjectionJac(data.detectedCornersVec[transfIdx],
                     data.board, cameraMap[data.cameraName], data.transStatusVec);
         double * intrinsicPtr = intrinsicMap[data.cameraName].data();
+        
         switch (ptrVec.size())
         {
         case 0:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2), intrinsicPtr);
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                    intrinsicPtr);
             break;
         case 1:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
-                    ptrVec[0], intrinsicPtr);
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                    intrinsicPtr, ptrVec[0]); //FIXME
             break;
         case 2:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
-                    ptrVec[0], ptrVec[1], intrinsicPtr);
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                    intrinsicPtr, ptrVec[0], ptrVec[1]);
             break;
         case 3:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
-                    ptrVec[0], ptrVec[1], ptrVec[2], intrinsicPtr);
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                    intrinsicPtr, ptrVec[0], ptrVec[1], ptrVec[2]);
             break;
         case 4:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                    intrinsicPtr,
                     ptrVec[0], ptrVec[1], ptrVec[2],
-                    ptrVec[3], intrinsicPtr);
+                    ptrVec[3]);
             break;
         case 5:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
+            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+                    intrinsicPtr,
                     ptrVec[0], ptrVec[1], ptrVec[2],
-                    ptrVec[3], ptrVec[4], intrinsicPtr);
+                    ptrVec[3], ptrVec[4]);
             break;
         default:
             throw runtime_error("the transform chain is too long (5 transforms at max are supproted)");
         }
+        
+//        
+//        switch (ptrVec.size())
+//        {
+//        case 0:
+//            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2), intrinsicPtr);
+//            break;
+//        case 1:
+//            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
+////                    ptrVec[0], intrinsicPtr); //FIXME
+//                    intrinsicPtr, ptrVec[0]);
+//            break;
+//        case 2:
+//            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
+//                    ptrVec[0], ptrVec[1], intrinsicPtr);
+//            break;
+//        case 3:
+//            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
+//                    ptrVec[0], ptrVec[1], ptrVec[2], intrinsicPtr);
+//            break;
+//        case 4:
+//            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
+//                    ptrVec[0], ptrVec[1], ptrVec[2],
+//                    ptrVec[3], intrinsicPtr);
+//            break;
+//        case 5:
+//            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(2),
+//                    ptrVec[0], ptrVec[1], ptrVec[2],
+//                    ptrVec[3], ptrVec[4], intrinsicPtr);
+//            break;
+//        default:
+//            throw runtime_error("the transform chain is too long (5 transforms at max are supproted)");
+//        }
         
         //set constant transformations
         for (int i = 0; i < data.transNameVec.size(); i++)
@@ -932,9 +981,11 @@ Transf GenericCameraCalibration::estimateInitialGrid(const ImageData & data, con
                 cam, {TRANSFORM_DIRECT});
                 
         problem.AddResidualBlock(costFunction, new SoftLOneLoss(25),
-                xiArr.data(), intrinsicMap[data.cameraName].data());
+                intrinsicMap[data.cameraName].data(), xiArr.data());
         problem.SetParameterBlockConstant(intrinsicMap[data.cameraName].data());
         Solver::Options options;
+//        options.check_gradients = true;
+//        options.gradient_check_relative_precision = 1;
         options.max_num_iterations = 500;
         Solver::Summary summary;
         

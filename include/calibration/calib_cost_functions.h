@@ -34,13 +34,14 @@ struct GenericProjectionJac : ceres::CostFunction
     _camera(camera->clone()),
     _transformStatusVec(transformStatusVec)
     {
-        int count = 0;
+//        int count = 0;
+        mutable_parameter_block_sizes()->push_back(_camera->numParams()); //FIXME
         for (auto & x : _transformStatusVec)
         {
             mutable_parameter_block_sizes()->push_back(6);
         }
-        assert(_constTransformVec.size() == count);
-        mutable_parameter_block_sizes()->push_back(_camera->numParams());
+//        assert(_constTransformVec.size() == count);
+//        mutable_parameter_block_sizes()->push_back(_camera->numParams()); //FIXME
         set_num_residuals(_proj.size()*2);
     }
 
@@ -57,7 +58,7 @@ struct GenericProjectionJac : ceres::CostFunction
     const Vector2dVec _proj;
     const Vector3dVec _grid;
     const vector<TransformationStatus> _transformStatusVec;
-    const vector<Transformation<double>> _constTransformVec;
+//    const vector<Transformation<double>> _constTransformVec;
 };
 
 struct OdometryPrior : ceres::SizedCostFunction<6, 6, 6>
