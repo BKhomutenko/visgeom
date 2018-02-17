@@ -221,15 +221,6 @@ public:
         double xn = x * deninv;
         double yn = y * deninv;
         
-        Matrix23drm jac_m; //  normalized point Jacobian dm / dX 
-        jac_m(0, 0) = (xi*rho + z - xi*xx*rhoinv) * deninv2;
-        jac_m(0, 1) = -xi * x * y * rhoinv * deninv2;
-        jac_m(0, 2) = -x * (1 + xi*z*rhoinv) * deninv2;
-        
-        jac_m(1, 0) = -xi * x * y * rhoinv * deninv2;
-        jac_m(1, 1) = (xi*rho + z - xi*yy*rhoinv) * deninv2;
-        jac_m(1, 2) = -y * (1 + xi*z*rhoinv) * deninv2;
-        
         //distorted point
         double xxn = xn * xn;
         double yyn = yn * yn;
@@ -292,6 +283,37 @@ public:
         dvdalpha[9] = 1;
         return true;
     }
+    
+    virtual double upperBound(int idx) const
+    {
+        switch (idx)
+        {
+        case 0:     return 3;       //xi
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:     return 10;      //k1-k5
+        default:    return 1e5;     //the rest
+        }
+    }
+    
+    virtual double lowerBound(int idx) const
+    {
+        switch (idx)
+        {
+        case 0:     return 0;       //xi
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:     return -10;      //k1-k5
+        default:    return 1;     //the rest
+        }
+    }
+    
+    virtual double getCenterU() { return params[8]; }
+    virtual double getCenterV() { return params[9]; }
     
     virtual MeiCamera * clone() const { return new MeiCamera(width, height, params.data()); }
     

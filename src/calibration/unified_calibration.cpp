@@ -40,7 +40,8 @@ bool GenericCameraCalibration::compute()
     //run the solver
     Solver::Options options;
 //    options.check_gradients = true;
-//    options.gradient_check_relative_precision = 1e-5;
+//    options.gradient_check_relative_precision = 0.01;
+//    options.line_search_direction_type = ceres::NONLINEAR_CONJUGATE_GRADIENT;
     options.max_num_iterations = 1000;
     options.function_tolerance = 1e-15;
     options.gradient_tolerance = 1e-15;
@@ -155,7 +156,7 @@ void GenericCameraCalibration::parseCameras()
         else if (cameraType == "ucm")
         {
             cout << "Model : UCM" << endl;
-            if (intrinsicVec.size() != 6) //FIXME must be 5
+            if (intrinsicVec.size() != 5)
             {
                 throw runtime_error("invalid number of intrinsic parameters");
             }
@@ -164,7 +165,7 @@ void GenericCameraCalibration::parseCameras()
         else if (cameraType == "mei")
         {
             cout << "Model : MEI" << endl;
-            if (intrinsicVec.size() != 10) //FIXME must be 5
+            if (intrinsicVec.size() != 10)
             {
                 throw runtime_error("invalid number of intrinsic parameters");
             }
@@ -474,29 +475,29 @@ void GenericCameraCalibration::addGridResidualBlocks(const ImageData & data)
         switch (ptrVec.size())
         {
         case 0:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, NULL, //new SoftLOneLoss(1),
                     intrinsicPtr);
             break;
         case 1:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, NULL, //new SoftLOneLoss(1),
                     intrinsicPtr, ptrVec[0]); //FIXME
             break;
         case 2:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, NULL, //new SoftLOneLoss(1),
                     intrinsicPtr, ptrVec[0], ptrVec[1]);
             break;
         case 3:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, NULL, //new SoftLOneLoss(1),
                     intrinsicPtr, ptrVec[0], ptrVec[1], ptrVec[2]);
             break;
         case 4:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, NULL, //new SoftLOneLoss(1),
                     intrinsicPtr,
                     ptrVec[0], ptrVec[1], ptrVec[2],
                     ptrVec[3]);
             break;
         case 5:
-            globalProblem.AddResidualBlock(costFunction, new SoftLOneLoss(1),
+            globalProblem.AddResidualBlock(costFunction, NULL, //new SoftLOneLoss(1),
                     intrinsicPtr,
                     ptrVec[0], ptrVec[1], ptrVec[2],
                     ptrVec[3], ptrVec[4]);
@@ -1049,7 +1050,8 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
         for (int i = 0; i < projectedVec.size(); i++)
         {
             Vector2d err = data.detectedCornersVec[transfIdx][i] - projectedVec[i];
-            residualFile << err.transpose() << "   " << projectedVec[i].transpose() << endl;
+            residualFile << err.transpose() << "   " << projectedVec[i].transpose() 
+                        << "   " << transfVec[transfIdx] << endl;
             stdAcc += err.squaredNorm();
         }
         

@@ -50,7 +50,6 @@ bool GenericProjectionJac::Evaluate(double const * const * params,
     xiAcc.transform(_grid, pointCamVec);
     
     //get the intrinsic parameters
-//    const int cameraIntrinsicIdx = _transformStatusVec.size(); //FIXME
     const int cameraIntrinsicIdx = 0;
     _camera->setParameters(params[cameraIntrinsicIdx]);
     

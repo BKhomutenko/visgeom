@@ -34,38 +34,31 @@ struct UnifiedProjector
 {
     bool operator() (const T* params, const T* src, T* dst) const
     {
-        const T & alpha = params[0];
-        const T & beta = params[1];
-        const T & fu = params[2];
-        const T & fv = params[3];
-        const T & u0 = params[4];
-        const T & v0 = params[5];
+        //TODO check whether projected
+        const T & xi = params[0];
+        const T & fu = params[1];
+        const T & fv = params[2];
+        const T & u0 = params[3];
+        const T & v0 = params[4];
         
         const T & x = src[0];
         const T & y = src[1];
         const T & z = src[2];
         
-        T denom = alpha * sqrt(z*z + (x*x + y*y)) + (T(1.) - alpha) * z;
-        if (denom < T(1e-3)) return false;
-        
-        // Check that the point is in the upper hemisphere in case of ellipsoid
-        if (alpha > T(0.5))
-        {
-            const T zn = z / denom; 
-            const T C = (alpha - T(1.)) / (alpha + alpha - T(1.));
-            if (zn < C) return false;
-        }
-        
+        T rho = sqrt(z*z + x*x + y*y);
+        T denominv = T(1.) / (z + xi*rho);
+
         // Project the point to the mu plane
-        const T xn = x / denom;
-        const T yn = y / denom;
+        T xn = x * denominv;
+        T yn = y * denominv;
+        
         // Compute image point
         dst[0] = fu * xn + u0;
         dst[1] = fv * yn + v0;
         return true;  
     } 
       
-    static const int INTRINSIC_COUNT = 6;
+    static const int INTRINSIC_COUNT = 5;
 };
 
 class UnifiedCamera : public ICamera
@@ -74,12 +67,12 @@ public:
     using ICamera::params;
     using ICamera::width;
     using ICamera::height;
-    UnifiedCamera(int W, int H, const double * const parameters) : ICamera(W, H, 6)
+    UnifiedCamera(int W, int H, const double * const parameters) : ICamera(W, H, 5)
     {  
         ICamera::setParameters(parameters);
     }
 
-    UnifiedCamera(const double * const parameters)  : ICamera(1, 1, 6)
+    UnifiedCamera(const double * const parameters)  : ICamera(1, 1, 5)
     {  
         ICamera::setParameters(parameters);
     }
@@ -87,84 +80,72 @@ public:
      /// takes raw image points and apply undistortion model to them
     virtual bool reconstructPoint(const Vector2d & src, Vector3d & dst) const
     {
-        const double & alpha = params[0];
-        const double & beta = params[1];
-        const double & fu = params[2];
-        const double & fv = params[3];
-        const double & u0 = params[4];
-        const double & v0 = params[5];
+        //FIXME ???
+        const double & xi = params[0];
+        const double & fu = params[1];
+        const double & fv = params[2];
+        const double & u0 = params[3];
+        const double & v0 = params[4];
         
         double xn = (src(0) - u0) / fu;
         double yn = (src(1) - v0) / fv;
         
         double u2 = xn * xn + yn * yn;
-        double gamma = 1. - alpha;    
-        double num = 1. - u2 * alpha * alpha;
-        double det = 1 - (alpha - gamma)*u2;
-        if (det < 0) return false;
-        double denom = gamma + alpha*sqrt(det);
-        dst << xn, yn, num/denom;
-
+        
+        
+        double gamma = sqrt(1. + u2*(1 - xi*xi));
+            
+        double etanum = -gamma - xi*u2;
+        double etadenom = xi*xi*u2 - 1;
+        dst << xn, yn, etadenom/(etadenom + xi*etanum);
+        
         return true;
     }
 
     /// projects 3D points onto the original image
     virtual bool projectPoint(const Vector3d & src, Vector2d & dst) const
     {
-        EnhancedProjector<double> projector;
+        UnifiedProjector<double> projector;
         return projector(params.data(), src.data(), dst.data()); 
     }
     
     virtual bool projectionJacobian(const Vector3d & src, double * dudx, double * dvdx) const
     {
-        const double & alpha = params[0];
-        const double & beta = params[1];
-        const double & fu = params[2];
-        const double & fv = params[3];
-        const double & u0 = params[4];
-        const double & v0 = params[5];
+        const double & xi = params[0];
+        const double & fu = params[1];
+        const double & fv = params[2];
+        const double & u0 = params[3];
+        const double & v0 = params[4];
         
-        const double & x = src(0);
-        const double & y = src(1);
-        const double & z = src(2);
-
-        double rho = sqrt(z * z + (x * x + y * y));
-        double gamma = 1. - alpha;
-        double eta = alpha * rho + gamma * z;
+        const double & x = src[0];
+        const double & y = src[1];
+        const double & z = src[2];
         
-        bool isProjected = true;
-        if (eta < 1e-3) isProjected = false;
-        else if (alpha > 0.5)
-        {
-            const double zn = z / eta; 
-            const double C = (alpha - 1.) / (alpha + alpha - 1.);
-            if (zn < C) isProjected = false;
-        }
+        double xx = x*x;
+        double yy = y*y;
+        double zz = z*z;
+        double rho = sqrt(xx + yy + zz);
+        double rhoinv = 1. / rho;
+        double deninv = 1./ (xi*rho + z);
+        double deninv2 = deninv * deninv;
         
-        if (not isProjected)
-        {
-            dudx[0] = 0;
-            dudx[1] = 0;
-            dudx[2] = 0;
-            dvdx[0] = 0;  
-            dvdx[1] = 0;
-            dvdx[2] = 0;
-            return false;
-         
-        }
         
-        double k = 1. / eta / eta;
-        double abrho = alpha / rho;
-        double Jxy = k * abrho * x * y;
-        double Jz = k * (gamma + alpha * z / rho);
-        double Jx = gamma * z + alpha * rho;
-        dudx[0] = fu * k * (Jx - abrho * x * x);
-        dudx[1] = -fu * Jxy;
-        dudx[2] = -fu * x * Jz;
-        dvdx[0] = -fv * Jxy;    
-        dvdx[1] = fv * k * (Jx - abrho * y * y);
-        dvdx[2] = -fv * y * Jz;
-
+        //normalized point
+        double xn = x * deninv;
+        double yn = y * deninv;
+        
+        Covector3d dudX; //  normalized point Jacobian dm / dX 
+        dudX(0) = (xi*rho + z - xi*xx*rhoinv) * deninv2;
+        dudX(1) = -xi * x * y * rhoinv * deninv2;
+        dudX(2) = -x * (1 + xi*z*rhoinv) * deninv2;
+        
+        Covector3d dvdX;
+        dvdX(0) = -xi * x * y * rhoinv * deninv2;
+        dvdX(1) = (xi*rho + z - xi*yy*rhoinv) * deninv2;
+        dvdX(2) = -y * (1 + xi*z*rhoinv) * deninv2;
+        
+        Map<Covector3d>((double *)dudx) = fu * dudX;
+        Map<Covector3d>((double *)dvdx) = fv * dvdX;
         return true;
 
     }
@@ -172,58 +153,45 @@ public:
     virtual bool intrinsicJacobian(const Vector3d & src,
                     double * dudalpha, double * dvdalpha) const
     {
-        const double & alpha = params[0];
-        const double & beta = params[1];
-        const double & fu = params[2];
-        const double & fv = params[3];
-        const double & u0 = params[4];
-        const double & v0 = params[5];
+        const double & xi = params[0];
+        const double & fu = params[1];
+        const double & fv = params[2];
+        const double & u0 = params[3];
+        const double & v0 = params[4];
         
-        const double & x = src(0);
-        const double & y = src(1);
-        const double & z = src(2);
+        const double & x = src[0];
+        const double & y = src[1];
+        const double & z = src[2];
         
-        double x2y2 = x * x + y * y;
-        double rho2 = z * z + (x2y2);
-        double rho = sqrt(rho2);
-        double gamma = 1. - alpha;
-        double eta = alpha * rho + gamma * z;
+        double xx = x*x;
+        double yy = y*y;
+        double zz = z*z;
+        double rho = sqrt(xx + yy + zz);
+        double rhoinv = 1. / rho;
+        double deninv = 1. / (xi*rho + z);
+        double deninv2 = deninv * deninv;
         
-        bool isProjected = true;
-        if (eta < 1e-3) isProjected = false;
-        else if (alpha > 0.5)
-        {
-            const double zn = z / eta; 
-            const double C = (alpha - 1.) / (alpha + alpha - 1.);
-            if (zn < C) isProjected = false;
-        }
         
-        if (not isProjected)
-        {
-            for (int i = 0; i < 6; i++)
-            {
-                dudalpha[i] = 0;
-                dvdalpha[i] = 0;
-            }
-            return false;
-        }
+        //normalized point
+        double xn = x * deninv;
+        double yn = y * deninv;
         
-        double eta2 = eta * eta;
+        //xi
+        dudalpha[0] = -fu * xn * deninv * rho;
+        //Projection matrix part
+        dudalpha[1] = xn;
+        dudalpha[2] = 0;
+        dudalpha[3] = 1;
+        dudalpha[4] = 0;
         
-        dudalpha[0] = -fu * x * (rho - z) / eta2;
-        dudalpha[1] = 0;
-        dudalpha[2] = x / eta;
-        dudalpha[3] = 0;
-        dudalpha[4] = 1;
-        dudalpha[5] = 0;
         
-        dvdalpha[0] = -fv * y * (rho - z) / eta2;
+        //xi
+        dvdalpha[0] = -fv * yn * deninv * rho;
+        //Projection matrix part
         dvdalpha[1] = 0;
-        dvdalpha[2] = 0;
-        dvdalpha[3] = y / eta;
-        dvdalpha[4] = 0;
-        dvdalpha[5] = 1;
-        
+        dvdalpha[2] = yn;
+        dvdalpha[3] = 0;
+        dvdalpha[4] = 1;
         return true;
 
     }
@@ -232,8 +200,7 @@ public:
     {
         switch (idx)
         {
-        case 0:     return 1;       //alpha
-        case 1:     return 10;     //beta
+        case 0:     return 3;       //xi
         default:    return 1e5;     //the rest
         }
     }
@@ -242,14 +209,13 @@ public:
     {
         switch (idx)
         {
-        case 0:     return 0;       //alpha
-        case 1:     return 0.1;     //beta
+        case 0:     return 0;       //xi
         default:    return 1;     //the rest
         }
     }
     
-    virtual double getCenterU() { return params[4]; }
-    virtual double getCenterV() { return params[5]; }
+    virtual double getCenterU() { return params[3]; }
+    virtual double getCenterV() { return params[4]; }
     
     virtual UnifiedCamera * clone() const { return new UnifiedCamera(width, height, params.data()); }
     
