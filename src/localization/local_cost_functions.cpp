@@ -468,6 +468,86 @@ vector<double> MutualInformation::reduceHist(const vector<double> & hist2d) cons
     return hist;
 }
 
+
+MutualInformationOdom::MutualInformationOdom(  const ICamera * camera, 
+                        const PhotometricPack & dataPack, 
+                        const Transf xiBaseCam,
+                        const Transf xiOdom,
+                        const Transf xiPrior,
+                        const Mat32f & img2, 
+                        double scale, 
+                        int numBins, 
+                        double valMax,
+                        const double errV, 
+                        const double errW,
+                        const double lambdaT, 
+                        const double lambdaR
+            ) :
+            MutualInformation(camera, dataPack, xiBaseCam, img2, scale, numBins, valMax),
+            _xiPrior(xiPrior),
+            _C(Matrix6d::Zero())
+{
+    const double delta = xiOdom.rot()(2);
+    const double l = xiOdom.trans().norm();
+    
+    const double delta2 = delta / 2.;
+    const double l2 = l / 2.;
+    
+    const double s = sin(delta2);
+    const double c = cos(delta2);
+    
+    Matrixd<3, 2> dfdu;
+
+    dfdu <<     s,      -l2 * c,
+                c,      l2 * s,                   
+                0,           1;
+
+    Matrix2d Cu;
+    Cu <<   errV * errV * l * l,              0,
+                      0,    errW * errW * delta * delta; 
+   
+    Matrix3d lambdaMat = Matrix3d::Identity();
+    lambdaMat(0, 0) *= lambdaT * lambdaT;
+    lambdaMat(1, 1) *= lambdaT * lambdaT;
+    lambdaMat(2, 2) *= lambdaR * lambdaR;
+    Matrix3d Cx = dfdu * Cu * dfdu.transpose() + lambdaMat;
+    Matrix3d CxInv = Cx.inverse();
+    _C.topLeftCorner<2, 2>() = CxInv.topLeftCorner<2, 2>();
+    _C.topRightCorner<2, 1>() = CxInv.topRightCorner<2, 1>();
+    _C.bottomLeftCorner<1, 2>() = CxInv.bottomLeftCorner<1, 2>();
+    _C(5, 5) = CxInv(2, 2);
+    _C(2, 2) = 1 / (lambdaT * lambdaT);
+    _C(3, 3) = 1 / (lambdaR * lambdaR);
+    _C(4, 4) = 1 / (lambdaR * lambdaR);
+    
+    Matrix3d M = interOmegaRot(xiPrior.rot());
+    Matrix3d R = xiPrior.rotMatInv();
+    
+    _J.topLeftCorner<3, 3>() = _C.topLeftCorner<3, 3>() * R;
+    _J.topRightCorner<3, 3>() = _C.topRightCorner<3, 3>() * R * M;
+    _J.bottomLeftCorner<3, 3>() = _C.bottomLeftCorner<3, 3>() * R;
+    _J.bottomRightCorner<3, 3>() = _C.bottomRightCorner<3, 3>() * R * M;
+    _C *= 0.5; //to avoid division by 2 at every evaluation
+}
+
+bool MutualInformationOdom::Evaluate(double const * parameters, double * cost, double * gradient) const
+{
+    MutualInformation::Evaluate(parameters, cost, gradient);
+    Transf xi(parameters);
+    Covector6d err;
+    _xiPrior.inverseCompose(xi).toArray(err.data());
+    
+    const double DAMPING = 0.0002;
+    
+    Vector6d priorGrad = err * _J;
+    for (int i = 0; i < 6; i++)
+    {
+        gradient[i] += priorGrad[i] * DAMPING;
+    }
+    *cost += DAMPING * double(err * _C * err.transpose());
+}
+
+
 bool MonoReprojectCost::Evaluate(double const * const * params,
         double * residual, double ** jacobian) const
 {
@@ -651,7 +731,7 @@ OdometryPrior::OdometryPrior(const double errV, const double errW,
     _A(Matrix6d::Zero()),
     _xiPrior(xiOdom)
 {
-    const double delta = xiOdom.rot().norm();
+    const double delta = xiOdom.rot()(2);
     const double l = xiOdom.trans().norm();
     
     const double delta2 = delta / 2.;
@@ -688,29 +768,29 @@ OdometryPrior::OdometryPrior(const double errV, const double errW,
 //    _A(4, 4) = 1. / lambdaR;
 //    _A(5, 5) = U(2, 2);
     
-    //FOR THE SIMULATION 
-    //Z -- forward, Y -- rotation
-    _A(0, 0) = U(1, 1);
-    _A(0, 2) = U(0, 1);
-    _A(2, 2) = U(0, 0);
-    _A(0, 4) = U(1, 2);
-    _A(2, 4) = U(0, 2);
-    _A(1, 1) = 1. / lambdaT;
-    _A(3, 3) = 1. / lambdaR;
-    _A(4, 4) = U(2, 2);
-    _A(5, 5) = 1. / lambdaR;
-    
-        //FOR THE REAL DATA 
-    //Y -- forward, Z -- rotation
-//    _A(1, 1) = U(0, 0);
-//    _A(0, 0) = -U(1, 1);
-//    _A(0, 1) = -U(0, 1);
-//    _A(0, 5) = -U(1, 2);
-//    _A(1, 5) = U(0, 2);
-//    _A(2, 2) = 1. / lambdaT;
+//    //FOR THE SIMULATION 
+//    //Z -- forward, Y -- rotation
+//    _A(0, 0) = U(1, 1);
+//    _A(0, 2) = U(0, 1);
+//    _A(2, 2) = U(0, 0);
+//    _A(0, 4) = U(1, 2);
+//    _A(2, 4) = U(0, 2);
+//    _A(1, 1) = 1. / lambdaT;
 //    _A(3, 3) = 1. / lambdaR;
-//    _A(4, 4) = 1. / lambdaR;
-//    _A(5, 5) = U(2, 2);
+//    _A(4, 4) = U(2, 2);
+//    _A(5, 5) = 1. / lambdaR;
+    
+//        FOR THE REAL DATA 
+//    Y -- forward, Z -- rotation
+    _A(1, 1) = U(0, 0);
+    _A(0, 0) = -U(1, 1);
+    _A(0, 1) = -U(0, 1);
+    _A(0, 5) = -U(1, 2);
+    _A(1, 5) = U(0, 2);
+    _A(2, 2) = 1. / lambdaT;
+    _A(3, 3) = 1. / lambdaR;
+    _A(4, 4) = 1. / lambdaR;
+    _A(5, 5) = U(2, 2);
 
     Matrix3d M = interOmegaRot(xiOdom.rot());
     Matrix3d R = xiOdom.rotMatInv();

@@ -70,7 +70,7 @@ public:
     void setVerbosity(int newVerbosity) { verbosity = newVerbosity; }
     
     Transf computePoseMI(const Transf & T12);
-
+    Transf computePoseMI(const Transf & T12, const Transf & Todom);
     //TODO make enum for choosing the camera
     array<double, 6> covarianceEigenValues(const int scaleIdx, 
             const Transf T12, bool baseValues);
@@ -82,6 +82,9 @@ private:
     void computePose(int scaleIdx, Transf & T12);
     void computePoseAuto(int scaleIdx, Transf & T12);
     void computePoseMI(int scaleIdx, Transf & T12);
+    //TODO optimize, not to recompute the odometry covariance at every step
+    //Mey be implement a separate function localOdometryCovariance(Todom) or a structure
+    void computePoseMI(int scaleIdx, Transf & T12, const Transf & Todom);
     PhotometricPack initPhotometricData(int scaleIdx);
 
     Transf _xiBaseCam;

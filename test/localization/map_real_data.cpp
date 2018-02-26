@@ -127,7 +127,8 @@ int main(int argc, char** argv)
             odom.feedImage(img1);
             
             fvo << odom._interFrame.xi.compose(odom._xiLocal) << endl;
-            fwo << xiMap.inverseCompose(odomVec[i]) << endl; //true only if odomVec contains GT
+//            fwo << xiMap.inverseCompose(odomVec[i]) << endl; //true only if odomVec contains GT
+            fwo << odomVec[i] << endl;
             fgt << xiMap.inverseCompose(gtVec[i]) << endl;
             if (odom._state == PhotometricMapping::MAP_SLAM) 
             {

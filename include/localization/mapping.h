@@ -95,15 +95,15 @@ public:
     
     void reInit(const Transf & xi);
     
-    int selectMapFrame(const Transf & xi); //-1 means that there is no matching frame
+    int selectMapFrame(const Transf & xi, const double K = 4); //-1 means that there is no matching frame
     
     Transf localizeMI(); //localizes the inter frame wrt _frameVec[_mapIdx]
     Transf localizePhoto(const Mat8u & img); //localizes the image wrt interFrame
     
     Transf getCameraMotion(const Transf & xi) const;
     
-    bool checkDistance(const Transf & xi) const;
-    bool checkDistance(const Transf & xi1, const Transf & xi2) const;
+    bool checkDistance(const Transf & xi, const double K = 1.) const;
+    bool checkDistance(const Transf & xi1, const Transf & xi2, const double K = 1.) const;
     
     void improveStereo(const Mat8u & img);
 //private:
@@ -128,6 +128,7 @@ public:
     Transf _xiLocal; //current base pose estimation in the local frame
     Transf _xiLocalOld; //for VO scale rectification
     Transf _xiOdom; //the last odometry measure
+    Transf _zetaOdom; //the last odometry measure
     Transf _xiOdomImage; //the last odometry before the last image
     
     Transf _xiBaseCam;

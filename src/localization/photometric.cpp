@@ -140,7 +140,7 @@ void ScalePhotometric::computePose(int scaleIdx, Transf & T12)
     if (useMotionPrior) //FIXME experimental
     {
         //A proper nose model on the depth map localization must be applied
-        OdometryPrior * odometryCost = new OdometryPrior(0.02, 0.02, 0.01, 0.01, _xiPrior);
+        OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.01, 0.01, _xiPrior);
         problem.AddResidualBlock(odometryCost, NULL, pose.data());
     }
     
@@ -167,6 +167,22 @@ Transf ScalePhotometric::computePoseMI(const Transf & T12)
     for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 0; scaleIdx--)
     {
         computePoseMI(scaleIdx, xi);
+    }
+    return xi;
+}
+
+Transf ScalePhotometric::computePoseMI(const Transf & T12, const Transf & Todom)
+{
+    if (verbosity > 0) 
+    {
+        cout << "ScalePhotometric::computePoseMI" << endl;
+    }
+    Transf xi = T12;
+    _xiPrior = T12;
+    //TODO set the optimization depth with the parameters   v
+    for (int scaleIdx = scaleSpace1.size() - 1; scaleIdx >= 0; scaleIdx--)
+    {
+        computePoseMI(scaleIdx, xi, Todom);
     }
     return xi;
 }
@@ -255,7 +271,71 @@ void ScalePhotometric::computePoseMI(int scaleIdx, Transf & T12)
     
 //    if (useMotionPrior) //FIXME experimental
 //    {
-//        //A proper nose model on the depth map localization must be applied
+//        //A proper noise model on the depth map localization must be applied
+//        OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.03, 0.03, _xiPrior);
+//        problem.AddResidualBlock(odometryCost, NULL, pose.data());
+//    }
+    
+    //TODO put to a separate file                                                    
+//    array<double, 6> grad;
+//    double val;
+//    array<double, 6> val1;
+//    array<double, 6> val2;
+//    double eps = 1e-5;
+//    costFunction->Evaluate(pose.data(), &val, grad.data());
+//    for (int i = 0; i < 6; i++)
+//    {
+//        pose[i] += eps;
+//        costFunction->Evaluate(pose.data(), &val2[i], NULL);
+//        pose[i] -= 2*eps;
+//        costFunction->Evaluate(pose.data(), &val1[i], NULL);
+//        pose[i] += eps;
+//    }
+//    
+//    for (int i = 0; i < 6; i++)
+//    {
+//        cout << grad[i] << "    " << (val2[i] - val1[i]) / 2 / eps << endl;
+//    }
+    
+//    return;
+    GradientProblem problem(costFunction);
+    
+    if (verbosity > 2) cout << "    Problem created" << endl;
+    //run the solver
+    GradientProblemSolver::Options options;
+    options.line_search_direction_type = ceres::BFGS;
+//    options.use_approximate_eigenvalue_bfgs_scaling = true;
+//    options.line_search_interpolation_type = ceres::CUBIC;
+    options.function_tolerance = 1e-2;
+    options.gradient_tolerance = 1e-3;
+//    options.linear_solver_type = ceres::DENSE_QR;
+//    options.max_num_iterations = 15;
+    if (verbosity > 2) options.minimizer_progress_to_stdout = true;
+    GradientProblemSolver::Summary summary;
+    Solve(options, problem, pose.data(), &summary);
+    if (verbosity > 2) cout << summary.FullReport() << endl;
+    else if (verbosity > 1) cout << summary.BriefReport() << endl;
+    T12 = Transf(pose.data());
+//    cout << T12 << endl;
+//    saveSurface("surf01.txt", costFunction, 2, 3, 0.0005, 50, pose.data());
+}
+
+void ScalePhotometric::computePoseMI(int scaleIdx, Transf & T12, const Transf & Todom)
+{
+    if (verbosity > 1) 
+    {
+        cout << "ScalePhotometric::computePoseMI with scaleIdx = " << scaleIdx << endl;
+    }
+    PhotometricPack dataPack = initPhotometricData(scaleIdx);
+    scaleSpace2.setActiveScale(scaleIdx);
+    array<double, 6> pose = T12.toArray();
+    MutualInformationOdom * costFunction = new MutualInformationOdom(camPtr2, dataPack, _xiBaseCam,
+                                Todom, _xiPrior,
+                                scaleSpace2.get(), scaleSpace2.getActiveScale(), 8, 255);
+    
+//    if (useMotionPrior) //FIXME experimental
+//    {
+//        //A proper noise model on the depth map localization must be applied
 //        OdometryPrior * odometryCost = new OdometryPrior(0.03, 0.03, 0.03, 0.03, _xiPrior);
 //        problem.AddResidualBlock(odometryCost, NULL, pose.data());
 //    }

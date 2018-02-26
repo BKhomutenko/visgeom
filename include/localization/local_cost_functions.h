@@ -198,6 +198,38 @@ struct MutualInformation : public FirstOrderFunction
     vector<double> _hist1;
 };
 
+struct MutualInformationOdom : public MutualInformation
+{
+
+    MutualInformationOdom(  const ICamera * camera, 
+                        const PhotometricPack & dataPack, 
+                        const Transf xiBaseCam,
+                        const Transf xiOdom,
+                        const Transf xiPrior,
+                        const Mat32f & img2, 
+                        double scale, 
+                        int numBins, 
+                        double valMax = 1.,
+                        const double errV = 0.1, 
+                        const double errW = 0.01,
+                        const double lambdaT = 0.01, 
+                        const double lambdaR = 0.01
+            );
+    
+    virtual int NumParameters() const { return 6; }
+    
+    virtual ~MutualInformationOdom()  
+    {
+    }
+    
+    virtual bool Evaluate(double const * parameters, double * cost, double * gradient) const;
+    
+    Matrix6d _C;
+    Matrix6d _J;
+    Transf _xiPrior;
+};
+
+
 // excluding the point reconstruction reduces the number of unknowns,
 // might be faster TODO check it
 // but statisically not optimal

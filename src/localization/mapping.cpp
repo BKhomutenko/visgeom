@@ -34,6 +34,7 @@ PhotometricMapping::PhotometricMapping(const ptree & params):
     _odomInit(false),
     _localizer(5, _camera),
     _xiLocal(0, 0, 0, 0, 0, 0),
+    _zetaOdom(0, 0, 0, 0, 0, 0),
     _state(MAP_BEGIN),
     _warningState(WARNING_NONE)
 {
@@ -44,7 +45,7 @@ PhotometricMapping::PhotometricMapping(const ptree & params):
 bool PhotometricMapping::constructMap(const Transf & xiOdom, const Mat8u & img)
 {
     // if the new position is too far from the las keyframe
-    if (selectMapFrame(xiOdom) == -1)
+    if (selectMapFrame(xiOdom, 1) == -1)
     {
     // insert a map keyframe
         _frameVec.emplace_back();
@@ -117,23 +118,25 @@ void PhotometricMapping::feedImage(const Mat8u & img)
         //check the constraints
         
         //distance to the inter frame
-        interDistanceOk = checkDistance(_xiLocal);
+        interDistanceOk = checkDistance(_xiLocal); //bool
         
         //distane to the map frame
         xiMapFr = _frameVec[_mapIdx].xi.inverseCompose(_interFrame.xi);
-        mapDistanceOk = checkDistance(xiMapFr.compose(_xiLocal));
+        mapDistanceOk = checkDistance(xiMapFr.compose(_xiLocal)); //bool
         
         //TODO MI localization before recomputing the depth
         if (not mapDistanceOk) //need to change the map frame
         {
             pushInterFrame(img);
+            int mapIdxOld = _mapIdx;
             _mapIdx = selectMapFrame(_interFrame.xi);
-            if (_mapIdx != -1) 
+            if (_mapIdx != -1 and mapIdxOld != _mapIdx) 
             {
                 localizeMI();
             }
-            else
+            else if (_mapIdx == -1)
             {
+                
                 _state = MAP_SLAM;
             }
         }
@@ -243,6 +246,7 @@ void PhotometricMapping::pushInterFrame(const Mat8u & img)
     
     img.copyTo(_interFrame.img);
     _interFrame.xi = _interFrame.xi.compose(_xiLocal);
+    _zetaOdom = _xiLocal;
     _xiLocalOld = _xiLocal = Transf(0, 0, 0, 0, 0, 0);
     
     _localizer.setBaseImage(img);
@@ -268,7 +272,7 @@ void PhotometricMapping::reInit(const Transf & xi)
     _odomInit = false;
 }
 
-int PhotometricMapping::selectMapFrame(const Transf & xi)
+int PhotometricMapping::selectMapFrame(const Transf & xi, const double K)
 {
     int res = -1;
     double bestDist = DOUBLE_MAX;
@@ -284,7 +288,7 @@ int PhotometricMapping::selectMapFrame(const Transf & xi)
 //        cout << r << "   " << d << endl;
 //        cout << "SELECT FRAME " << i << endl;
 //        cout << "    d : " << d << "    r : " << r << endl;
-        if (not checkDistance(xi, _frameVec[i].xi)) continue;
+        if (not checkDistance(xi, _frameVec[i].xi, K)) continue;
             
         if (r + d < bestDist)
         {
@@ -296,13 +300,26 @@ int PhotometricMapping::selectMapFrame(const Transf & xi)
 }
 
 bool PhotometricMapping::checkDistance(const Transf & xi1,
-                                         const Transf & xi2) const
+                                         const Transf & xi2,
+                                         const double K) const
 {
     Transf delta = xi1.inverseCompose(xi2);
-    return checkDistance(delta);
+    return checkDistance(delta, K);
 }
 
-bool PhotometricMapping::checkDistance(const Transf & xi) const
+//bool PhotometricMapping::checkDistance(const Transf & xi) const
+//{
+//    /*double r = xi.rot().squaredNorm();
+//    double d = xi.trans().squaredNorm();
+//    return (r < _params.angularThreshSq and
+//            d < _params.distThreshSq);*/ //the general spherical threshold
+//    double r = xi.rot().squaredNorm();
+//    double d = xi.trans()[0] * xi.trans()[0] / 5 + xi.trans()[1]*xi.trans()[1] + xi.trans()[2]*xi.trans()[2];
+//    return (r < _params.angularThreshSq and
+//            d < _params.distThreshSq);
+//}
+
+bool PhotometricMapping::checkDistance(const Transf & xi, const double K) const
 {
     /*double r = xi.rot().squaredNorm();
     double d = xi.trans().squaredNorm();
@@ -311,7 +328,7 @@ bool PhotometricMapping::checkDistance(const Transf & xi) const
     double r = xi.rot().squaredNorm();
     double d = xi.trans()[0] * xi.trans()[0] / 5 + xi.trans()[1]*xi.trans()[1] + xi.trans()[2]*xi.trans()[2];
     return (r < _params.angularThreshSq and
-            d < _params.distThreshSq);
+            d < _params.distThreshSq * K);
 }
 
 Transf PhotometricMapping::localizeMI()
@@ -328,7 +345,8 @@ Transf PhotometricMapping::localizeMI()
 //    waitKey(0);
     Transf & xiFr = _interFrame.xi;
     const Transf & xiMap = _frameVec[_mapIdx].xi;
-    Transf xiFrMap = localizer.computePoseMI(xiFr.inverseCompose(xiMap));
+//    Transf xiFrMap = localizer.computePoseMI(xiFr.inverseCompose(xiMap));
+    Transf xiFrMap = localizer.computePoseMI(xiFr.inverseCompose(xiMap), _zetaOdom);
     xiFr = xiMap.composeInverse(xiFrMap);
 }
 
@@ -404,12 +422,12 @@ Transf PhotometricMapping::localizePhoto(const Mat8u & img)
         Transf zeta = _xiLocalOld.inverseCompose(_xiLocal);
         double lengthPrior = zetaPrior.trans().norm();
         double length = zeta.trans().norm();
-        double rotPrior = zetaPrior.rot().norm();
-        double rot = zeta.rot().norm();
+        double rotPrior = zetaPrior.rot()(2);
+        double rot = zeta.rot()(2);
         cout << "prior : " << endl << zetaPrior << endl;
             cout << "calc  : " << endl << zeta << endl;
         _warningState = WARNING_NONE;
-        if (abs(rot - rotPrior) > 0.002) 
+        if (abs(rot - rotPrior) > 0.005) 
         {
             cout << "WARNING : discard VO result, rotation error" << endl;
             _xiLocal = _xiLocalOld.compose(zetaPrior);
@@ -417,14 +435,14 @@ Transf PhotometricMapping::localizePhoto(const Mat8u & img)
         }
         else
         {
-            double K = lengthPrior / length;
+            double K = lengthPrior / length ;
             cout << "Correction : " << K << endl;
             
             
             if (length > 1e-2) //TODO put a meaningful threshold
             {
                 
-                if (K > 1.2) //too much divergence between WO and VO
+                if (K < 0.8 or K > 1.2) //too much divergence between WO and VO
                 {
                     cout << "WARNING : discard VO result, scale error" << endl;
                     _warningState = WARNING_SCALE;
