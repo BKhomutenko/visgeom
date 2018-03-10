@@ -31,7 +31,7 @@ Relative camera pose estimation based on photometric error and depth map
 #include "geometry/geometry.h"
 #include "projection/generic_camera.h"
 #include "localization/local_cost_functions.h"
-
+#include "localization/cost_function_mi.h"
 //TODO add assertions ???
 class ScalePhotometric
 {
