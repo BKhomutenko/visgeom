@@ -30,6 +30,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include "render/render.h"
 #include "localization/sparse_odom.h"
 //FIXME make an argument
+//TODO use the dense_ba file
 ofstream results;
 string histDataName;
 
