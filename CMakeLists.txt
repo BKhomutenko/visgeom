@@ -137,6 +137,27 @@ target_link_libraries( board_detector
 
 ### RECONSTRUCTION ###
 
+add_executable( hough_test 
+    test/reconstruction/hough_test.cpp
+)
+
+target_link_libraries( hough_test
+    ${OpenCV_LIBS} 
+    reconstruction
+)
+
+add_executable( dense_ba_test 
+    test/reconstruction/dense_ba_test.cpp
+)
+
+target_link_libraries( dense_ba_test
+    ${OpenCV_LIBS} 
+    reconstruction
+    render
+    localization
+)
+
+
 add_executable( equalizer_test 
     test/reconstruction/equalizer_test.cpp
 )
