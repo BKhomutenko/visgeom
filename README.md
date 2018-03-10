@@ -24,7 +24,7 @@ $ cd build
 $ cmake ..
 $ make 
 ```
-## Calibration
+## Monocular Calibration
 
 
 To run the calibration process you need to collect calibration data and describe the problem in a .json file. An example of such a file for monocular calibration is given in data/calib_example.json
@@ -62,9 +62,9 @@ There is a single block of transformations **xiCamBoard**. The name is arbitrary
 ```
 
 In this case, we have one single camera called **camera1**. The following types are supported:
-* **ucm** --- the Unified Camera Model [J. Courbon et. al., A generic fisheye camera model for robotic applications. IROS 2007]
-* **eucm** --- the Enhanced Unified Camera Model [B. Khomutenko et. al., An enhanced unified camera model. IEEE RA-L 2016]
-* **mei** --- the Unified Camera Model with distortion [C. Mei and P. Rives, Single view point omnidirectional camera calibration from planar grids. ICRA 2007]
+* **ucm** --- Unified Camera Model [J. Courbon et. al., A generic fisheye camera model for robotic applications. IROS 2007]
+* **eucm** --- Enhanced Unified Camera Model [B. Khomutenko et. al., An enhanced unified camera model. IEEE RA-L 2016]
+* **mei** --- Unified Camera Model with distortion [C. Mei and P. Rives, Single view point omnidirectional camera calibration from planar grids. ICRA 2007]
 
 **value** contains the initial guess for the parameters, or if **constant** is **true**, then it is the intrinsic parameters which will be used during the whole optimization process. In the case of monocular calibration **constant** must be **false**.
 
