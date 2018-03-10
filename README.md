@@ -1,10 +1,15 @@
-The project allows you to calibrate your camera using an enhanced unified camera model,
-or you can change some code to calibrate your own camera model.
-The program uses images of a chessboard calibration pattern.
-It extracts corners automatically, you just need to check visually the extraction and discard 
-difficult images.
+This project includes following features:
+* Fast subpixel detector of calibration boards (checkerboards)
+* Calibration toolbox for intrinsic, stereo and extrinsic calibration of fisheye cameras
+* Algorithms of direct stereo correspondence
+* Sparse and dense localization algorithms
 
-INSTALLATION
+Some of these features are quite mature and can be used for practical purposes. 
+For example, calibration toolbox is automated and easy to use.
+The part on 3D reconstruction requires a certain degree of refactoring.
+The localization part is quite experimental.
+
+# INSTALLATION
 
 Requred packages:
 * ceres-solver 1.10.0+
@@ -18,11 +23,50 @@ $ cd build
 $ cmake ..
 $ make 
 ```
-CALIBRATION
+# CALIBRATION
 
-(The file formatting will be changed to xml or yaml in the nearest future, the given version is temporary)
-To run the calibration process you need to write calibration info files.
-ex_calibrate.txt is an example of such file
+
+To run the calibration process you need to collect calibration data and describe the problem in a .json file.
+An example of such a file for monocular calibration is given in data/calib_example.json
+
+## Calibration Variables
+
+First all the calibration variables have to be defined:
+
+```
+"transformations" : [
+    {
+        "name" : "xiCamBoard",
+        "global" : false,
+        "constant" : false,
+        "prior" : false
+    }
+],
+```
+
+There is a single block of transformations **xiCamBoard**. 
+**global** is __false__ because this transformation is unique for every image.
+**constant** is __false__ because we have to compute it.
+**prior** is __false__ because we don't have any prior estimation of these transformations.
+
+
+```
+"cameras": [
+    {
+       "name" : "camera1",
+       "type" : "eucm",
+       "constant" : false,
+       "value" : [0.5, 1, 300, 300, 600, 500]
+    }
+],
+```
+
+In this case, we have one single camera called **camera1**. 
+The following types are supported:
+* ucm -- the Unified Camera Model 
+* eucm -- the Enhanced Unified Camera Model
+* mei -- the Unified Camera Model with 
+
 The structure of the file is the following:
 ```
 %NX %NY %W %EMAX %CheckExtraction
