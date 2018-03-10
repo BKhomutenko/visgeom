@@ -244,9 +244,13 @@ public:
         default:    return 1;     //the rest
         }
     }
+    virtual double  getAlpha()      const   { return params[0]; }
+    virtual double  getBeta()       const   { return params[1]; }
+    virtual double  getFocalU()     const   { return params[2]; }
+    virtual double  getFocalV()     const   { return params[3]; }
+    virtual double  getCenterU()    const   { return params[4]; }
+    virtual double  getCenterV()    const   { return params[5]; }
     
-    virtual double getCenterU() { return params[4]; }
-    virtual double getCenterV() { return params[5]; }
     
     virtual EnhancedCamera * clone() const { return new EnhancedCamera(width, height, params.data()); }
     

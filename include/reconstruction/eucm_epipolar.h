@@ -91,10 +91,12 @@ public:
     
     const StereoEpipoles & getEpipoles() const { return *epipoles; }
     
+    //TODO separate function?
+    Polynomial2 computePolynomial(Vector3d plane) const;
 private:
     
     void prepareCamera(CameraIdx camIdx);
-    Polynomial2 computePolynomial(Vector3d plane) const;
+    
     int index(Vector3d X) const;
     
     // variables for the epipolar computations
