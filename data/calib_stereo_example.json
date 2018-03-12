@@ -1,0 +1,204 @@
+{
+
+"transformations" : [
+    {
+        "name" : "xiCamBoard1",
+        "global" : false,
+        "constant" : false,
+        "prior" : false
+    },
+    {
+        "name" : "xiCamBoard2",
+        "global" : false,
+        "constant" : false,
+        "prior" : false
+    },
+    {
+        "name" : "xiCamBoardStereo",
+        "global" : false,
+        "constant" : false,
+        "prior" : false
+    },
+    {
+        "name" : "xiCam12",
+        "global" : true,
+        "constant" : false,
+        "prior" : true,
+        "value" : [0, -0.3, 0, 0, 0, 0]
+    }
+],
+
+"cameras": [
+    {
+       "name" : "camera1",
+       "type" : "eucm",
+       "constant" : false,
+       "value" : [0.55, 1.2, 200, 200,  320,  240]
+    },
+    {
+       "name" : "camera2",
+       "type" : "eucm",
+       "constant" : false,
+       "value" : [0.55, 1.2, 200, 200,  320,  240]
+    }
+],
+
+"data" : [ 
+    
+    {
+        "type" : "images",
+        "camera" : "camera1",
+        "transform_chain" : [
+            {"name" : "xiCamBoardStereo", "direct" : true}
+        ],
+        "init" : "xiCamBoardStereo",
+        "object" : {
+            "type" : "checkboard",
+            "rows" : 5,
+            "cols" : 8,
+            "size" : 0.1
+        },    
+        "parameters" : [
+            "_check_extraction",
+            "show_outliers",
+            "_user_guided",
+            "improve_detection"
+        ],
+        "images" : {
+            "prefix" : "/home/bogdan/projects/data/calibration/fluence_vertical_3/stereo/bottom/",
+            "names" : [
+                "000001.png",
+                "000002.png",
+                "000003.png",
+                "000004.png",
+                "000005.png",
+                "000006.png",
+                "000007.png",
+                "000008.png",
+                "000009.png",
+                "000010.png"
+            ]
+        }
+    },
+    
+    
+    {
+        "type" : "images",
+        "camera" : "camera2",
+        "transform_chain" : [
+            {"name" : "xiCam12", "direct" : false},
+            {"name" : "xiCamBoardStereo", "direct" : true}
+        ],
+        "init" : "none",
+        "object" : {
+            "type" : "checkboard",
+            "rows" : 5,
+            "cols" : 8,
+            "size" : 0.1
+        },    
+        "parameters" : [
+            "_check_extraction",
+            "show_outliers",
+            "_user_guided",
+            "improve_detection"
+        ],
+        "images" : {
+            "prefix" : "/home/bogdan/projects/data/calibration/fluence_vertical_3/stereo/top/",
+            "names" : [
+                "000001.png",
+                "000002.png",
+                "000003.png",
+                "000004.png",
+                "000005.png",
+                "000006.png",
+                "000007.png",
+                "000008.png",
+                "000009.png",
+                "000010.png"
+            ]
+        }
+    },
+    {
+        "type" : "images",
+        "camera" : "camera1",
+        "transform_chain" : [
+            {"name" : "xiCamBoard1", "direct" : true}
+        ],
+        "init" : "xiCamBoard1",
+        "object" : {
+            "type" : "checkboard",
+            "rows" : 5,
+            "cols" : 8,
+            "size" : 0.1
+        },    
+        "parameters" : [
+            "_check_extraction",
+            "show_outliers",
+            "_user_guided",
+            "improve_detection",
+            "_save_outlire_images"
+        ],
+        "images" : {
+            "prefix" : "/home/bogdan/projects/data/calibration/fluence_vertical_3/bottom/bottom/",
+            "names" : [
+                    "000020.png",
+                     "000021.png",
+                     "000022.png",
+                     "000023.png",
+                     "000024.png",
+                     "000025.png",
+                     "000026.png",
+                     "000027.png",
+                     "000028.png",
+                     "000029.png",
+                     "000030.png",
+                     "000031.png",
+                     "000032.png",
+                     "000033.png"
+            ]
+        }
+    },
+    {
+        "type" : "images",
+        "camera" : "camera2",
+        "transform_chain" : [
+            {"name" : "xiCamBoard2", "direct" : true}
+        ],
+        "init" : "xiCamBoard2",
+        "object" : {
+            "type" : "checkboard",
+            "rows" : 5,
+            "cols" : 8,
+            "size" : 0.1
+        },    
+        "parameters" : [
+            "_check_extraction",
+            "show_outliers",
+            "_user_guided",
+            "improve_detection"
+        ],
+        "images" : {
+            "prefix" : "/home/bogdan/projects/data/calibration/fluence_vertical_3/top/top/",
+            "names" : [
+                    "000025.png",
+                     "000026.png",
+                     "000027.png",
+                     "000028.png",
+                     "000029.png",
+                     "000030.png",
+                     "000031.png",
+                     "000032.png",
+                     "000033.png",
+                     "000034.png",
+                     "000035.png",
+                     "000036.png",
+                     "000037.png",
+                     "000038.png",
+                     "000039.png",
+                     "000040.png"
+            ]
+        }
+    }
+    ]
+}
+
