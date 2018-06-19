@@ -205,6 +205,15 @@ target_link_libraries( stereo_test
     ${OpenCV_LIBS} 
 )
 
+add_executable( stereo_flow
+    test/reconstruction/stereo_flow_test.cpp
+)
+
+target_link_libraries( stereo_flow
+    reconstruction
+    ${OpenCV_LIBS} 
+)
+
 ## LOCALIZATION ###
 add_executable( mapping
     test/localization/map_test.cpp

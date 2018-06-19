@@ -310,32 +310,32 @@ Vector2d subpixel(const Mat32f & acc, int u, int v)
     return Vector2d(u + uAcc / numAcc, v + vAcc / numAcc);
 }
 
-Vector2d subpixel(const Mat32f & acc, int u, int v)
-{
-//    Matrix<double, 8, 5> A;
-//    Matrix<double, 8, 1> B;
-    double  k1 = acc(v, u);
-    double uAcc = 0, vAcc = 0, numAcc = 0;
-    const double AVG_SIZE = 1;
-    for (int du = -AVG_SIZE ; du <= AVG_SIZE ; du++)
-    {
-        for (int dv = -AVG_SIZE ; dv <= AVG_SIZE ; dv++)
-        {   
-            double val = acc(v + dv, u + du);
-            numAcc += val;
-            uAcc += du * val;
-            vAcc += dv * val;
-//            if (du == 0 and dv == 0) continue;
-//            A(i, 0) = du;
-//            A(i, 1) = dv;
-//            A(i, 2) = du * du;
-//            A(i, 3) = du * dv;
-//            A(i, 4) = dv * dv;
-//            B(i) = acc(v + dv, u + du) - k1;
-        }
-    }
-    return Vector2d(u + uAcc / numAcc, v + vAcc / numAcc);
-}
+//Vector2d subpixel(const Mat32f & acc, int u, int v)
+//{
+////    Matrix<double, 8, 5> A;
+////    Matrix<double, 8, 1> B;
+//    double  k1 = acc(v, u);
+//    double uAcc = 0, vAcc = 0, numAcc = 0;
+//    const double AVG_SIZE = 1;
+//    for (int du = -AVG_SIZE ; du <= AVG_SIZE ; du++)
+//    {
+//        for (int dv = -AVG_SIZE ; dv <= AVG_SIZE ; dv++)
+//        {   
+//            double val = acc(v + dv, u + du);
+//            numAcc += val;
+//            uAcc += du * val;
+//            vAcc += dv * val;
+////            if (du == 0 and dv == 0) continue;
+////            A(i, 0) = du;
+////            A(i, 1) = dv;
+////            A(i, 2) = du * du;
+////            A(i, 3) = du * dv;
+////            A(i, 4) = dv * dv;
+////            B(i) = acc(v + dv, u + du) - k1;
+//        }
+//    }
+//    return Vector2d(u + uAcc / numAcc, v + vAcc / numAcc);
+//}
 
 int main(int argc, char** argv) 
 {

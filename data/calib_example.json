@@ -1,0 +1,58 @@
+{
+
+"transformations" : [
+    {
+        "name" : "xiCamBoard",
+        "global" : false,
+        "constant" : false,
+        "prior" : false
+    }
+],
+
+"cameras": [
+    {
+       "name" : "camera1",
+       "type" : "eucm",
+       "constant" : false,
+       "value" : [0.5, 1, 300, 300, 600, 500]
+    }
+],
+
+"data" : [ 
+    {
+        "type" : "images",
+        "camera" : "camera1",
+        "transform_chain" : [
+            {"name" : "xiCamBoard", "direct" : true}
+        ],
+        "init" : "xiCamBoard",
+        "object" : {
+            "type" : "checkboard",
+            "rows" : 5,
+            "cols" : 8,
+            "size" : 0.1
+        },    
+        "parameters" : [
+            "check_extraction",
+            "show_outliers",
+            "improve_detection",
+            "_do_not_solve_global",
+            "_do_not_solve",
+            "_save_outlire_images"
+        ],
+        "images" : {
+            "prefix" : "/home/bogdan/projects/data/calibration/calib_camera_12062017_fluence/calib_bottom/selected/",
+            "names" : [
+                "000000.png",
+                "000081.png",
+                "000102.png",
+                "000148.png",
+                "000254.png",
+                "000415.png",
+                "000601.png"
+            ]
+        }
+    }
+    ]
+}
+
