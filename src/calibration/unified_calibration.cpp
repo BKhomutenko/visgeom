@@ -229,6 +229,45 @@ void GenericCameraCalibration::initTransformChainInfo(ImageData & data, const pt
     cout << endl;
 }
 
+
+void GenericCameraCalibration::initGridIR(ImageData & data, const ptree & node)
+{   
+    data.Nx = 1;
+    data.Ny = 1;
+    data.sqSize = 1;
+    data.board.clear();
+    data.board.reserve(data.Nx * data.Ny);
+    for (auto & x : node.get_child("object.points"))
+    {
+        vector<double> pt = readVector<double>(x.second);
+        data.board.emplace_back(pt[0], pt[1], pt[2]);
+    }
+}
+
+void GenericCameraCalibration::readCorners(ImageData & data, const ptree & node)
+{
+    ptree dataFile;
+    read_json(node.get<string>("data_file"), dataFile);
+    string cameraID = node.get<string>("camera");
+    for (auto & dataPoint : dataFile)
+    {
+        data.detectedCornersVec.emplace_back();
+        Vector2dVec & cornerVec = data.detectedCornersVec.back();
+        for (auto & x : dataPoint.second)
+        {
+            if (x.second.get<string>("camera_id") == cameraID)
+            {
+                for (auto & y : x.second.get_child("points"))
+                {
+                    vector<double> pt = readVector<double>(y.second);
+                    cornerVec.emplace_back(pt[0], pt[1]);
+                }
+                break;
+            }
+        }
+    }
+}
+
 void GenericCameraCalibration::initGrid(ImageData & data, const ptree & node)
 {   
     data.Nx = node.get<int>("object.cols");
@@ -394,21 +433,22 @@ void GenericCameraCalibration::initTransforms(const ImageData & data, const stri
         throw runtime_error(initName + " has a prior value");
     }
     
-    if  (transformInfoMap[initName].initialized) 
-    {
-        throw runtime_error(initName + " has already been initialized");
-    }
+//    if  (transformInfoMap[initName].initialized) 
+//    {
+//        throw runtime_error(initName + " has already been initialized");
+//    }
     
-    if (not transformInfoMap[initName].global and sequenceTransformMap[initName].size() != 0)
-    {
-        throw runtime_error(initName + " has already been initialized");
-    }
+    
+//    if (not transformInfoMap[initName].global and sequenceTransformMap[initName].size() != 0)
+//    {
+//        throw runtime_error(initName + " has already been initialized");
+//    }
     
     transformInfoMap[initName].initialized = true;
-    
+    //FIXME if the transformation is partially initialized then it breaks !!!!! BUG
     for (auto & x : data.transNameVec)
     {
-        if (not (transformInfoMap[x].prior xor transformInfoMap[x].initialized))
+        if ( not (transformInfoMap[x].prior xor transformInfoMap[x].initialized) )
         {
             const string errMsg = " is not initialized. Cannot initialize more than one transform at a time";
             throw runtime_error(x + errMsg);
@@ -418,21 +458,28 @@ void GenericCameraCalibration::initTransforms(const ImageData & data, const stri
     //do the initialization
     if (not transformInfoMap[initName].global)
     {
+        const bool IS_ALLOCATED = (sequenceTransformMap[initName].size() != 0);
+        if (not IS_ALLOCATED)
+        {
+            sequenceTransformMap[initName].reserve(data.detectedCornersVec.size());
+        }
+        
         for (int transfIdx = 0; transfIdx < data.detectedCornersVec.size(); transfIdx++)
         {
-            if (data.detectedCornersVec[transfIdx].empty())
+            if (not IS_ALLOCATED)
             {
-                cout << "WARNING : " << initName << " " << transfIdx
-                     << " is not initialized, no board extracted" << endl;
                 sequenceTransformMap[initName].push_back(Array6d{0, 0, 1, 0, 0, 0});  
                 sequenceInitMap[initName].push_back(false);
             }
-            else
+            
+            if (not data.detectedCornersVec[transfIdx].empty() and not sequenceInitMap[initName][transfIdx])
             {
+//                cout << "WARNING : " << initName << " " << transfIdx
+//                     << " is not initialized, no board extracted" << endl;
                 auto xi = estimateInitialGrid(data, transfIdx);
                 xi = getInitTransform(xi, initName, data, transfIdx);
-                sequenceTransformMap[initName].push_back(xi.toArray());
-                sequenceInitMap[initName].push_back(true);
+                sequenceTransformMap[initName][transfIdx] = xi.toArray();
+                sequenceInitMap[initName][transfIdx] = true;
             }
         }
     }
@@ -580,6 +627,17 @@ void GenericCameraCalibration::parseData()
             initTransformChainInfo(dataVec.back(), dataInfo.second);
             initGrid(dataVec.back(), dataInfo.second);
             
+            //init variables and add residuals to the problem
+            initTransforms(dataVec.back(), dataInfo.second.get<string>("init"));
+            addGridResidualBlocks(dataVec.back());
+        }
+        if (dataType == "ir_images")
+        {
+            //load calibration data
+            dataVec.emplace_back();
+            initTransformChainInfo(dataVec.back(), dataInfo.second);
+            initGridIR(dataVec.back(), dataInfo.second);
+            readCorners(dataVec.back(), dataInfo.second);
             //init variables and add residuals to the problem
             initTransforms(dataVec.back(), dataInfo.second.get<string>("init"));
             addGridResidualBlocks(dataVec.back());

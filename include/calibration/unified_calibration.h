@@ -52,6 +52,7 @@ struct ImageData
     vector<string> transNameVec;
     vector<TransformationStatus> transStatusVec;
     
+    //TODO to specifit to grid-like boards, to change in future
     int Nx, Ny; //calibration board size
     Vector3dVec board; //calibraiton board model
     double sqSize;
@@ -108,6 +109,13 @@ protected:
     void initTransformChainInfo(ImageData & data, const ptree & node);
     
     void initGrid(ImageData & data, const ptree & node);
+    
+    //4-point grid, the model is given in the file directly
+    void initGridIR(ImageData & data, const ptree & node);
+    
+    //allocates transformation memory if not yet done
+    //can be used for stereo calibration
+    void readCorners(ImageData & data, const ptree & node);
     
     void initTransforms(const ImageData & data, const string & initName);
     
