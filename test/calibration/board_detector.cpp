@@ -120,8 +120,8 @@ public:
 
 int main(int argc, char** argv) 
 {
-    const int Nx = 8;
-    const int Ny = 6;
+    const int Nx = 7;
+    const int Ny = 4;
     
     Mat8u frame = imread(argv[1], 0);
     

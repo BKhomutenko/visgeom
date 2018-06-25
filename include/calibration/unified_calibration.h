@@ -47,16 +47,24 @@ struct ImageData
     vector<Vector2dVec> detectedCornersVec;
     string filePrefix;
     vector<string> imageNameVec;
+    bool useImages = true;
+    
+    int imageWidth, imageHeight;
     
     //transformation chain information
     vector<string> transNameVec;
     vector<TransformationStatus> transStatusVec;
     
     //TODO to specifit to grid-like boards, to change in future
+    //TODO separate board from BA data
     int Nx, Ny; //calibration board size
     Vector3dVec board; //calibraiton board model
     double sqSize;
     string cameraName;
+    
+    // indices of upper-left, upper-right, bottom-left and bottom-right corners
+    // for board position initialization purposes
+    int idxUL, idxUR, idxBL, idxBR;
     
     
     bool checkExtraction = false;

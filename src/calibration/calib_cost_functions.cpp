@@ -192,7 +192,7 @@ bool OdometryPrior::Evaluate(double const * const * params,
             Matrix3d R10_Mwr1 = R10 * interOmegaRot(xi1.rot());
             Matrix6d J1;
             J1 << R10, Matrix3d::Zero(), Matrix3d::Zero(), R10_Mwr1;
-            Matrix6d TT = _zetaPrior.screwTransfInv();
+            Matrix6d TT = zeta.screwTransfInv();
             Map<Matrix6drm> jac(jacobian[0]);
             jac = -_A * TT * J1;
         }

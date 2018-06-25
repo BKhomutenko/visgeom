@@ -29,6 +29,7 @@ along with visgeom.  If not, see <http://www.gnu.org/licenses/>.
 #include <glog/logging.h>
 
 #include "calibration/calib_cost_functions.h"
+#include "calibration/odometry_cost_function.h"
 #include "calibration/corner_detector.h"
 #include "projection/generic_camera.h"
 #include "projection/eucm.h"
@@ -232,11 +233,15 @@ void GenericCameraCalibration::initTransformChainInfo(ImageData & data, const pt
 
 void GenericCameraCalibration::initGridIR(ImageData & data, const ptree & node)
 {   
-    data.Nx = 1;
-    data.Ny = 1;
-    data.sqSize = 1;
+    data.Nx = 2;
+    data.Ny = 2;
+    data.sqSize = -1;
     data.board.clear();
     data.board.reserve(data.Nx * data.Ny);
+    data.idxUL = node.get<int>("object.corner_ul");
+    data.idxUR = node.get<int>("object.corner_ur");
+    data.idxBL = node.get<int>("object.corner_bl");
+    data.idxBR = node.get<int>("object.corner_br");
     for (auto & x : node.get_child("object.points"))
     {
         vector<double> pt = readVector<double>(x.second);
@@ -246,6 +251,9 @@ void GenericCameraCalibration::initGridIR(ImageData & data, const ptree & node)
 
 void GenericCameraCalibration::readCorners(ImageData & data, const ptree & node)
 {
+    data.useImages = false;
+    data.imageWidth = node.get<int>("image_width");
+    data.imageHeight = node.get<int>("image_height");
     ptree dataFile;
     read_json(node.get<string>("data_file"), dataFile);
     string cameraID = node.get<string>("camera");
@@ -255,7 +263,7 @@ void GenericCameraCalibration::readCorners(ImageData & data, const ptree & node)
         Vector2dVec & cornerVec = data.detectedCornersVec.back();
         for (auto & x : dataPoint.second)
         {
-            if (x.second.get<string>("camera_id") == cameraID)
+            if (x.second.get<string>("camera") == cameraID)
             {
                 for (auto & y : x.second.get_child("points"))
                 {
@@ -282,7 +290,13 @@ void GenericCameraCalibration::initGrid(ImageData & data, const ptree & node)
            data.board.emplace_back(data.sqSize * j, data.sqSize * i, 0); 
         }
     }
+    data.idxUL = 0;
+    data.idxUR = data.Nx - 1;
+    data.idxBL = data.Nx * (data.Ny - 1);
+    data.idxBR = data.Nx * data.Ny - 1;
+    
     //fill up detectedCornersVec which stores all the extracted grids
+    data.useImages = true;
     const string prefix = node.get<string>("images.prefix");
     data.detectedCornersVec.clear();
     for (auto & x : node.get_child("images.names"))
@@ -631,16 +645,100 @@ void GenericCameraCalibration::parseData()
             initTransforms(dataVec.back(), dataInfo.second.get<string>("init"));
             addGridResidualBlocks(dataVec.back());
         }
-        if (dataType == "ir_images")
+        if (dataType == "ir_data")
         {
             //load calibration data
             dataVec.emplace_back();
             initTransformChainInfo(dataVec.back(), dataInfo.second);
             initGridIR(dataVec.back(), dataInfo.second);
+            
+            
             readCorners(dataVec.back(), dataInfo.second);
             //init variables and add residuals to the problem
             initTransforms(dataVec.back(), dataInfo.second.get<string>("init"));
             addGridResidualBlocks(dataVec.back());
+        }
+        if (dataType == "odometry_intrinsic")
+        {
+            const string transformName = dataInfo.second.get<string>("transform");
+            if (transformInfoMap.find(transformName) == transformInfoMap.end())
+            {
+                throw runtime_error(transformName + " has not been declared");
+            }
+            if (transformInfoMap[transformName].global)
+            {
+                throw runtime_error(transformName + " is global. Odometry must be a sequence");
+            }
+            
+            const double errV = dataInfo.second.get<double>("err_v"); //relative error in speed
+            const double errW = dataInfo.second.get<double>("err_w"); //relative error in rotation
+            const double lambda = dataInfo.second.get<double>("lambda"); //relative error in rotation
+            
+            intrinsicMap[transformName] = vector<double>();
+            intrinsicMap[transformName].push_back(dataInfo.second.get<double>("radius_left"));
+            intrinsicMap[transformName].push_back(dataInfo.second.get<double>("radius_right"));
+            intrinsicMap[transformName].push_back(dataInfo.second.get<double>("track_gauge"));
+            vector<Vector2dVec> deltaQVec;
+            
+            //read the odometry increment measurements
+            ptree dataFile;
+            read_json(dataInfo.second.get<string>("data_file"), dataFile);
+            for (auto & dataPoint : dataFile)
+            {
+                deltaQVec.emplace_back();
+                for (auto & x : dataPoint.second)
+                {
+                    vector<double> pt = readVector<double>(x.second);
+                    deltaQVec.back().emplace_back(pt[0], pt[1]);
+                }
+            }
+            
+            //use the odometry as initial values
+            if (dataInfo.second.get<bool>("init"))
+            {
+                cout << transformName << endl;
+//                for (auto & xx : sequenceTransformMap[transformName])
+//                {
+//                    for (auto & x : xx)
+//                    {
+//                        cout << x << "   ";
+//                    }
+//                    cout << endl;
+//                }
+                if (not sequenceTransformMap[transformName].empty())
+                {
+                    throw runtime_error(transformName + " has already been initialized");
+                }
+                transformInfoMap[transformName].initialized = true;
+                sequenceTransformMap[transformName].emplace_back(array<double, 6>{0, 0, 0, 0, 0, 0});
+                sequenceInitMap[transformName].push_back(true);
+                //The init will be done at the next step
+            }
+            
+            //add the cost functions
+            for (int i = 0; i < deltaQVec.size(); i++)
+            {
+                OdometryCost * costFunction = new OdometryCost(errV, errW, lambda,
+                                                    deltaQVec[i], intrinsicMap[transformName].data());
+                
+                if (dataInfo.second.get<bool>("init"))
+                {
+                    Transf xiPrev(sequenceTransformMap[transformName].back().data());
+                    Transf xiPrior = xiPrev.compose(costFunction->_zetaPrior);
+                    sequenceTransformMap[transformName].emplace_back(xiPrior.toArray());
+                    sequenceInitMap[transformName].push_back(true);
+                }   
+                    
+                globalProblem.AddResidualBlock(costFunction, NULL,
+                    sequenceTransformMap[transformName][i].data(),
+                    sequenceTransformMap[transformName][i + 1].data(),
+                    intrinsicMap[transformName].data()); 
+                
+            }
+            if (dataInfo.second.get<bool>("anchor"))
+            {
+                globalProblem.SetParameterBlockConstant(sequenceTransformMap[transformName][0].data());
+            }
         }
         else if (dataType == "odometry")
         {
@@ -974,36 +1072,39 @@ Transf GenericCameraCalibration::estimateInitialGrid(const ImageData & data, con
     
     array<double, 6> xiArr{0, 0, 1, 0, 0, 0};
     
-    Vector2d pt1 = cornerVec[0];
-    Vector2d pt2 = cornerVec[data.Nx - 1];
-    Vector2d pt3 = cornerVec[(data.Ny - 1) * data.Nx];
-    Vector2d pt4 = cornerVec[data.Ny * data.Nx - 1];
-    Vector3d X1, X2, X3, X4;
     
-    cam->reconstructPoint(pt1, X1);
-    cam->reconstructPoint(pt2, X2);
-    cam->reconstructPoint(pt3, X3);
-    cam->reconstructPoint(pt4, X4);
+    Vector2d ptUL = cornerVec[data.idxUL];
+    Vector2d ptUR = cornerVec[data.idxUR];
+    Vector2d ptBL = cornerVec[data.idxBL];
+    Vector2d ptBR  = cornerVec[data.idxBR];
+    Vector3d XUL, XUR, XBL, XBR;
     
-    X1.normalize();
-    X2.normalize();
-    X3.normalize();
-    X4.normalize();
+    cam->reconstructPoint(ptUL, XUL);
+    cam->reconstructPoint(ptUR, XUR);
+    cam->reconstructPoint(ptBL, XBL);
+    cam->reconstructPoint(ptBR, XBR);
+    
+    XUL.normalize();
+    XUR.normalize();
+    XBR.normalize();
+    XBL.normalize();
     
     //initial position
-    Vector3d ex1(X2 - X1);
-    Vector3d ex2(X4 - X3);
-    Vector3d ey1(X3 - X1);
-    Vector3d ey2(X4 - X2);
-    double exModel = data.sqSize * (data.Nx - 1);
-    double eyModel = data.sqSize * (data.Ny - 1); 
+    Vector3d exU(XUR - XUL);
+    Vector3d exB(XBR - XBL);
+    Vector3d eyL(XBL - XUL);
+    Vector3d eyR(XBR - XUR);
+    double exModelU = (data.board[data.idxUR] - data.board[data.idxUL]).norm();
+    double exModelB = (data.board[data.idxBR] - data.board[data.idxBL]).norm();
+    double eyModelL = (data.board[data.idxBL] - data.board[data.idxUL]).norm();
+    double eyModelR = (data.board[data.idxBR] - data.board[data.idxUR]).norm(); 
     
-    double scaleX1 = exModel / ex1.norm();
-    double scaleX2 = exModel / ex2.norm();
-    double scaleY1 = eyModel / ey1.norm();
-    double scaleY2 = eyModel / ey2.norm();
+    double scaleXU = exModelU / exU.norm();
+    double scaleXB = exModelB / exB.norm();
+    double scaleYL = eyModelL / eyL.norm();
+    double scaleYR = eyModelR / eyR.norm();
     
-    Vector3d pos = X1 * min(scaleX1, scaleY1);
+    Vector3d pos = XUL * min(scaleXU, scaleYL);
     copy(pos.data(), pos.data() + 3, xiArr.data());
     
     //initial orientation
@@ -1016,8 +1117,8 @@ Transf GenericCameraCalibration::estimateInitialGrid(const ImageData & data, con
     Matrix3d R;
     R << ex1, ey, ez;
     */
-    Vector3d posx = X2 * min(scaleX1, scaleY2);
-    Vector3d posy = X3 * min(scaleX2, scaleY1);
+    Vector3d posx = XUR * min(scaleXU, scaleYR);
+    Vector3d posy = XBL * min(scaleXB, scaleYL);
     Vector3d ex = posx - pos;
     Vector3d ey = posy - pos;
     ex.normalize();
@@ -1118,11 +1219,11 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
         {
             Vector2d err = data.detectedCornersVec[transfIdx][i] - projectedVec[i];
             double errNorm = err.norm();
-            if (errNorm < 3.6 * sigma and errNorm < 1.) // px is for the case when all the points are off
-            {                                        // we are looking for the sub-pixel precision
-                inlierVec.push_back(projectedVec[i]);
-            }
-            else
+//            if (errNorm < 3.6 * sigma and errNorm < 1.) // px is for the case when all the points are off
+//            {                                        // we are looking for the sub-pixel precision
+//                inlierVec.push_back(projectedVec[i]);
+//            }
+//            else
             {
                 outlierVec.push_back(projectedVec[i]);
                 errVec.push_back(err.norm());
@@ -1132,14 +1233,25 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
         if ((data.showOutliers or data.saveOutlierImages) and not outlierVec.empty())
         {
             cout << "Sample #" << transfIdx << endl;
+            
+            Mat img;
+            if (data.useImages)
+            {
+                cout << data.imageNameVec[transfIdx] << endl;
+                img = imread(data.imageNameVec[transfIdx], CV_LOAD_IMAGE_COLOR);
+            }
+            else
+            { 
+                img = Mat(data.imageHeight, data.imageWidth, CV_8UC3);
+                img.setTo(0);
+            }
+            
+            
             cout << transfVec[transfIdx] << endl;
-            cout << data.imageNameVec[transfIdx] << endl;
             cout << "standard deviation : " << sigma << endl;
 //            cout << "6 sigma : " << 6 * sigma << endl;
-            Mat img = imread(data.imageNameVec[transfIdx], CV_LOAD_IMAGE_COLOR);
             
             drawPoints(img, data.detectedCornersVec[transfIdx]);
-            
             //projected
             for (int i = 0; i < inlierVec.size(); i++)
             {
@@ -1155,7 +1267,6 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
                 
                 cout << outlierVec[i].transpose() << "   err : " << errVec[i] << endl;
             }
-            
             //detected
             
 //            for (auto & pt : data.detectedCornersVec[transfIdx])

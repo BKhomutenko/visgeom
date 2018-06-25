@@ -39,6 +39,7 @@ add_library( calibration STATIC
     src/calibration/unified_calibration.cpp
     src/calibration/calib_cost_functions.cpp
     src/calibration/trajectory_generation.cpp
+    src/calibration/odometry_cost_function.cpp
 )
 
 target_link_libraries( calibration 
