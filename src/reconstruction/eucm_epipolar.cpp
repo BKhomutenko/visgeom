@@ -151,7 +151,7 @@ Polynomial2 EnhancedEpipolar::computePolynomial(Vector3d plane) const
         const double Cnorm = C / sqrt(AA + BB + CC);
         const double du = -A * Cnorm * normABinv * fu;
         const double dv = -B * Cnorm * normABinv * fv;
-        surf.k1 = -(u0  + du)* A/ fu - (v0 + dv) * B / fv;
+        surf.k1 = -(u0  + du)* A / fu - (v0 + dv) * B / fv;
         
 //        surf.k1 = -u0 * A/ fu - v0 * B / fv;
     }
@@ -212,6 +212,7 @@ void EnhancedEpipolar::traceEpipolarLine(int u, int v, Mat & out, CameraIdx camI
     CurveRasterizer<int, Polynomial2> * raster1 = NULL;
     Vector3d X1, X2;
     Vector2d pt;
+    CameraIdx targetIdx = camIdx == CAMERA_1 ? CAMERA_2 : CAMERA_1;
     if (camIdx == CAMERA_1)
     { 
         if (not camera1->reconstructPoint(Vector2d(u, v), X1)) return;
@@ -224,10 +225,12 @@ void EnhancedEpipolar::traceEpipolarLine(int u, int v, Mat & out, CameraIdx camI
         X1 = Transform12.rotMat() * X2;
         if (not camera1->projectPoint(X1, pt)) return;
     }
+    
+    
     Vector2i pti = round(pt); //FIXME make a function. where to put?
-    auto useInverted = epipoles->chooseEpipole(camIdx, pti);
-    Vector2i goal = epipoles->getPx(camIdx, useInverted);
-    raster1 = new CurveRasterizer<int, Polynomial2>(pti, goal, get(camIdx, X1));
+    auto useInverted = epipoles->chooseEpipole(targetIdx, pti);
+    Vector2i goal = epipoles->getPx(targetIdx, useInverted);
+    raster1 = new CurveRasterizer<int, Polynomial2>(pti, goal, get(targetIdx, X1));
     if (useInverted & EPIPOLE_INVERTED) raster1->setStep(-1);
         
     CurveRasterizer<int, Polynomial2> * raster2 = new CurveRasterizer<int, Polynomial2>(*raster1);
@@ -235,9 +238,9 @@ void EnhancedEpipolar::traceEpipolarLine(int u, int v, Mat & out, CameraIdx camI
     for (int i = 0; i < count; i++)
     {
         cv::circle(out, Point(raster1->u, raster1->v), 0, Scalar(128), -1);
-       cv::circle(out, Point(raster2->u, raster2->v), 0, Scalar(128), -1);
+//       cv::circle(out, Point(raster2->u, raster2->v), 0, Scalar(128), -1);
         raster1->step();
-        raster2->unstep();
+//        raster2->unstep();
     }
     delete raster1;
     delete raster2;
