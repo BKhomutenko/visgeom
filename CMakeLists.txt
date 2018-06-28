@@ -206,6 +206,15 @@ target_link_libraries( stereo_test
     ${OpenCV_LIBS} 
 )
 
+add_executable( stereo_single_pair
+    test/reconstruction/stereo_single_pair.cpp
+)
+
+target_link_libraries( stereo_single_pair
+    reconstruction
+    ${OpenCV_LIBS} 
+)
+
 add_executable( stereo_flow
     test/reconstruction/stereo_flow_test.cpp
 )

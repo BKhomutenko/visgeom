@@ -1219,11 +1219,11 @@ void GenericCameraCalibration::writeImageResidual(const ImageData & data, const 
         {
             Vector2d err = data.detectedCornersVec[transfIdx][i] - projectedVec[i];
             double errNorm = err.norm();
-//            if (errNorm < 3.6 * sigma and errNorm < 1.) // px is for the case when all the points are off
-//            {                                        // we are looking for the sub-pixel precision
-//                inlierVec.push_back(projectedVec[i]);
-//            }
-//            else
+            if (errNorm < 3.6 * sigma and errNorm < 1.) // px is for the case when all the points are off
+            {                                        // we are looking for the sub-pixel precision
+                inlierVec.push_back(projectedVec[i]);
+            }
+            else
             {
                 outlierVec.push_back(projectedVec[i]);
                 errVec.push_back(err.norm());

@@ -50,14 +50,14 @@ void CallBackFunc1(int event, int x, int y, int flags, void* userdata)
         vector<uint8_t> samleVec;
         raster2.steps(-5);
         cout << "Samples :" << endl;
-        for (int i = 0; i < 32; i++, raster2.step())
+        for (int i = 0; i < 256; i++, raster2.step())
         {
             cout << setw(5) << int(orig2(raster2.v, raster2.u));
         }
         cout << endl;
         
         
-        epipolar->traceEpipolarLine(x, y, img2, CAMERA_1, 100);
+        epipolar->traceEpipolarLine(x, y, img2, CAMERA_1, 256);
         cv::circle(img1, Point(x, y), 1, Scalar(128), -1);
         imshow("out1", img1);
         imshow("out2", img2);
@@ -69,7 +69,7 @@ void CallBackFunc2(int event, int x, int y, int flags, void* userdata)
     if  ( event == cv::EVENT_LBUTTONDOWN )
     {
         cout << "Left button of the mouse is clicked 2 - position (" << x << ", " << y << ")" << endl;
-        epipolar->traceEpipolarLine(x, y, img1,  CAMERA_2, 100);
+        epipolar->traceEpipolarLine(x, y, img1,  CAMERA_2, 500);
         cv::circle(img2, Point(x, y), 1, Scalar(128), -1);
         imshow("out1", img1);
         imshow("out2", img2);
@@ -78,6 +78,38 @@ void CallBackFunc2(int event, int x, int y, int flags, void* userdata)
 
 int main(int argc, char** argv)
 {	
+
+
+
+    ptree root;
+    read_json(argv[1], root);
+    TleftRight = readTransform(root.get_child("stereo_transformation"));
+    cam1 = new EnhancedCamera( readVector<double>(root.get_child("camera_params_left")).data() );
+    cam2 = new EnhancedCamera( readVector<double>(root.get_child("camera_params_right")).data() );
+
+    int length = root.get<int>("stereo_parameters.stereo_parameters.descriptor_size");
+    int reps = root.get<int>("stereo_parameters.stereo_parameters.descriptor_response_thresh");
+    
+    epipolarDescriptor = new EpipolarDescriptor(length, reps, {1});
+    epipoles = new StereoEpipoles(cam1, cam2, TleftRight);
+    epipolar = new EnhancedEpipolar(cam1, cam2, TleftRight, 2000);
+
+
+
+
+   
+    img1 = imread(root.get<string>("image_left"), 0);
+    img2 = imread(root.get<string>("image_right"), 0);
+    if(img1.empty()) cout << "Error in " << root.get<string>("image_left")<< endl;
+    if(img2.empty()) cout << "Error in " << root.get<string>("image_right") << endl;
+    img1.copyTo(orig1);
+    img2.copyTo(orig2);
+    imshow("out1", img1);
+    imshow("out2", img2);
+    cv::setMouseCallback("out1", CallBackFunc1, NULL);
+    cv::setMouseCallback("out2", CallBackFunc2, NULL);
+    waitKey();
+
     /*Polynomial2 poly2;
     poly2.kuu = -1; 
     poly2.kuv = 1; 

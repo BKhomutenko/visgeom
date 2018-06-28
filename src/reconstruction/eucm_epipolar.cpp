@@ -235,9 +235,9 @@ void EnhancedEpipolar::traceEpipolarLine(int u, int v, Mat & out, CameraIdx camI
     for (int i = 0; i < count; i++)
     {
         cv::circle(out, Point(raster1->u, raster1->v), 0, Scalar(128), -1);
-//        cv::circle(out, Point(raster2->u, raster2->v), 0, Scalar(128), -1);
+       cv::circle(out, Point(raster2->u, raster2->v), 0, Scalar(128), -1);
         raster1->step();
-//        raster2->unstep();
+        raster2->unstep();
     }
     delete raster1;
     delete raster2;
