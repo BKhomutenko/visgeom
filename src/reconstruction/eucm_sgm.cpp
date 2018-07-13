@@ -475,6 +475,34 @@ void EnhancedSgm::computeDynamicStep(const int32_t* inCost, const uint8_t * erro
     vald += error[_params.dispMax - 1];
 }
 
+void EnhancedSgm::computeDynamicStep2(const int32_t* inCost, const uint32_t * error, int32_t * outCost)
+{
+    int bestCost = inCost[0];
+    for (int i = 1; i < _params.dispMax; i++)
+    {
+        bestCost = min(bestCost, inCost[i]);
+    }
+    int & val0 = outCost[0];
+    val0 = inCost[0];
+    val0 = min(val0, inCost[1] + _params.lambdaStep);
+    val0 = min(val0, bestCost + _jumpCost);
+    val0 += error[0];
+    for (int i = 1; i < _params.dispMax-1; i++)
+    {
+        int & val = outCost[i];
+        val = inCost[i];
+        val = min(val, inCost[i + 1] + _params.lambdaStep);
+        val = min(val, inCost[i - 1] + _params.lambdaStep);
+        val = min(val, bestCost + _jumpCost);
+        val += error[i];
+    }
+    int & vald = outCost[_params.dispMax - 1];
+    vald = inCost[_params.dispMax - 1];
+    vald = min(vald, inCost[_params.dispMax - 2] + _params.lambdaStep);
+    vald = min(vald, bestCost + _jumpCost);
+    vald += error[_params.dispMax - 1];
+}
+
 void EnhancedSgm::computeDynamicProgramming()
 {
     if (_params.verbosity > 0) cout << "EnhancedSgm::computeDynamicProgramming" << endl;

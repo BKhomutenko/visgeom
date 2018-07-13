@@ -14,6 +14,7 @@ EnhancedCamera * cam1, * cam2;
 EpipolarDescriptor * epipolarDescriptor;
 StereoEpipoles * epipoles;
 Transformation<double> TleftRight;
+int epipolarLength;
 
 void CallBackFunc1(int event, int x, int y, int flags, void* userdata)
 {
@@ -57,7 +58,7 @@ void CallBackFunc1(int event, int x, int y, int flags, void* userdata)
         cout << endl;
         
         
-        epipolar->traceEpipolarLine(x, y, img2, CAMERA_1, 256);
+        epipolar->traceEpipolarLine(x, y, img2, CAMERA_1, epipolarLength);
         cv::circle(img1, Point(x, y), 1, Scalar(128), -1);
         imshow("out1", img1);
         imshow("out2", img2);
@@ -69,7 +70,7 @@ void CallBackFunc2(int event, int x, int y, int flags, void* userdata)
     if  ( event == cv::EVENT_LBUTTONDOWN )
     {
         cout << "Left button of the mouse is clicked 2 - position (" << x << ", " << y << ")" << endl;
-        epipolar->traceEpipolarLine(x, y, img1,  CAMERA_2, 500);
+        epipolar->traceEpipolarLine(x, y, img1,  CAMERA_2, epipolarLength);
         cv::circle(img2, Point(x, y), 1, Scalar(128), -1);
         imshow("out1", img1);
         imshow("out2", img2);
@@ -89,7 +90,7 @@ int main(int argc, char** argv)
 
     int length = root.get<int>("stereo_parameters.stereo_parameters.descriptor_size");
     int reps = root.get<int>("stereo_parameters.stereo_parameters.descriptor_response_thresh");
-    
+    epipolarLength = root.get<int>("stereo_parameters.stereo_parameters.disparity_max");;
     epipolarDescriptor = new EpipolarDescriptor(length, reps, {1});
     epipoles = new StereoEpipoles(cam1, cam2, TleftRight);
     epipolar = new EnhancedEpipolar(cam1, cam2, TleftRight, 2000);

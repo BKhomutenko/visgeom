@@ -122,7 +122,7 @@ public:
     void computeDynamicProgramming();
     
     void computeDynamicStep(const int* inCost, const uint8_t * error, int * outCost);
-    
+    void computeDynamicStep2(const int* inCost, const uint32_t * error, int * outCost);
     void reconstructDisparityMH();
     void reconstructDisparity();  // using the result of the dynamic programming
     

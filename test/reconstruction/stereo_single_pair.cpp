@@ -34,7 +34,7 @@ int main(int argc, char** argv)
     depthStereo.toInverseMat(depth);
 
     //visualisation (if necessary)
-    imshow("depth", depth);
+    imshow("depth", depth * (root.get<int>("brightness")/100.));
     imshow("img1", img1);
     imshow("img2", img2);
     waitKey();
