@@ -1,0 +1,50 @@
+{
+"camera_params_left": [0.595728, 0.768828, 307.318, 289.542, 642.617, 398.42],
+
+    "camera_params_right": [0.593948, 0.774335, 307.356, 289.482, 637.871, 396.818],
+
+    "stereo_transformation": [0.197255, 0.000222456, -0.00421324, -0.00570702, 0.00103386, -0.0140923],
+
+"image_left" : "/home/bogdan/projects/git/visgeom/data/varun/Left.png",
+"image_right" : "/home/bogdan/projects/git/visgeom/data/varun/Right.png",
+"brightness" : 50,
+
+"stereo_parameters":
+{
+    "scale" : 1,
+    "u0" : 50,
+    "v0" : 50,
+    "uMax" : 1280,
+    "vMax" : 800,
+    "xMax_" : 1250,
+    "yMax_" : 750,
+    "equal_margins" : true,
+    "num_epipolar_planes" : 2000,
+    "stereo_parameters" :
+    {
+        "disparity_max" : 120,
+        "error_max" : 150,
+        "verbosity" : 1,
+        "hypotheses" : 1,
+        "hypo_difference" : 10,
+        "flaw_cost" : 25,
+        "descriptor_size" : 15,
+        "scales" : [1, 2, 3, 5],
+        "scales_" : [1],
+        "descriptor_response_thresh" : 2
+    },
+    "sgm_stereo_parameters" :
+    {
+        "step_cost" : 5,
+        "jump_cost" : 32,
+        "image_based_cost" : true,
+        "salient_points_only" : true,
+        "use_uv_cache" : false
+    },
+    "motion_stereo_parameters" :
+    {
+        "gradient_thresh" : 2
+    }
+}
+
+}
